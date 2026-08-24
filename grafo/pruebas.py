@@ -23,6 +23,8 @@ if SRC not in sys.path:
 import construir                        # noqa: E402
 import dossier as mod_dossier          # noqa: E402
 import normalizacion as nz              # noqa: E402
+import redaccion                        # noqa: E402
+import render_html                      # noqa: E402
 import ontologia as ont                 # noqa: E402
 import resolucion                       # noqa: E402
 import validacion                       # noqa: E402
@@ -246,6 +248,62 @@ def main():
               chat[:60] not in crudo)
         check("el texto restringido si queda accesible por hash aparte",
               os.path.exists(os.path.join(tmp, "textos_restringidos.json")))
+
+        # ------------------------------------------------------------------
+        print("\n== El informe es del caso, no del archivo ==")
+        d_total = mod_dossier.construir(g, res)
+        casos = render_html.casos_de(g, res)
+        check("hay un caso por legajo y uno por reporte suelto", len(casos) == 5)
+
+        caso = [c for c in casos if c["id"] == "L001"][0]
+        recorte = mod_dossier.recortar(d_total, caso["reportes"])
+        check("el dossier del caso solo trae sus reportes",
+              sorted(r["reporte"] for r in recorte["reportes"])
+              == sorted(caso["reportes"]))
+        check("toda vinculacion del caso toca un reporte del caso",
+              all(v["reporte_a"] in caso["reportes"] or v["reporte_b"] in caso["reportes"]
+                  for v in recorte["vinculaciones"]))
+        check("el recorte no arrastra vinculaciones ajenas",
+              len(recorte["vinculaciones"]) < len(d_total["vinculaciones"]))
+        check("los pesos se recalculan sobre el caso",
+              recorte["pesos"]["cantidad"] == len(recorte["vinculaciones"]))
+
+        texto = redaccion.redactar(recorte, caso=caso)
+        check("el informe del caso lo dice en el titulo", caso["etiqueta"] in texto)
+        check("el informe remite a la carpeta de archivo provisorio",
+              u"carpeta de archivo provisorio" in texto)
+        ajenos = [c["reportes"][0] for c in casos if c["id"] != "L001"]
+        check("el informe no detalla reportes de otros casos",
+              not any(u"**Reporte %s**" % r in texto for r in ajenos))
+
+        # ------------------------------------------------------------------
+        print("\n== El visor no confunde una conclusion con un dato ==")
+        check("la identidad unificada no se dibuja como dato del reporte",
+              "IDENTIDAD" not in render_html.TIPOS_EN_TARJETA)
+        check("todo tipo que se dibuja tiene color de pantalla",
+              all(t in render_html.COLOR_VISOR
+                  for t in render_html.TIPOS_EN_TARJETA))
+        datos_visor = render_html._datos(g, res)
+        check("las coincidencias descartadas llegan al visor",
+              len(datos_visor["descartados"])
+              == len(res["vinculacion"]["descartados"]))
+        check("cada descartada dice con que elementos se la evaluo",
+              all(x["compartido"] for x in datos_visor["descartados"]))
+
+        # El color del lienzo significa una sola cosa: de que tipo de dato se
+        # trata. Si una linea ENTRE reportes toma uno de esos colores, deja de
+        # poder distinguirse de la linea de un dato. Paso con el ambar del
+        # "posible duplicado", que era el mismo ambar de UBICACION.
+        import re as _re
+        colores_dato = set(render_html.COLOR_VISOR[t]
+                           for t in render_html.TIPOS_EN_TARJETA)
+        de_conector = set(_re.findall(r"\.con\.\w+\{[^}]*stroke:(#[0-9a-fA-F]{6})",
+                                      render_html.PLANTILLA))
+        check("ninguna linea entre reportes usa un color de tipo de dato",
+              not (de_conector & colores_dato),
+              str(sorted(de_conector & colores_dato)))
+        check("cada tipo de dato tiene un color distinto",
+              len(colores_dato) == len(render_html.TIPOS_EN_TARJETA))
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

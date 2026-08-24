@@ -109,20 +109,72 @@ def construir(g, res):
              que_aporta=list(a["aportes"].keys()),
              fundamento=a["explicacion"])
         for a in alertas.get("alertas", [])]
+    # El campo `reportes` es lo que permite despues acotar el dossier a un caso.
     dossier["contra_evidencia"] = [
         dict(entidad=g.G.nodes[c["ancla"]].get("etiqueta") if c["ancla"] in g.G else c["ancla"],
              kilometros=c["km"], horas=c["horas"], km_por_hora=c["kmh"],
+             reportes=_reportes_de(g, c["ancla"]),
              fundamento=_explic(g, c["arista_id"]))
         for c in res.get("contradicciones", [])]
     dossier["hipotesis_de_identidad"] = [
         dict(mencion_a=g.G.nodes[h["a"]].get("etiqueta") if h["a"] in g.G else h["a"],
              mencion_b=g.G.nodes[h["b"]].get("etiqueta") if h["b"] in g.G else h["b"],
              cuenta_compartida=h["cuenta"],
+             reportes=sorted(set(_reportes_de(g, h["a"])) | set(_reportes_de(g, h["b"]))),
              fundamento=_explic(g, h["arista_id"]))
         for h in res.get("identidades", [])]
     dossier["agrupamientos"] = res.get("legajos", [])
     dossier["pendientes_de_revision"] = len(res.get("cola_revision", []))
     return dossier
+
+
+def _reportes_de(g, n):
+    """Reportes que mencionan un nodo. Sale de la procedencia de sus aristas."""
+    if n not in g.G:
+        return []
+    if g.G.nodes[n].get("tipo") == "REPORTE":
+        return [g.G.nodes[n]["valor"]]
+    rs = set()
+    for u, v, k, d in g.aristas(vigentes=False):
+        if u != n and v != n:
+            continue
+        sid = d.get("source_evidence_id") or ""
+        if sid.startswith("ncmec:"):
+            rs.add(sid.split(":", 1)[1])
+    return sorted(rs)
+
+
+def recortar(d, reportes):
+    """Dossier acotado a un caso.
+
+    El grafo se construye sobre todo el archivo -de ahi salen los antecedentes-,
+    pero el informe que firma un operador es del caso que tiene entre manos.
+    Enumerar el archivo entero deja de ser posible apenas hay unos miles de
+    reportes, y ademas pone en el informe material ajeno al caso.
+    """
+    rs = set(reportes)
+    toca = lambda x: x.get("reporte_a") in rs or x.get("reporte_b") in rs
+    alcanza = lambda x: bool(set(x.get("reportes") or []) & rs)
+
+    e = OrderedDict()
+    e["meta"] = dict(d["meta"])
+    e["meta"]["reportes_del_caso"] = sorted(rs)
+    e["glosario_de_reglas"] = d["glosario_de_reglas"]
+    e["reportes"] = [r for r in d["reportes"] if r["reporte"] in rs]
+    e["vinculaciones"] = [v for v in d["vinculaciones"] if toca(v)]
+    e["pesos"] = _resumen_pesos(e["vinculaciones"])
+    e["vinculaciones_descartadas"] = [x for x in d["vinculaciones_descartadas"]
+                                      if toca(x)]
+    e["antecedentes_reactivados"] = [
+        a for a in d["antecedentes_reactivados"]
+        if a["reporte_archivado"] in rs or a["reporte_que_lo_reactiva"] in rs]
+    e["contra_evidencia"] = [c for c in d["contra_evidencia"] if alcanza(c)]
+    e["hipotesis_de_identidad"] = [h for h in d["hipotesis_de_identidad"]
+                                   if alcanza(h)]
+    e["agrupamientos"] = [l for l in d["agrupamientos"]
+                          if set(l.get("reportes") or []) & rs]
+    e["pendientes_de_revision"] = d["pendientes_de_revision"]
+    return e
 
 
 def _regla(x):

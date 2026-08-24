@@ -123,14 +123,31 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
 
     # El informe discursivo se genera siempre, sin depender de ningun modelo,
     # y viaja embebido en el visor para que el operador lo tenga a mano.
+    #
+    # Se redacta uno por caso: el informe que firma un operador es de la
+    # actuacion que tiene entre manos, no del archivo entero. El general queda
+    # como resumen de corrida.
     texto_informe = redaccion.redactar(dossier)
     with open(os.path.join(dir_salida, "informe_vinculaciones.md"), "w",
               encoding="utf-8") as fh:
         fh.write(texto_informe)
 
+    informes_por_caso = {}
+    for caso in render_html.casos_de(g, resultado):
+        recorte = mod_dossier.recortar(dossier, caso["reportes"])
+        informes_por_caso[caso["id"]] = redaccion.redactar(recorte, caso=caso)
+    dir_casos = os.path.join(dir_salida, "informes_por_caso")
+    if not os.path.isdir(dir_casos):
+        os.makedirs(dir_casos)
+    for cid, texto in informes_por_caso.items():
+        with open(os.path.join(dir_casos, "informe_%s.md" % cid), "w",
+                  encoding="utf-8") as fh:
+            fh.write(texto)
+
     docs_modelo.generar(os.path.join(BASE, "MODELO_DATOS.md"), g.resumen())
     render_html.render(g, resultado, os.path.join(dir_salida, "grafo.html"),
-                       dossier=dossier, texto_informe=texto_informe)
+                       dossier=dossier, texto_informe=texto_informe,
+                       informes_por_caso=informes_por_caso)
     mod_informe.escribir(g, resultado, os.path.join(dir_salida, "informe.md"))
     return g, resultado
 

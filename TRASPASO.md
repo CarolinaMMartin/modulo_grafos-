@@ -1,6 +1,6 @@
 # Traspaso — módulo de grafos, Bóveda CIJ
 
-Documento de continuidad. Reúne todo lo trabajado en la sesión del **24 de
+Documento de continuidad. Reúne todo lo trabajado en las sesiones del **24 de
 agosto de 2026**: qué se construyó, por qué se tomó cada decisión, qué errores
 se encontraron en el camino, qué quedó deliberadamente afuera y qué falta.
 
@@ -62,7 +62,7 @@ Cuantico/
     construir.py             orquestador
     validar.py               CLI de validación humana
     informe_ia.py            informe vía modelo local (opcional)
-    pruebas.py               55 invariantes
+    pruebas.py               69 invariantes
     generar_sinteticos.py    generador del dataset
     README.md                cómo se usa
     ESTADO.md                qué está implementado, simplificado o ausente
@@ -76,8 +76,8 @@ Cuantico/
       identidades.py         consolida las unificaciones aprobadas
       alertas.py             reapertura tipada por motivo de archivo
       analisis.py            componentes, comunidades, centralidades, baseline
-      dossier.py             dossier crudo, seudonimización, prompt
-      redaccion.py           informe en prosa, determinista
+      dossier.py             dossier crudo, recorte por caso, seudonimización
+      redaccion.py           informe en prosa, determinista, uno por caso
       validacion.py          libro append-only encadenado por hash
       render_html.py         visor autocontenido
       informe.py             informe técnico en Markdown
@@ -85,6 +85,7 @@ Cuantico/
       jurisdiccion.py        SIN CONECTAR — ver sección 8
     estado/validaciones.jsonl  decisiones humanas registradas
     salida/                    resultados de la última corrida (no versionado)
+    salida/informes_por_caso/  un informe por caso, que es el que se firma
 ```
 
 ### Resultado sobre el dataset de prueba
@@ -98,7 +99,7 @@ Cuantico/
 - **1 contradicción** por desplazamiento implausible.
 - **3 hipótesis de identidad**, 1 unificada por decisión humana registrada.
 - **5 casos** (legajos): L001 con 4 reportes, L002 y L003 con 2, y 2 reportes
-  sueltos.
+  sueltos. Cada uno con su informe.
 
 ---
 
@@ -118,7 +119,7 @@ Después, abrir `grafo/salida/grafo.html`.
 python grafo/pruebas.py
 ```
 
-55 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
+69 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
 de diseño, no de presentación.
 
 ### Validación humana
@@ -134,8 +135,12 @@ python grafo/validar.py auditar
 
 ### Informe
 
-Se genera solo en cada corrida (`salida/informe_vinculaciones.md`) y viaja
-embebido en el visor. Para una redacción más fluida con un modelo local:
+Se genera solo en cada corrida. Hay **uno por caso** en
+`salida/informes_por_caso/`, que es el que el visor muestra y descarga: el
+informe que firma un operador es de la actuación que tiene entre manos. El
+general de toda la corrida queda en `salida/informe_vinculaciones.md`.
+
+Para una redacción más fluida con un modelo local:
 
 ```bash
 python grafo/informe_ia.py
@@ -267,7 +272,23 @@ Transcripciones de chat y bios de perfil quedan en `salida/textos_restringidos.j
 referenciadas por hash. Del chat solo se leen los identificadores de perfil que
 la plataforma agrega de forma estructurada. Hay invariantes que lo verifican.
 
-### 4.12 Blocking, para que escale
+### 4.12 El informe es del caso, y el archivo no se enumera
+
+El grafo se construye sobre todo el archivo —de ahí salen los antecedentes—,
+pero el informe se acota al caso: sus reportes, sus vinculaciones, sus
+antecedentes, sus contradicciones y sus descartadas, con los pesos recalculados
+sobre ese subconjunto.
+
+El material restante **no se enumera**. Se lo nombra como *carpeta de archivo
+provisorio*, con la explicación de qué reúne y por qué el sistema la recorre en
+cada corrida. Enumerarla no aporta nada al caso, incorpora al informe material
+ajeno a él y deja de ser posible apenas hay unos miles de reportes.
+
+La única excepción son las coincidencias descartadas, que sí nombran reportes de
+afuera: es el registro de *"se comparó y no alcanzó"*, y el informe aclara
+expresamente que esos reportes no integran el caso.
+
+### 4.13 Blocking, para que escale
 
 Comparar todos contra todos es `O(n²)`. Se construye un índice
 `identificador → reportes` y solo se comparan pares que ya comparten algo. El
@@ -342,6 +363,55 @@ Las animaciones de reacomodamiento quedaban a mitad de camino. Se agregó un
 temporizador de respaldo. (Ya no aplica al visor actual, que no anima layout,
 pero conviene recordarlo.)
 
+### 5.8 El atributo de presentación pierde contra la hoja de estilos
+
+El color de cada línea de cruce se ponía con `setAttribute("stroke", color)`.
+Eso es un **atributo de presentación**, y pierde contra cualquier regla CSS:
+`.con { stroke:#3d5070 }` ganaba siempre y todas las líneas salían grises.
+
+Lo grave es cómo se ocultó: la auditoría leía `getAttribute("stroke")` y veía
+los colores correctos. Es la misma lección de §5.4 —medir lo que se ve, no lo
+que se declaró— aplicada al color: hay que usar `getComputedStyle`. Ahora el
+color va por `style.stroke`, que sí manda, y hay un invariante de auditoría que
+cuenta cuántos cruces quedan del gris por defecto.
+
+### 5.9 Tres copias del mismo bloque de constantes
+
+`render_html.py` tenía **tres veces** el bloque `ATRIBUTOS_LEGIBLES`, `OCULTAR`,
+`MOTIVO_CORTO`, `TIPOS_EN_TARJETA` y `NIVEL_JERARQUICO`. Idénticas, así que el
+programa funcionaba: ganaba la última. Pero editar la primera no hacía nada, y
+ese es el peor tipo de error para quien retome el código. Quedó una sola.
+
+### 5.10 El estilo en línea sobrevive al plegado
+
+Al redimensionar un panel a mano queda un `flex-basis` en línea. Al plegarlo
+después, el estilo en línea le ganaba a `#der.plegado { flex-basis:44px }`: el
+panel se vaciaba pero seguía ocupando todo el ancho al que lo habían llevado.
+Ahora se guarda ese ancho, se suelta el estilo mientras está plegado y se
+devuelve al reabrirlo.
+
+Misma familia que §5.4 y §5.8: **la cascada CSS decide cosas que el código cree
+estar decidiendo él**.
+
+### 5.11 El ámbar del duplicado era el ámbar de «ubicación»
+
+El conector de *posible duplicado* se dibujaba en ámbar, que es exactamente el
+color del tipo de dato **ubicación**. Con el criterio de color vigente —el color
+dice de qué dato se trata— esa línea entre reportes se leía como una línea de
+Monte Grande: al poner ese dato en foco aparecían cuatro líneas de su color
+para tres reportes.
+
+Lo encontró la auditoría contando líneas por color, no la vista. El duplicado
+volvió al cian de las vinculaciones, con la raya más corta, y ahora **lo dice
+con letras** en el rótulo. Hay un invariante que verifica que ningún color de
+conector coincida con un color de tipo de dato.
+
+### 5.12 El interlineado de 12 px no alcanzaba para 10 px de letra
+
+Los dos renglones de un motivo largo se tocaban por un pixel. El alto real de un
+renglón de 10 px —con acentos y colas— llega a 12. Pasó a 14. Lo detectó la
+auditoría de superposiciones, no la vista.
+
 ---
 
 ## 6. El visor: cómo llegó a ser lo que es
@@ -365,7 +435,7 @@ etiqueta de relación sobre cada arista.
 
 También apertura en cascada: se empieza con los reportes y se abre de a un paso.
 
-### Versión 3 — árbol (la actual)
+### Versión 3 — árbol
 
 A pedido explícito, con un boceto de referencia. El lienzo se lee de arriba
 hacia abajo:
@@ -395,6 +465,48 @@ hacia abajo:
 vinculan con la cadena completa; el reporte muestra su resumen y sus entidades
 agrupadas por tipo; el dato muestra en qué reportes aparece.
 
+### Versión 4 — legible con diez líneas en pantalla (la actual)
+
+La versión 3 se leía bien con tres reportes y se caía con nueve datos abiertos:
+etiquetas encimadas, líneas todas del mismo gris, y ninguna forma de aislar lo
+que se estaba mirando. Los cambios salieron de mirarla en uso, uno por uno.
+
+**Un solo criterio de línea, y está en la leyenda del panel.**
+
+- El **trazo** dice de dónde sale la relación: lleno, consta en la fuente;
+  rayado, derivada por una regla; punteado, hipótesis sin validar. Es la
+  separación observada/derivada/inferida, dibujada.
+- El **color** dice de qué dato se trata. Es el mismo en la barra de la caja, en
+  la línea y en su punta de flecha. Toda línea que toca un dato es de su color,
+  incluida la que baja del reporte del que cuelga: mientras esa era gris, al
+  elegir un dato quedaba un reporte encendido sin ninguna línea de su color y
+  se leía como suelto (§5.8 y la nota de abajo).
+- Cada línea de cruce lleva **un punto en el arranque** y corre por su propio
+  carril, con esquinas redondeadas: con el ángulo vivo, dos líneas que doblan en
+  el mismo lugar se leen como una cruz.
+
+**El clic aísla, y el segundo clic devuelve la vista.** Al tocar un dato se
+apaga todo lo que no lo involucra —de 19 cajas encendidas a 5— y la ficha abre
+con *«Vinculaciones que sostiene»*: el porqué, no dónde aparece. Lo mismo al
+tocar un conector, que enciende sus dos reportes y los datos que lo sostienen.
+
+**Las cajas se mueven de a una** y los conectores las siguen, porque salen de la
+posición y no de un dibujo guardado. **Ordenar** las devuelve a su lugar.
+
+**Un dato puede ponerse en el centro.** El árbol se cuelga de él y la fila de
+abajo pasa a ser la de los reportes en los que consta. Es la vista para
+investigar un identificador —una cuenta, un dispositivo— en lugar de un reporte.
+
+**Volvió el panel de filtros**, a la izquierda: buscar dentro del caso,
+antecedentes a revisar, peso mínimo, mostrar el peso sobre la línea, mostrar
+solo los datos compartidos, tipos de dato con su color, y la leyenda. El peso
+sobre la línea sale **apagado**: satura y casi nunca es lo que se está mirando.
+
+**Los textos se recortan midiendo lo que ocupan**, no contando caracteres, y el
+título manda: si la marca de la derecha no entra, se reduce a un punto de color
+y su texto queda en el globo de ayuda. Antes que recortar el número de reporte,
+se pierde la marca.
+
 ### Qué no se dibuja, y por qué
 
 - **Plataformas y prestadores.** Todos los reportes de Grindr comparten Grindr:
@@ -402,14 +514,32 @@ agrupadas por tipo; el dato muestra en qué reportes aparece.
 - **La mención de persona y el chat.** Son estructura interna del reporte, no
   aquello por lo que un reporte se vincula con otro. Aparecen en la cadena
   completa de una vinculación.
-- **Entidades de otros casos.** El visor nunca muestra dos casos a la vez.
+- **La identidad unificada.** No es un dato del reporte: es una conclusión sobre
+  una persona que un operador aprobó *porque* dos reportes comparten una cuenta.
+  Dibujarla al lado de esa cuenta la hacía competir con ella y se leía como una
+  segunda coincidencia independiente. Los reportes que agrupa llevan la marca
+  *«misma persona»* y la ficha lo explica.
+- **Entidades de otros casos.** El visor nunca muestra dos casos a la vez. Pero
+  si un dato aparece además en reportes de otros casos, la caja lo dice —*«en
+  otros casos»*— y la ficha explica que la coincidencia se evaluó y no alcanzó.
+  Sin eso, la ausencia de línea se leía como una falla del sistema, cuando era
+  justamente el criterio funcionando.
 
 ### Detalles de interacción que costaron
 
 - El clic en el vacío **no** descarta el recorrido. Antes reseteaba la vista.
 - Hay historial con **Volver / Siguiente** (`Alt + ←` / `Alt + →`).
-- El panel se pliega desde adentro, dejando un riel angosto: nunca desaparece
-  del todo.
+- Los dos paneles se pliegan desde adentro, dejando un riel angosto: nunca
+  desaparecen del todo. Y recuerdan el ancho al que los llevaron (§5.10).
+
+### Cómo se verifica que se ve bien
+
+No alcanza con mirarlo. Hay una auditoría que se corre desde la consola del
+navegador y **mide rectángulos en pantalla**: recorre los cinco casos con todos
+los reportes abiertos, cuenta pares de textos superpuestos, textos recortados,
+líneas sin color efectivo y líneas sin punta. Es lo que detectó §5.8 y §5.11,
+que a ojo pasaban. El criterio quedó en §5.4 y se sigue cumpliendo: **medir lo
+que se ve, no lo que se declaró**.
 
 ---
 
@@ -528,10 +658,19 @@ El visor es del caso, pero el circuito alrededor no existe:
 
 - **Botón de validar en la interfaz.** Hoy la aprobación es por CLI porque no
   hay sesión de usuario.
-- **Casos con muchos datos.** Con 9 datos abiertos y 13 líneas de cruce el
-  dibujo se ensancha. Si en casos reales hay reportes con muchas más entidades,
-  habría que mostrar por defecto solo los datos compartidos y dejar el resto
-  detrás de un segundo clic.
+- **Casos con muchos datos.** Existe el filtro *«solo los datos que comparte con
+  otro reporte»*, pero sale apagado. Si en casos reales hay reportes con muchas
+  más entidades, habría que invertirlo: mostrar por defecto solo los
+  compartidos y dejar el resto detrás de un segundo clic. Hace falta ver un
+  caso real antes de decidirlo.
+- **Casos con muchos reportes vinculados.** La disposición en árbol pone todos
+  los reportes en una fila. Con más de siete u ocho el lienzo se vuelve muy
+  ancho y hay que alejarse tanto que deja de leerse. Falta una segunda fila, o
+  paginado, o algún criterio de recorte por peso.
+- **La redacción del modelo local no llega al visor.** `informe_ia.py` escribe
+  su versión en `salida/informe_vinculaciones.md`, pero el visor muestra los
+  informes por caso que produce `construir.py` con plantillas. Cuando haya un
+  modelo, hay que decidir si redacta también uno por caso.
 - **PostgreSQL** como registro oficial, en reemplazo del archivo lateral de
   estado. Es la primera pieza a integrar cuando salga del banco de pruebas.
 - **Control de acceso.** Hoy quien corre el script ve todo.
