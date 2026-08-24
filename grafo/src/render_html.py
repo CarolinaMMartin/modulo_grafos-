@@ -908,7 +908,11 @@ function botonVincular(a, b){
     'data-a="'+esc(a)+'" data-b="'+esc(b)+'">Vincular estos reportes</button></div>';
 }
 
-/* Tarjeta de una coincidencia que se evaluó y no prosperó. */
+/* Tarjeta de una coincidencia que se evaluó y no prosperó.
+   Lleva el botón adentro: donde se dice que no alcanzó es donde el operador
+   puede discrepar, y esta tarjeta aparece en la ficha del caso, en la del
+   reporte y en la del dato. Si el botón vive afuera, en alguna de las tres
+   falta —que fue justamente lo que pasó con la ficha del dato—. */
 function tarjetaDescartada(x, idDato){
   const c = (x.compartido||[]).find(y=>y.nodo && RE(y.nodo)===idDato);
   const cuales = (x.compartido||[]).map(y=>y.valor).filter(Boolean);
@@ -918,7 +922,8 @@ function tarjetaDescartada(x, idDato){
     '<div style="font-size:12px;color:var(--suave);margin-top:5px">'+
     esc(c ? c.texto : ("Comparten "+cuales.join(", ")+"."))+'</div>'+
     '<div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
-    esc(x.motivo||"")+'</div></div>';
+    esc(x.motivo||"")+'</div>'+
+    botonVincular(x.a, x.b)+'</div>';
 }
 /* Identidad que un operador confirmó, si alcanza a este reporte. No se dibuja
    como dato: se muestra como distintivo sobre los reportes que agrupa. */

@@ -365,6 +365,13 @@ def main():
               "Copiar el comando" not in render_html.PLANTILLA)
         check("abierto como archivo suelto, el boton explica en vez de fallar",
               "Hay que abrir la aplicación" in render_html.PLANTILLA)
+        # Una coincidencia descartada se muestra en tres fichas -la del caso, la
+        # del reporte y la del dato- y en las tres el operador tiene que poder
+        # discrepar. El boton falto una vez justamente en la del dato.
+        check("las tres fichas que muestran una descartada ofrecen vincular",
+              render_html.PLANTILLA.count("botonVincular(") == 4)
+        check("la tarjeta de descartada trae el boton adentro",
+              "botonVincular(x.a, x.b)" in render_html.PLANTILLA)
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
