@@ -402,10 +402,14 @@ svg.arrastrandoLienzo{cursor:grabbing}
 .arista.derivada{stroke:#22d3ee;stroke-width:2;stroke-dasharray:8 5;opacity:.85}
 .arista.inferida{stroke:#a78bfa;stroke-width:1.8;stroke-dasharray:2 5;opacity:.8}
 .arista.contradice{stroke:var(--alarma);stroke-width:2.2;stroke-dasharray:11 3 2 3}
-.arista.apagada{opacity:0}
 .arista.rechazada{opacity:.18}
 .arista.resaltada{stroke-width:3.4}
 .arista.sel{stroke:#fff;stroke-width:3.6;opacity:1}
+/* Va ultima a proposito: una arista filtrada no se dibuja NUNCA, ni siquiera
+   estando seleccionada o rechazada. Con la misma especificidad gana la ultima
+   regla, y antes .sel le ganaba a .apagada: eso pintaba una linea blanca hacia
+   nodos que no estaban en pantalla. */
+.arista.apagada{opacity:0}
 .zonaClic{stroke:transparent;stroke-width:14;fill:none;cursor:pointer}
 .pesoArista{font-size:9.5px;fill:#67e8f9;font-family:var(--mono);pointer-events:none;
   paint-order:stroke;stroke:#080d17;stroke-width:3.5;stroke-linejoin:round;
@@ -724,6 +728,14 @@ function animarA(destino, ms, alTerminar){
   const inicio = new Map();
   SIM.forEach((s,id)=>inicio.set(id,{x:s.x,y:s.y}));
   const t0 = performance.now();
+  // Salvaguarda: en una pestana en segundo plano requestAnimationFrame no se
+  // dispara y la disposicion quedaria a mitad de camino. El temporizador la
+  // completa igual.
+  const red = setTimeout(()=>{
+    if(!animando) return;
+    destino.forEach((d,id)=>{ const s = SIM.get(id); s.x = d.x; s.y = d.y; s.vx = 0; s.vy = 0; });
+    animando = false; pintarPos(); if(alTerminar) alTerminar();
+  }, (ms||700)+260);
   (function cuadro(t){
     const p = Math.min(1,(t-t0)/(ms||700));
     const e = p<0.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
@@ -733,7 +745,7 @@ function animarA(destino, ms, alTerminar){
     });
     pintarPos();
     if(p<1) requestAnimationFrame(cuadro);
-    else { animando = false; if(alTerminar) alTerminar(); }
+    else { clearTimeout(red); animando = false; if(alTerminar) alTerminar(); }
   })(performance.now());
 }
 
@@ -827,6 +839,21 @@ function dispPorQue(aristaId){
 function dispSecuencia(){
   const vis = visiblesAhora();
   if(!vis.length) return new Map();
+
+  // Si lo unico visible son reportes, no hay secuencia que armar: son pares.
+  // Se los apila en una columna y las vinculaciones quedan como arcos, cada uno
+  // con su etiqueta a distinta altura. Es la forma legible de leer quien se
+  // conecta con quien cuando son unos pocos.
+  if(vis.every(n=>n.tipo==="REPORTE")){
+    const col = vis.slice().sort((a,b)=>String(a.etiqueta).localeCompare(String(b.etiqueta)));
+    const alto = ALTO-320, paso = alto/Math.max(1, col.length-1);
+    const d = new Map();
+    col.forEach((n,i)=>d.set(n.id, {
+      x: ANCHO*0.34,
+      y: col.length>1 ? 190+paso*i : ALTO/2}));
+    return d;
+  }
+
   const ids = new Set(vis.map(n=>n.id));
   const rs = reportesDelCaso();
   const reportes = vis.filter(n=>n.tipo==="REPORTE");
@@ -905,6 +932,7 @@ const SVGNS = "http://www.w3.org/2000/svg";
 const gG = document.getElementById("ggrupos"), gA = document.getElementById("garistas");
 const gP = document.getElementById("gpesos"), gN = document.getElementById("gnodos");
 const elA = new Map(), elZ = new Map(), elN = new Map(), elP = new Map();
+const TETIQ = new Map(), CURV = new Map();
 
 D.aristas.forEach(a=>{
   if(!NODOS.has(a.a)||!NODOS.has(a.b)) return;
@@ -920,6 +948,13 @@ D.aristas.forEach(a=>{
                  (a.estado==="rechazada"?" rechazada":""));
   gA.appendChild(p); gA.appendChild(z);
   elA.set(a.id,p); elZ.set(a.id,z);
+  // Si todas las etiquetas cayeran en el punto medio, las aristas que se cruzan
+  // las apilarian una encima de otra. Se escalona la posicion a lo largo de
+  // cada linea.
+  TETIQ.set(a.id, 0.5 + (((elA.size + 1) % 3) - 1) * 0.16);
+  // Curvatura propia por arista: dos vinculaciones de igual largo dejarian de
+  // otro modo arcos superpuestos, con sus etiquetas una encima de la otra.
+  CURV.set(a.id, 0.07 + ((elA.size + 1) % 4) * 0.035);
   // Cada arista lleva escrito QUE la vincula. Sin la etiqueta, una linea entre
   // dos nodos no dice nada: el operador tiene que poder leer la relacion.
   const tx = document.createElementNS(SVGNS,"text");
@@ -978,11 +1013,20 @@ function pintarPos(){
     const s = SIM.get(RE(a.a)), t = SIM.get(RE(a.b));
     if(!s||!t) return;
     const dx = t.x-s.x, dy = t.y-s.y;
-    const cx = (s.x+t.x)/2 - dy*0.08, cy = (s.y+t.y)/2 + dx*0.08;
+    const k = CURV.get(a.id) || 0.08;
+    const cx = (s.x+t.x)/2 - dy*k, cy = (s.y+t.y)/2 + dx*k;
     const d = "M"+s.x+","+s.y+" Q"+cx+","+cy+" "+t.x+","+t.y;
     p.setAttribute("d",d); elZ.get(a.id).setAttribute("d",d);
     const tx = elP.get(a.id);
-    if(tx){ tx.setAttribute("x",(s.x+t.x)/2 - dy*0.04); tx.setAttribute("y",(s.y+t.y)/2 + dx*0.04 + 3); }
+    if(tx){
+      // punto sobre la curva cuadratica en la posicion escalonada
+      const u = TETIQ.get(a.id) || 0.5, w = 1-u;
+      const px = w*w*s.x + 2*w*u*cx + u*u*t.x;
+      const py = w*w*s.y + 2*w*u*cy + u*u*t.y;
+      const largo = Math.sqrt(dx*dx+dy*dy) || 1;
+      tx.setAttribute("x", px - dy/largo*9);
+      tx.setAttribute("y", py + dx/largo*9 + 3);
+    }
   });
   SIM.forEach((s,id)=>{
     const el = elN.get(id);
@@ -1076,6 +1120,13 @@ function conjuntoVisible(){
     base = new Set(delCaso.map(n=>n.id));
   }
 
+  // Una relacion elegida desde la ficha tiene que poder verse: se traen sus dos
+  // extremos aunque el nivel de detalle no los incluyera.
+  if(v.tipo==="arista"){
+    const a = ARISTAS.get(v.id);
+    if(a){ base.add(RE(a.a)); base.add(RE(a.b)); }
+  }
+
   const fin = new Set();
   base.forEach(id0=>{
     const id = RE(id0);
@@ -1120,10 +1171,22 @@ function aplicar(reacomodar){
   // Con muchas aristas las etiquetas se pisan y estorban: por encima de ese
   // umbral se deja solo el peso de las vinculaciones entre reportes.
   const pocasAristas = cuenta <= 90;
+  const yaEtiquetado = new Set();
   visiblesA.forEach(([a, ok])=>{
     const tx = elP.get(a.id); if(!tx) return;
-    const mostrar = ok && estado.verEtiquetas &&
-                    (a.entreReportes ? estado.verPesos : pocasAristas);
+    let mostrar = ok && estado.verEtiquetas &&
+                  (a.entreReportes ? estado.verPesos : pocasAristas);
+    if(mostrar){
+      // Una arista muy corta no tiene lugar para su etiqueta.
+      const s1 = SIM.get(RE(a.a)), s2 = SIM.get(RE(a.b));
+      if(s1 && s2 && Math.hypot(s2.x-s1.x, s2.y-s1.y) < 80) mostrar = false;
+    }
+    if(mostrar && !a.entreReportes){
+      // Dos aristas paralelas con la misma relacion se dibujan encima: alcanza
+      // con rotular una sola vez.
+      const clave = [RE(a.a), RE(a.b)].sort().join("|")+"|"+a.relacionLegible;
+      if(yaEtiquetado.has(clave)) mostrar = false; else yaEtiquetado.add(clave);
+    }
     tx.style.opacity = mostrar ? 1 : 0;
   });
   elN.forEach((el,id)=>el.classList.toggle("sel", v.tipo==="nodo" && RE(v.id)===id));
@@ -1297,9 +1360,11 @@ function pintarInicio(){
       '<div style="font-size:12.5px"><b>Reporte '+esc(rid)+'</b>'+
       (estado.foco===n.id? ' <span class="chip cy">en curso</span>':'')+'</div>'+
       '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">'+
-      esc([at["Plataforma"], legible(at["Estado en SIPAR"]),
-           legible(at["Motivo del archivo"])].filter(Boolean).join(" · "))+
-      '</div></div>';
+      // El motivo ya dice "archivado por...": repetir el estado sobra.
+      esc([at["Plataforma"],
+           at["Motivo del archivo"] ? legible(at["Motivo del archivo"])
+                                    : legible(at["Estado en SIPAR"])]
+          .filter(Boolean).join(" · "))+'</div></div>';
   });
 
   if(vinc.length){
