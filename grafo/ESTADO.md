@@ -27,7 +27,13 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Lienzo en árbol: reporte en análisis, reportes vinculados y datos, con conectores en ángulo recto rotulados | **implementada** | `render_html`, función `dibujar` |
 | Apertura por reporte, con líneas de color hacia los otros reportes que comparten el dato | **implementada** | `render_html`, función `dibujar` |
 | Colapso visual de aristas paralelas, informando en cuántos reportes constan | **implementada** | `GRUPO` / `MIEMBROS` en `aplicar` |
-| Informe embebido en el visor, descargable | **implementada** | `src/redaccion.py` |
+| Informe en prosa, uno por caso, embebido en el visor y descargable | **implementada** | `dossier.recortar`, `src/redaccion.py` |
+| Panel de filtros: buscar, peso mínimo, tipos de dato, solo datos compartidos | **implementada** | `src/render_html.py` |
+| Criterio único de línea: el trazo dice el origen, el color dice el tipo de dato | **implementada** | `render_html.COLOR_VISOR`, hoja de estilos |
+| Foco por dato o por vinculación: apaga lo que no interviene, y el segundo clic lo devuelve | **implementada** | `render_html`, `alternarFoco` |
+| Cajas movibles de a una, con los conectores recalculados | **implementada** | `render_html.arrastrable` |
+| Un dato puesto en el centro: el árbol se cuelga de él | **implementada** | `render_html.centrarEn` |
+| Coincidencias evaluadas que no alcanzaron, visibles en el lienzo y en la ficha | **implementada** | `render_html`, campo `descartados` |
 | Contra-evidencia por desplazamiento implausible | **implementada** | `resolucion.detectar_contradicciones` |
 | Alertas de reapertura tipadas por motivo de archivo | **implementada** | `src/alertas.py` |
 | Componentes, comunidades (Louvain), centralidades, puentes | **implementada** | `src/analisis.py` |
@@ -46,9 +52,10 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Estado institucional como sidecar JSON | No hay transaccionalidad ni concurrencia | Integración con la base transaccional (PostgreSQL) |
 | El libro de validaciones es un archivo local | Detecta modificación de registros previos, **no** impide reescribir el archivo entero, ni sella el tiempo | Almacenamiento append-only del lado del servidor o anclaje externo |
 | Sin control de acceso | Cualquiera que corra el script ve todo | Permisos por rol, caso, jurisdicción y sensibilidad |
-| El informe del visor se redacta con plantillas | Texto correcto pero rígido | Un modelo local vía `informe_ia.py`, cuando esté disponible |
+| El informe del visor se redacta con plantillas | Texto correcto pero rígido. Además la versión que redacta `informe_ia.py` no llega al visor: escribe el informe general, no los de cada caso | Un modelo local vía `informe_ia.py`, y decidir si redacta uno por caso |
 | La unificación de identidades se aprueba por CLI | No hay botón en la interfaz | Un control en el visor, cuando exista la aplicación con sesión de usuario |
-| Visor propio en SVG, con disposición en árbol calculada a mano | Alcanza y se lee bien para un caso; no contempla casos con decenas de reportes vinculados | Un algoritmo de dibujo por capas con ruteo de aristas, o una librería especializada |
+| Visor propio en SVG, con disposición en árbol calculada a mano | Alcanza y se lee bien para un caso. Los reportes vinculados van todos en una fila: con más de siete u ocho el lienzo se vuelve tan ancho que deja de leerse | Un algoritmo de dibujo por capas con ruteo de aristas, o una librería especializada |
+| La legibilidad del lienzo se verifica midiendo rectángulos en pantalla desde la consola | Es una auditoría manual, no una prueba automática | Llevarla a `pruebas.py` con un navegador headless |
 | Ventanas temporales de IP por prestador, estimadas | El supuesto viaja en la explicación de cada arista, pero no está verificado | Confirmar tiempos de lease con cada prestador |
 
 ## 3. Qué está ausente

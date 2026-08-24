@@ -85,6 +85,24 @@ cima del árbol y reconstruye la vista alrededor de él.
   desplazar.
 - **Contraer** cierra todo lo abierto.
 - El selector de arriba cambia de caso. El visor nunca muestra dos a la vez.
+- Al hacer clic en un dato se apaga todo lo que no lo involucra, y el panel
+  derecho dice qué vinculaciones sostiene. El segundo clic devuelve la vista.
+  Lo mismo al hacer clic sobre el conector de una vinculación.
+- Las cajas se arrastran de a una para separar ramas que se cruzan.
+  **Ordenar** las devuelve a su lugar.
+- Desde la ficha de un dato, **Poner este dato en el centro** vuelve a colgar el
+  árbol de él: arriba el dato, abajo los reportes en los que consta.
+- El panel izquierdo trae la búsqueda dentro del caso, los antecedentes a
+  revisar, el peso mínimo, los tipos de dato y la leyenda.
+
+### Cómo leer las líneas
+
+Un solo criterio, y está en la leyenda del panel izquierdo:
+
+- el **trazo** dice de dónde sale la relación — lleno: consta en la fuente;
+  rayado: derivada por una regla; punteado: hipótesis sin validar;
+- el **color** dice de qué tipo de dato se trata, y es el mismo en la barra de
+  la caja, en la línea y en su punta de flecha.
 
 ### Lo que no se dibuja
 
@@ -93,13 +111,22 @@ cima del árbol y reconstruye la vista alrededor de él.
 - **La mención de persona y el chat.** Son estructura interna del reporte, no
   aquello por lo que un reporte se vincula con otro. Aparecen en la cadena
   completa cuando se abre una vinculación.
-- **Entidades de otros casos.**
+- **Entidades de otros casos.** Pero si un dato aparece además en reportes de
+  otro caso, la caja lo dice —*«en otros casos»*— y la ficha explica que la
+  coincidencia se evaluó y no alcanzó para vincular.
+- **La identidad unificada.** No es un dato del reporte sino una conclusión
+  sobre una persona. Los reportes que agrupa llevan la marca *«misma persona»*.
 
 ## Informe
 
-El botón **Informe** abre el informe de vinculaciones ya redactado, con el peso
-de cada vínculo y el aporte de cada regla. Se genera en cada corrida, sin
-depender de ninguna infraestructura, y se puede descargar en Markdown.
+El botón **Informe** abre el informe **del caso en curso**, ya redactado, con el
+peso de cada vínculo y el aporte de cada regla. Se genera uno por caso en cada
+corrida, sin depender de ninguna infraestructura, y se puede descargar en
+Markdown.
+
+No enumera el archivo completo: lista los reportes del caso y remite al resto
+como *carpeta de archivo provisorio*, explicando qué reúne y por qué el sistema
+la recorre. Enumerarla deja de ser posible apenas hay unos miles de reportes.
 
 Cuando haya un modelo local disponible, `informe_ia.py` toma el mismo dossier y
 produce una redacción más fluida:
@@ -161,7 +188,7 @@ no borra: marca la arista como no vigente y conserva la historia.
 grafo/
   construir.py             orquestador: ingesta -> análisis -> salidas
   validar.py               CLI de validación humana
-  pruebas.py               invariantes no negociables (55 chequeos)
+  pruebas.py               invariantes no negociables (69 chequeos)
   generar_sinteticos.py    dataset sintético de prueba
   MODELO_DATOS.md          generado desde la ontología, no editar a mano
   ESTADO.md                qué está implementado y qué no
@@ -196,7 +223,8 @@ grafo/
 | `salida/textos_restringidos.json` | Texto sensible, **fuera** del grafo, indexado por hash. |
 | `salida/informe_crudo.json` | Dossier con el peso de cada vinculación y el aporte de cada regla. |
 | `salida/informe_crudo_anonimo.json` | El mismo, seudonimizado: es lo único que ve el modelo. |
-| `salida/informe_vinculaciones.md` | El informe discursivo para el abogado. |
+| `salida/informe_vinculaciones.md` | El informe discursivo de toda la corrida. |
+| `salida/informes_por_caso/` | Un informe por caso: es el que el visor muestra y el que se firma. |
 
 ## Decisiones de diseño que conviene conocer antes de tocar el código
 

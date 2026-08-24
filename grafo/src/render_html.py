@@ -69,104 +69,39 @@ MOTIVO_CORTO = {
 }
 
 # Lo que se muestra al abrir un reporte: los datos por los que se vincula.
+#
 # Quedan afuera la mencion de persona y el chat, que son estructura interna del
 # reporte y no son aquello que el operador esta buscando.
-TIPOS_EN_TARJETA = ("IDENTIDAD", "CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
+#
+# Tambien queda afuera IDENTIDAD. Una identidad unificada no es un dato del
+# reporte sino una conclusion sobre una persona, que un operador aprobo *porque*
+# dos reportes comparten una cuenta. Dibujarla en la fila de datos la haria
+# competir con la cuenta que la origino y se leeria como si fuera una segunda
+# coincidencia independiente. Se muestra como distintivo sobre los reportes que
+# agrupa y se explica en la ficha.
+TIPOS_EN_TARJETA = ("CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
                     "DISPOSITIVO", "EVIDENCIA", "UBICACION")
 
-ATRIBUTOS_LEGIBLES = {
-    "valor": u"Valor", "clasificacion": u"Clasificación NCMEC",
-    "prioridad": u"Prioridad", "plataforma": u"Plataforma", "pais": u"País",
-    "fecha_incidente": u"Fecha del hecho", "fecha_recepcion": u"Fecha de recepción",
-    "estado_sipar": u"Estado en SIPAR", "motivo_archivo": u"Motivo del archivo",
-    "fecha_estado": u"Fecha del estado", "operador": u"Operador asignado",
-    "esp": u"Plataforma", "esp_user_id": u"Identificador de usuario",
-    "area": u"Código de área", "subtipo": u"Subtipo", "servicio": u"Servicio",
-    "ciudad": u"Ciudad", "region": u"Región", "cp": u"Código postal",
-    "lat": u"Latitud", "lon": u"Longitud", "forma_original": u"Forma original",
-    "cgnat": u"Bajo CGNAT", "privada": u"Dirección privada",
-    "atribuible_sin_dato_extra": u"Atribuible sin datos adicionales",
-    "version": u"Versión IP", "cuenta_suspendida": u"Cuenta dada de baja",
-    "genero": u"Género", "edad_aprox": u"Edad aproximada",
-    "reporte": u"Reporte de origen", "nombre": u"Nombre del archivo",
-    "tipo_mime": u"Tipo de archivo", "enviado_a_le": u"Remitido a autoridad",
-    "prioridad_desc": u"Detalle de prioridad",
+# Color de cada tipo de dato en el lienzo. La ontologia declara un color
+# institucional pensado para papel; sobre fondo oscuro varios de esos tonos no
+# se distinguen. Esta es la variante de pantalla, y es el unico criterio de
+# color del visor: un tipo de dato, un color, en la barra de la caja y en la
+# linea que lo vincula con los otros reportes.
+COLOR_VISOR = {
+    "CUENTA": "#fb923c",
+    "ALIAS": "#fdba74",
+    "EMAIL": "#38bdf8",
+    "TELEFONO": "#2dd4bf",
+    "IP": "#4ade80",
+    "DISPOSITIVO": "#c084fc",
+    "EVIDENCIA": "#cbd5e1",
+    "UBICACION": "#fbbf24",
+    "IDENTIDAD": "#818cf8",
+    "PERSONA_MENCION": "#818cf8",
+    "ORGANIZACION": "#94a3b8",
+    "REPORTE": "#38bdf8",
+    "EVENTO": "#7dd3fc",
 }
-
-OCULTAR = {"tipo", "etiqueta", "identificador", "fusionable", "bio_hash",
-           "decision", "transcripciones", "_variantes"}
-
-# Escalones de la disposicion jerarquica: de la actuacion hacia el dato tecnico.
-# Frase corta que explica por que dos reportes quedaron vinculados. Es lo que
-# se escribe sobre el conector, como el "motivo vinculacion" del boceto.
-MOTIVO_CORTO = {
-    "CUENTA": u"misma cuenta",
-    "DISPOSITIVO": u"mismo dispositivo",
-    "TELEFONO": u"mismo teléfono",
-    "EMAIL": u"mismo correo",
-    "EVIDENCIA": u"mismo archivo",
-    "IP": u"misma IP",
-    "ALIAS": u"mismo nombre visible",
-    "UBICACION": u"misma zona",
-}
-
-# Lo que se muestra al abrir un reporte: los datos por los que se vincula.
-# Quedan afuera la mencion de persona y el chat, que son estructura interna del
-# reporte y no son aquello que el operador esta buscando.
-TIPOS_EN_TARJETA = ("IDENTIDAD", "CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
-                    "DISPOSITIVO", "EVIDENCIA", "UBICACION")
-
-NIVEL_JERARQUICO = {
-    "REPORTE": 0,
-    "EVENTO": 1, "PERSONA_MENCION": 1, "IDENTIDAD": 1,
-    "CUENTA": 2,
-    "ALIAS": 3, "EMAIL": 3, "TELEFONO": 3, "IP": 3, "DISPOSITIVO": 3,
-    "EVIDENCIA": 3, "SEGMENTO": 3,
-    "UBICACION": 4, "ORGANIZACION": 4, "DOCUMENTO": 4, "JURISDICCION": 4,
-}
-
-
-ATRIBUTOS_LEGIBLES = {
-    "valor": u"Valor", "clasificacion": u"Clasificación NCMEC",
-    "prioridad": u"Prioridad", "plataforma": u"Plataforma", "pais": u"País",
-    "fecha_incidente": u"Fecha del hecho", "fecha_recepcion": u"Fecha de recepción",
-    "estado_sipar": u"Estado en SIPAR", "motivo_archivo": u"Motivo del archivo",
-    "fecha_estado": u"Fecha del estado", "operador": u"Operador asignado",
-    "esp": u"Plataforma", "esp_user_id": u"Identificador de usuario",
-    "area": u"Código de área", "subtipo": u"Subtipo", "servicio": u"Servicio",
-    "ciudad": u"Ciudad", "region": u"Región", "cp": u"Código postal",
-    "lat": u"Latitud", "lon": u"Longitud", "forma_original": u"Forma original",
-    "cgnat": u"Bajo CGNAT", "privada": u"Dirección privada",
-    "atribuible_sin_dato_extra": u"Atribuible sin datos adicionales",
-    "version": u"Versión IP", "cuenta_suspendida": u"Cuenta dada de baja",
-    "genero": u"Género", "edad_aprox": u"Edad aproximada",
-    "reporte": u"Reporte de origen", "nombre": u"Nombre del archivo",
-    "tipo_mime": u"Tipo de archivo", "enviado_a_le": u"Remitido a autoridad",
-    "prioridad_desc": u"Detalle de prioridad",
-}
-
-OCULTAR = {"tipo", "etiqueta", "identificador", "fusionable", "bio_hash",
-           "decision", "transcripciones", "_variantes"}
-
-# Escalones de la disposicion jerarquica: de la actuacion hacia el dato tecnico.
-# Frase corta que explica por que dos reportes quedaron vinculados. Es lo que
-# se escribe sobre el conector, como el "motivo vinculacion" del boceto.
-MOTIVO_CORTO = {
-    "CUENTA": u"misma cuenta",
-    "DISPOSITIVO": u"mismo dispositivo",
-    "TELEFONO": u"mismo teléfono",
-    "EMAIL": u"mismo correo",
-    "EVIDENCIA": u"mismo archivo",
-    "IP": u"misma IP",
-    "ALIAS": u"mismo nombre visible",
-    "UBICACION": u"misma zona",
-}
-
-# Lo que se muestra al abrir un reporte: los datos por los que se vincula.
-# Quedan afuera la mencion de persona y el chat, que son estructura interna del
-# reporte y no son aquello que el operador esta buscando.
-TIPOS_EN_TARJETA = ("IDENTIDAD", "CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
-                    "DISPOSITIVO", "EVIDENCIA", "UBICACION")
 
 NIVEL_JERARQUICO = {
     "REPORTE": 0,
@@ -270,6 +205,12 @@ def _reportes_por_nodo(g):
     return {n: sorted(v) for n, v in mapa.items()}
 
 
+def casos_de(g, res):
+    """Los casos del visor, expuestos para que construir.py pueda redactar un
+    informe por cada uno. Es la misma lista que ve el operador en el selector."""
+    return _casos(g, res, {})
+
+
 def _casos(g, res, legajo_de):
     """Un caso es un legajo: el reporte y todos aquellos con los que quedo
     vinculado. Un reporte sin vinculaciones es un caso de uno solo.
@@ -326,6 +267,7 @@ def _datos(g, res, dossier=None, texto_informe=None):
             reportes=por_nodo.get(n, []),
             enTarjeta=(d.get("tipo") in TIPOS_EN_TARJETA),
             color=ont.TIPOS_NODO.get(d.get("tipo"), {}).get("color", "#8a94a6"),
+            colorVisor=COLOR_VISOR.get(d.get("tipo"), "#8fa1bb"),
             atributos=atributos,
             transcripciones=d.get("transcripciones") or [],
         ))
@@ -383,6 +325,8 @@ def _datos(g, res, dossier=None, texto_informe=None):
     salida = dict(
         nodos=nodos, aristas=aristas, identidades=identidades,
         tipos={t: dict(color=m["color"],
+                       colorVisor=COLOR_VISOR.get(t, "#8fa1bb"),
+                       enTarjeta=(t in TIPOS_EN_TARJETA),
                        legible=ont.ETIQUETA_TIPO.get(t, t), desc=m["desc"],
                        # Las organizaciones -plataforma que reporta, prestador
                        # de internet- no aportan a la vinculacion: todos los
@@ -394,6 +338,20 @@ def _datos(g, res, dossier=None, texto_informe=None):
                   ontologia=res.get("ontologia_version"),
                   reportes=res.get("reportes_ingeridos")),
         alertas=res.get("alertas", {}).get("alertas", []),
+        # Coincidencias que NO alcanzaron para vincular. Sin esto el visor no
+        # puede explicar por que dos reportes que comparten un dato aparecen
+        # separados, y la ausencia de linea se lee como una falla del sistema.
+        descartados=[dict(
+            a=x["reporte_a"], b=x["reporte_b"],
+            confianza=x.get("confianza"), motivo=x.get("motivo"),
+            compartido=[dict(
+                nodo=d.get("nodo"),
+                tipo=ont.ETIQUETA_TIPO.get(d.get("tipo"), d.get("tipo")),
+                valor=d.get("valor"),
+                sostiene=not d.get("corrobora_solamente"),
+                texto=d.get("nota"))
+                for d in (x.get("disparos") or [])])
+            for x in res.get("vinculacion", {}).get("descartados", [])],
         legajos=res.get("legajos", []),
         casos=_casos(g, res, legajo_de),
     )
@@ -426,7 +384,25 @@ body{margin:0;background:var(--fondo);color:var(--texto);display:flex;
 ::-webkit-scrollbar-thumb{background:#1c2942;border-radius:5px}
 ::-webkit-scrollbar-track{background:transparent}
 
-#centro{flex:1;min-width:280px;position:relative;margin:10px 0 10px 10px;
+#izq{flex:0 0 300px;background:var(--panel);border:1px solid var(--borde);
+  border-radius:14px;margin:10px 0 10px 10px;overflow-y:auto;position:relative;
+  transition:flex-basis .3s cubic-bezier(.4,0,.2,1)}
+#izq.plegado{flex-basis:44px}
+#izq.plegado .contenido{display:none}
+#izq .contenido{padding:42px 18px 26px 18px}
+#izq .plegar{left:auto;right:10px}
+#izq.plegado .plegar{right:9px}
+#izq label{display:flex;align-items:center;gap:7px;font-size:12px;
+  color:var(--suave);margin:5px 0;cursor:pointer;line-height:1.35}
+#izq label:hover{color:var(--texto)}
+#izq input[type=checkbox]{accent-color:#22d3ee;margin:0;flex:0 0 auto}
+#izq input[type=range]{accent-color:#22d3ee}
+.sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto;display:inline-block}
+.rotuloGrupo{font-size:10.5px;color:var(--tenue);margin:14px 0 4px;
+  text-transform:uppercase;letter-spacing:.1em}
+.trazo{display:inline-block;width:26px;height:0;vertical-align:middle;
+  margin-right:8px;border-top-width:2px;flex:0 0 auto}
+#centro{flex:1;min-width:280px;position:relative;margin:10px 0;
   border:1px solid var(--borde);border-radius:14px;background:
     radial-gradient(1200px 700px at 30% 15%,rgba(34,211,238,.04),transparent 60%),
     var(--lienzo);overflow:hidden}
@@ -501,7 +477,9 @@ svg{width:100%;height:100%;display:block;cursor:grab}
 svg.arrastrando{cursor:grabbing}
 
 /* --- cajas ------------------------------------------------------------- */
-.caja{cursor:pointer}
+.caja{cursor:grab}
+.caja.moviendo{cursor:grabbing}
+.caja.movida rect.cuerpo{filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))}
 .caja rect.cuerpo{fill:#0e1728;stroke:#2b3a55;stroke-width:1.4;rx:7;
   transition:stroke .18s,fill .18s}
 .caja:hover rect.cuerpo{stroke:var(--cyan)}
@@ -513,24 +491,48 @@ svg.arrastrando{cursor:grabbing}
 .caja .sub{fill:#7d8ba3;font-size:10px;dominant-baseline:middle;pointer-events:none}
 .caja .marca{fill:var(--ambar);font-size:9.5px;font-family:var(--mono);
   text-anchor:end;dominant-baseline:middle;pointer-events:none}
+/* El orden importa: realzada gana sobre raiz, y apagada gana sobre todo. Con
+   la misma especificidad manda la última, y una caja filtrada que se siga
+   viendo encendida es exactamente el error de §5.4 del traspaso. */
+.caja.realzada rect.cuerpo{stroke:#fff;stroke-width:2.2}
+.caja.apagada{opacity:.16}
+.caja.apagada rect.cuerpo{stroke:#22314c;stroke-width:1.4}
 
 .mas{cursor:pointer}
 .mas circle{fill:#0d1626;stroke:var(--ambar);stroke-width:1.4;transition:fill .18s}
 .mas:hover circle{fill:rgba(251,191,36,.25)}
 .mas path{stroke:var(--ambar);stroke-width:1.6;stroke-linecap:round}
 
-/* --- conectores -------------------------------------------------------- */
-.con{fill:none;stroke:#3d5070;stroke-width:1.6;transition:stroke .18s,stroke-width .18s}
-.con.vinculo{stroke:#22d3ee;stroke-width:2}
-.con.duplicado{stroke:var(--ambar);stroke-width:2;stroke-dasharray:9 4}
-.con.cruce{stroke-width:1.5;stroke-dasharray:5 4}
-.con.sel{stroke:#fff;stroke-width:3}
+/* --- conectores --------------------------------------------------------
+   Criterio unico, y no se mezcla:
+     el TRAZO dice como se obtuvo la relacion  -> lleno: consta en la fuente;
+       rayado: derivada por una regla; punteado: hipotesis a validar.
+     el COLOR dice de que tipo de dato se trata (COLOR_VISOR).
+     el GROSOR de una vinculacion acompana su peso.
+   Ver la leyenda del panel izquierdo. */
+.con{fill:none;stroke:#3d5070;stroke-width:1.5;
+  transition:stroke .18s,stroke-width .18s,opacity .18s}
+.con.vinculo{stroke:#22d3ee;stroke-width:2;stroke-dasharray:11 5}
+/* El duplicado NO va en ámbar: el ámbar es el color del tipo de dato
+   "ubicación", y una línea entre reportes con color de dato rompe el criterio
+   -se contaba como una línea de Monte Grande-. Queda en el cian de las
+   vinculaciones, con la raya más corta, y lo dice el rótulo con todas las
+   letras. */
+.con.duplicado{stroke-dasharray:4 4}
+.con.inferida{stroke:#a78bfa;stroke-width:1.8;stroke-dasharray:2 4}
+.con.cruce{stroke-width:1.7;opacity:.72}
+.con.realzada{opacity:1;stroke-width:2.8;filter:drop-shadow(0 0 4px currentColor)}
+.con.origen{stroke-width:0}
+.con.origen.realzada{stroke-width:0}
+.con.apagada{opacity:.08}
+.con.sel{stroke:#fff;stroke-width:3;opacity:1}
 .zona{stroke:transparent;stroke-width:16;fill:none;cursor:pointer}
 .rotulo{font-size:10px;font-family:var(--mono);fill:#8fa1bb;text-anchor:middle;
   pointer-events:none;paint-order:stroke;stroke:#080d17;stroke-width:4;
   stroke-linejoin:round}
-.rotulo.vinculo{fill:#67e8f9}
+.rotulo.vinculo{fill:#a5d8e8}
 .rotulo.peso{fill:#6ee7b7}
+.rotulo.apagado{opacity:.2}
 
 table{width:100%;border-collapse:collapse;font-size:12px}
 td{padding:5px 2px;vertical-align:top;border-bottom:1px solid rgba(26,39,64,.7)}
@@ -552,6 +554,47 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
   border-radius:8px;padding:6px 10px}
 </style></head><body>
 
+<aside id="izq">
+  <button class="plegar" id="plegIzq" title="Plegar los filtros">‹</button>
+  <div class="contenido">
+    <h1>Vinculaciones</h1>
+    <div class="sub" id="meta"></div>
+
+    <h2>Buscar en el caso</h2>
+    <input type="text" id="buscar" placeholder="cuenta, IP, dispositivo, alias...">
+
+    <h2>Antecedentes a revisar</h2>
+    <div id="alertas"></div>
+
+    <h2>Qué se muestra</h2>
+    <div class="rotuloGrupo">Peso mínimo de la vinculación</div>
+    <div class="fila">
+      <input type="range" id="peso" min="0" max="100" value="0" style="flex:1">
+      <span class="sub" id="pesov" style="min-width:34px;text-align:right">0,00</span>
+    </div>
+    <label><input type="checkbox" id="verPesos">
+      Escribir el peso sobre la línea</label>
+    <label><input type="checkbox" id="soloComp">
+      Solo los datos que comparte con otro reporte</label>
+
+    <div class="rotuloGrupo">Tipos de dato</div>
+    <div id="tipos"></div>
+
+    <h2>Cómo leer el lienzo</h2>
+    <div class="rotuloGrupo" style="margin-top:4px">El trazo dice de dónde sale</div>
+    <div id="leyenda"></div>
+
+    <div class="tarjeta cyan" style="margin-top:18px">
+      <div style="font-size:12px;color:var(--suave)">
+        Todo lo que se muestra son <b style="color:var(--texto)">propuestas del
+        sistema</b>. Ninguna relación acredita autoría ni responsabilidad.
+      </div>
+    </div>
+  </div>
+</aside>
+
+<div class="asa" id="asaIzq"></div>
+
 <main id="centro">
   <div id="barra">
     <div class="grupo">
@@ -560,8 +603,11 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
     </div>
     <select id="selCaso" title="Caso en curso"></select>
     <button class="solo" id="contraer">Contraer</button>
+    <button class="solo" id="ordenar" title="Devolver las cajas que moviste a su lugar">Ordenar</button>
     <button class="solo" id="ajustar" title="Encuadrar">Encuadrar</button>
     <button class="solo primario" id="btnInforme">Informe</button>
+    <button class="solo" id="centrado" style="display:none"
+            title="Volver al reporte en análisis"></button>
     <div id="ruta"></div>
   </div>
   <svg id="lienzo">
@@ -611,9 +657,27 @@ const LEGIBLE = {
   sin_ubicacion:"archivado sin datos de ubicación",
   material_sin_relevancia:"archivado por material sin relevancia"};
 const legible = v => v ? (LEGIBLE[v] || String(v).replace(/_/g," ")) : v;
+/* En la caja el estado va corto. La frase entera está en la ficha y en el
+   globo de ayuda: dentro del recuadro solo entra una línea. */
+const BREVE = {
+  sin_datos_de_usuario:"archivado · sin datos de usuario",
+  no_atribuible_nat:"archivado · IP no atribuible",
+  sin_archivos:"archivado · sin archivos",
+  sin_ubicacion:"archivado · sin ubicación",
+  material_sin_relevancia:"archivado · sin relevancia",
+  archivado_latente:"archivado de forma latente"};
+const breve = v => v ? (BREVE[v] || legible(v)) : v;
 const attr = n => Object.fromEntries((n.atributos||[]));
 
-const estado = {caso:null, raiz:null, abiertos:new Set(), sel:null};
+/* Tipos de dato que pueden aparecer en la fila de datos, en el orden en que se
+   ofrecen en el panel. Sale de la ontologia, no de una lista escrita a mano. */
+const TIPOS_DATO = Object.keys(D.tipos||{}).filter(t=>D.tipos[t].enTarjeta);
+const COLOR_TIPO = t => (D.tipos[t]||{}).colorVisor || "#8fa1bb";
+const NOMBRE_TIPO = t => (D.tipos[t]||{}).legible || t;
+
+const estado = {caso:null, raiz:null, abiertos:new Set(), sel:null,
+                texto:"", pesoMin:0, verPesos:false, soloCompartidos:false,
+                tipos:new Set(TIPOS_DATO), mov:new Map(), centro:null};
 
 /* =============================================================== caso ===== */
 function caso(){ return CASOS.find(c=>c.id===estado.caso) || CASOS[0]; }
@@ -622,23 +686,79 @@ function nodoReporte(valor){ return NODOS.get("REPORTE::"+String(valor).toLowerC
 function vinculosDe(idReporte){
   return VINCULOS.filter(a=>a.a===idReporte||a.b===idReporte)
     .filter(a=>{ const rs=reportesCaso();
-      return rs.has((NODOS.get(a.a)||{}).valor) && rs.has((NODOS.get(a.b)||{}).valor); });
+      return rs.has((NODOS.get(a.a)||{}).valor) && rs.has((NODOS.get(a.b)||{}).valor); })
+    .filter(a=>(a.confianza==null || a.confianza>=estado.pesoMin));
 }
 /* Datos por los que un reporte puede vincularse. Se dejan afuera la mención de
    persona y el chat: son estructura interna del reporte, no aquello que el
-   operador está buscando. */
+   operador está buscando. Tampoco entra la identidad unificada, que es una
+   conclusión sobre una persona y no un dato del reporte. */
 function datosDe(valorReporte){
   return D.nodos.filter(n => n.enTarjeta
                           && (n.reportes||[]).includes(valorReporte)
-                          && RE(n.id) === n.id);
+                          && RE(n.id) === n.id)
+                .filter(n => estado.tipos.has(n.tipo))
+                .filter(n => !estado.soloCompartidos || otrosReportesDe(n).length>1);
 }
 function otrosReportesDe(nodo){
   const rs = reportesCaso();
   return (nodo.reportes||[]).filter(r=>rs.has(r));
 }
+/* El mismo dato en reportes de otros casos. Que no haya línea significa que la
+   coincidencia no alcanzó para vincular, no que el sistema no la haya visto:
+   sin decirlo, la ausencia de línea se lee como un error. */
+function fueraDelCaso(nodo){
+  const rs = reportesCaso();
+  return (nodo.reportes||[]).filter(r=>!rs.has(r));
+}
+const DESCARTADOS = D.descartados || [];
+function descartadosDelDato(id){
+  return DESCARTADOS.filter(x=>(x.compartido||[]).some(c=>c.nodo && RE(c.nodo)===id));
+}
+function descartadosDelReporte(valor){
+  return DESCARTADOS.filter(x=>x.a===valor || x.b===valor);
+}
+function casoDe(valorReporte){
+  return CASOS.find(c=>c.reportes.includes(valorReporte));
+}
+/* Tarjeta de una coincidencia que se evaluó y no prosperó. */
+function tarjetaDescartada(x, idDato){
+  const c = (x.compartido||[]).find(y=>y.nodo && RE(y.nodo)===idDato);
+  const cuales = (x.compartido||[]).map(y=>y.valor).filter(Boolean);
+  return '<div class="tarjeta">'+
+    '<div style="font-size:12.5px"><b>Reporte '+esc(x.a)+'</b> y <b>Reporte '+
+    esc(x.b)+'</b></div>'+
+    '<div style="font-size:12px;color:var(--suave);margin-top:5px">'+
+    esc(c ? c.texto : ("Comparten "+cuales.join(", ")+"."))+'</div>'+
+    '<div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
+    esc(x.motivo||"")+'</div></div>';
+}
+/* Identidad que un operador confirmó, si alcanza a este reporte. No se dibuja
+   como dato: se muestra como distintivo sobre los reportes que agrupa. */
+const IDENTIDADES = D.nodos.filter(n=>n.tipo==="IDENTIDAD");
+function identidadDe(valorReporte){
+  return IDENTIDADES.find(n=>(n.reportes||[]).includes(valorReporte)) || null;
+}
+/* La búsqueda no oculta: apaga. Lo que no coincide se atenúa y sigue en su
+   lugar, para no perder la forma del caso mientras se busca. */
+function coincide(nodo){
+  const t = estado.texto.trim().toLowerCase();
+  if(!t) return true;
+  const blob = (nodo.etiqueta+" "+nodo.tipoLegible+" "+
+    (nodo.atributos||[]).map(x=>x[1]).join(" ")).toLowerCase();
+  return blob.includes(t);
+}
 
 /* ========================================================== navegación ==== */
 const HIST = {pila:[], pos:-1};
+/* Volver a tocar lo que ya estaba elegido suelta el realce y devuelve el caso
+   completo. Sin esto, la única forma de recuperar la vista era cambiar de caso:
+   el clic apagaba todo y no había cómo volver a encenderlo. */
+function alternarFoco(v){
+  const a = estado.sel;
+  if(a && a.tipo===v.tipo && a.id===v.id) ir({tipo:"inicio"});
+  else ir(v);
+}
 function ir(v){
   const act = HIST.pila[HIST.pos];
   if(!(act && act.tipo===v.tipo && act.id===v.id)){
@@ -676,19 +796,57 @@ document.getElementById("adelante").onclick = adelante;
 const SVGNS = "http://www.w3.org/2000/svg";
 const gCon = document.getElementById("gcon"), gRot = document.getElementById("grot"),
       gCaj = document.getElementById("gcajas"), svg = document.getElementById("lienzo");
-const ANCHO_CAJA = 200, ALTO_CAJA = 52, SEP_X = 34;
-const Y_RAIZ = 90, Y_REL = 280, Y_ENT = 480;
-const PALETA = ["#34d399","#a78bfa","#f472b6","#fbbf24","#38bdf8","#fb7185",
-                "#4ade80","#c084fc"];
+const ANCHO_CAJA = 250, ALTO_CAJA = 64, SEP_X = 34;
+const Y_RAIZ = 90, Y_REL = 290, Y_ENT = 500;
+/* Altura a la que corre el tramo horizontal del que cuelgan los reportes
+   vinculados. Deja libre la franja donde se escribe el motivo de cada rama. */
+const CARRIL_VINC = Y_RAIZ + ALTO_CAJA + 36;
 
 let VP = {x:0,y:0,k:1};
 function pintarVP(){ document.getElementById("vista")
   .setAttribute("transform","translate("+VP.x+","+VP.y+") scale("+VP.k+")"); }
 
-function caja(g, x, y, {titulo, sub, marca, color, clases, alClic}){
+/* Recorta un texto al ancho que efectivamente queda libre, midiendo lo que
+   ocupa dibujado. Truncar por cantidad de caracteres no alcanza: con la misma
+   cantidad de letras "181.46.66.242" y "Identidad unificada" no ocupan lo
+   mismo, y el recorte fijo dejaba el título pisando la marca de la derecha.
+
+   Medir obliga al navegador a recalcular la disposición, y el lienzo se
+   redibuja entero en cada paso de un arrastre. Por eso lo medido se guarda:
+   la misma letra, del mismo tamaño, mide siempre lo mismo. */
+const MEDIDAS = new Map();
+function medir(el, texto){
+  const k = el.getAttribute("class")+"|"+texto;
+  if(MEDIDAS.has(k)) return MEDIDAS.get(k);
+  el.textContent = texto;
+  const w = el.getComputedTextLength();
+  MEDIDAS.set(k, w);
+  return w;
+}
+function ajustar(el, texto, ancho){
+  const s = String(texto == null ? "" : texto);
+  if(ancho <= 0){ el.textContent = "…"; return; }
+  if(medir(el, s) <= ancho){ el.textContent = s; return; }
+  let lo = 0, hi = s.length;
+  while(lo < hi){
+    const m = Math.ceil((lo+hi)/2);
+    if(medir(el, s.slice(0,m)+"…") <= ancho) lo = m; else hi = m-1;
+  }
+  el.textContent = lo ? s.slice(0,lo)+"…" : "…";
+}
+
+/* Una caja tiene tres textos y ninguno puede pisar a otro:
+     título  arriba a la izquierda; es lo que identifica la caja y manda.
+     marca   arriba a la derecha, con lo que sobre después del título. Si no
+             entra escrita, se reduce a un punto del color que le corresponde
+             y el texto queda en el globo de ayuda: preferible perder la marca
+             antes que recortar el número de reporte.
+     sub     abajo, a lo ancho de la caja. */
+function caja(g, x, y, {titulo, sub, marca, marcaColor, color, clases, alClic}){
   const el = document.createElementNS(SVGNS,"g");
   el.setAttribute("class","caja "+(clases||""));
   el.setAttribute("transform","translate("+x+","+y+")");
+  g.appendChild(el);                 // medir exige estar en el documento
   const r = document.createElementNS(SVGNS,"rect");
   r.setAttribute("class","cuerpo"); r.setAttribute("width",ANCHO_CAJA);
   r.setAttribute("height",ALTO_CAJA); r.setAttribute("rx",7);
@@ -701,24 +859,77 @@ function caja(g, x, y, {titulo, sub, marca, color, clases, alClic}){
   }
   const t = document.createElementNS(SVGNS,"text");
   t.setAttribute("class","titulo"); t.setAttribute("x",13);
-  t.setAttribute("y", sub? ALTO_CAJA/2-8 : ALTO_CAJA/2);
-  t.textContent = String(titulo).slice(0,24); el.appendChild(t);
-  if(sub){
-    const s2 = document.createElementNS(SVGNS,"text");
-    s2.setAttribute("class","sub"); s2.setAttribute("x",13);
-    s2.setAttribute("y",ALTO_CAJA/2+10);
-    s2.textContent = String(sub).slice(0,32); el.appendChild(s2);
-  }
+  t.setAttribute("y", sub ? 24 : ALTO_CAJA/2);
+  el.appendChild(t);
+  const libre = ANCHO_CAJA - 26 - medir(t, String(titulo)) - 12;
   if(marca){
     const m = document.createElementNS(SVGNS,"text");
     m.setAttribute("class","marca"); m.setAttribute("x",ANCHO_CAJA-12);
-    m.setAttribute("y",13); m.textContent = marca; el.appendChild(m);
+    m.setAttribute("y",24);
+    if(marcaColor) m.setAttribute("fill",marcaColor);
+    el.appendChild(m);
+    const anchoMarca = medir(m, marca);
+    if(anchoMarca > libre){
+      el.removeChild(m);
+      const pt = document.createElementNS(SVGNS,"circle");
+      pt.setAttribute("cx",ANCHO_CAJA-14); pt.setAttribute("cy",21);
+      pt.setAttribute("r",4);
+      pt.setAttribute("fill",marcaColor||"#fbbf24"); el.appendChild(pt);
+      ajustar(t, titulo, ANCHO_CAJA - 26 - 16);
+    } else {
+      ajustar(t, titulo, ANCHO_CAJA - 26 - anchoMarca - 12);
+    }
+  } else {
+    ajustar(t, titulo, ANCHO_CAJA - 26);
+  }
+  if(sub){
+    const s2 = document.createElementNS(SVGNS,"text");
+    s2.setAttribute("class","sub"); s2.setAttribute("x",13);
+    s2.setAttribute("y",45);
+    el.appendChild(s2);
+    ajustar(s2, sub, ANCHO_CAJA - 26);
   }
   const ti = document.createElementNS(SVGNS,"title");
-  ti.textContent = titulo + (sub? "  ·  "+sub : ""); el.appendChild(ti);
-  if(alClic) el.addEventListener("click", e=>{ e.stopPropagation(); alClic(); });
-  g.appendChild(el);
+  ti.textContent = titulo + (sub? "  ·  "+sub : "") + (marca? "  ·  "+marca : "");
+  el.appendChild(ti);
+  if(alClic) el.addEventListener("click", e=>{
+    e.stopPropagation();
+    if(SEARRASTRO){ SEARRASTRO = false; return; }   // soltar no es hacer clic
+    alClic();
+  });
   return el;
+}
+
+/* Cada caja se puede correr a mano. La disposición automática ordena el caso,
+   pero cuando dos ramas se cruzan el operador necesita poder separarlas para
+   entender qué está mirando. Los conectores se recalculan solos porque salen
+   de la posición, no de un dibujo guardado. */
+let SEARRASTRO = false;
+function arrastrable(el, id){
+  el.addEventListener("pointerdown", e=>{
+    if(e.button!==0) return;
+    e.stopPropagation();                       // no arrastra el lienzo entero
+    SEARRASTRO = false;                        // cada gesto arranca limpio
+    const p0 = {x:e.clientX, y:e.clientY};
+    const m0 = estado.mov.get(id) || {dx:0, dy:0};
+    let movido = false;
+    const mover = ev=>{
+      const dx = (ev.clientX-p0.x)/VP.k, dy = (ev.clientY-p0.y)/VP.k;
+      if(!movido && Math.abs(dx)+Math.abs(dy) < 3) return;
+      movido = true; SEARRASTRO = true;
+      document.body.style.userSelect = "none";
+      estado.mov.set(id, {dx:m0.dx+dx, dy:m0.dy+dy});
+      dibujar();
+    };
+    const soltar = ()=>{
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      document.body.style.userSelect = "";
+      document.getElementById("ordenar").disabled = estado.mov.size===0;
+    };
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+  });
 }
 function botonMas(g, x, y, abierto, alClic, ayuda){
   const el = document.createElementNS(SVGNS,"g");
@@ -736,16 +947,77 @@ function botonMas(g, x, y, abierto, alClic, ayuda){
 }
 /* Conector en ángulo recto: baja del origen, corre horizontal y entra al
    destino por arriba. Es la forma en que se lee un árbol. */
-function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril}){
+/* Corta el motivo en renglones por sus comas. "misma cuenta, misma IP, mismo
+   dispositivo" en una sola línea mide más que la caja y se monta sobre el
+   motivo de la rama de al lado. */
+function envolver(txt, max){
+  const out = [];
+  String(txt).split(", ").forEach(p=>{
+    const u = out.length-1;
+    if(u>=0 && (out[u]+", "+p).length<=max) out[u] += ", "+p;
+    else out.push(p);
+  });
+  return out;
+}
+/* Punta de flecha del color de la línea. Con una sola punta gris para todas no
+   se sabe cuál flecha es de cuál línea, que es justamente lo que hay que poder
+   ver cuando hay diez líneas corriendo en paralelo. */
+const MARCADORES = new Map();
+function marcador(color){
+  if(MARCADORES.has(color)) return MARCADORES.get(color);
+  const id = "fl"+MARCADORES.size;
+  const m = document.createElementNS(SVGNS,"marker");
+  m.setAttribute("id",id); m.setAttribute("viewBox","0 0 8 8");
+  m.setAttribute("refX","7"); m.setAttribute("refY","4");
+  m.setAttribute("markerWidth","6"); m.setAttribute("markerHeight","6");
+  m.setAttribute("orient","auto");
+  const p = document.createElementNS(SVGNS,"path");
+  p.setAttribute("d","M0,0 L8,4 L0,8 z"); p.setAttribute("fill",color);
+  m.appendChild(p);
+  document.querySelector("#lienzo defs").appendChild(m);
+  MARCADORES.set(color,"url(#"+id+")");
+  return MARCADORES.get(color);
+}
+/* Esquinas redondeadas: con el ángulo vivo, dos líneas que doblan en el mismo
+   lugar se ven como una sola en cruz. Redondeadas, cada una sigue siendo un
+   trazo continuo que se puede seguir con la vista. */
+function ruta(x1, y1, x2, y2, ym){
+  if(Math.abs(x2-x1) < 1) return "M"+x1+","+y1+" V"+y2;
+  const r = Math.min(9, Math.abs(x2-x1)/2, Math.abs(ym-y1), Math.abs(y2-ym));
+  if(r < 2) return "M"+x1+","+y1+" V"+ym+" H"+x2+" V"+y2;
+  const sx = x2>x1 ? 1 : -1, s1 = ym>y1 ? 1 : -1, s2 = y2>ym ? 1 : -1;
+  return "M"+x1+","+y1+
+    " V"+(ym-r*s1)+" Q"+x1+","+ym+" "+(x1+r*sx)+","+ym+
+    " H"+(x2-r*sx)+" Q"+x2+","+ym+" "+x2+","+(ym+r*s2)+
+    " V"+y2;
+}
+function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
+                                 dato, punto, apagado, realzado}){
   const x1 = desde.x, y1 = desde.y, x2 = hasta.x, y2 = hasta.y;
   const ym = carril!=null ? carril : (y1 + (y2-y1)/2);
-  const d = "M"+x1+","+y1+" V"+ym+" H"+x2+" V"+y2;
+  const d = ruta(x1,y1,x2,y2,ym);
+  const cl = "con "+(clase||"")+(apagado?" apagada":"")+(realzado?" realzada":"");
   const p = document.createElementNS(SVGNS,"path");
-  p.setAttribute("class","con "+(clase||""));
+  p.setAttribute("class",cl);
   p.setAttribute("d",d);
-  if(color) p.setAttribute("stroke",color);
-  p.setAttribute("marker-end", clase==="vinculo" ? "url(#flechaCyan)" : "url(#flecha)");
+  // style y no setAttribute: el atributo de presentación pierde contra
+  // cualquier regla de la hoja de estilos, y .con ya define un stroke.
+  if(color) p.style.stroke = color;
+  if(dato) p.setAttribute("data-dato",dato);
+  p.setAttribute("marker-end", color ? marcador(color)
+    : ((clase||"").indexOf("vinculo")===0 ? "url(#flechaCyan)" : "url(#flecha)"));
   gCon.appendChild(p);
+  /* Un punto en el arranque: dice de dónde sale la línea sin tener que
+     seguirla hasta el final para descubrirlo. Solo en los cruces, que corren
+     por carriles paralelos; en el resto sería ruido. */
+  if(punto){
+    const o = document.createElementNS(SVGNS,"circle");
+    o.setAttribute("class",cl+" origen");
+    o.setAttribute("cx",x1); o.setAttribute("cy",y1); o.setAttribute("r",3.2);
+    if(color){ o.style.fill = color; o.style.stroke = "none"; }
+    o.setAttribute("data-dato",dato);
+    gCon.appendChild(o);
+  }
   if(alClic){
     const z = document.createElementNS(SVGNS,"path");
     z.setAttribute("class","zona"); z.setAttribute("d",d);
@@ -754,39 +1026,67 @@ function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril}){
     ti.textContent = rotulo||""; z.appendChild(ti);
     gCon.appendChild(z);
   }
+  /* El rótulo va sobre la rama que describe -no en el medio del recorrido, que
+     es el mismo punto para todas- y colgando del tramo horizontal, no pegado a
+     la caja: contra la punta de flecha no se llegaba a leer. */
   if(rotulo){
-    const t = document.createElementNS(SVGNS,"text");
-    t.setAttribute("class","rotulo "+(clase==="vinculo"?"vinculo":""));
-    t.setAttribute("x",(x1+x2)/2); t.setAttribute("y",ym-7);
-    t.textContent = rotulo; gRot.appendChild(t);
-    if(peso!=null){
-      const w = document.createElementNS(SVGNS,"text");
-      w.setAttribute("class","rotulo peso");
-      w.setAttribute("x",(x1+x2)/2); w.setAttribute("y",ym+13);
-      w.textContent = "peso "+num(peso); gRot.appendChild(w);
-    }
+    const lineas = envolver(rotulo, 28);
+    if(peso!=null && estado.verPesos) lineas.push("peso "+num(peso));
+    // 14 y no 12: con 12 el alto real de un renglón de 10px -acentos y colas
+    // incluidos- llega a tocar el de abajo. La auditoría lo detecta.
+    const base = ym + 24, alto = 14;
+    lineas.forEach((ln,i)=>{
+      const esPeso = (peso!=null && estado.verPesos && i===lineas.length-1);
+      const t = document.createElementNS(SVGNS,"text");
+      t.setAttribute("class","rotulo "+(esPeso ? "peso" : "vinculo")+
+                              (apagado?" apagado":""));
+      t.setAttribute("x",x2); t.setAttribute("y",base+i*alto);
+      t.textContent = ln; gRot.appendChild(t);
+    });
   }
   return p;
+}
+/* Al pasar el puntero por un dato se realzan las líneas que lo llevan a los
+   otros reportes. Es la pregunta que el operador se hace mirando la fila de
+   abajo: "¿este dato de dónde más sale?". */
+function marcarCruces(id, on){
+  gCon.querySelectorAll('[data-dato="'+id+'"]')
+      .forEach(p=>p.classList.toggle("realzada",on));
 }
 
 function dibujar(){
   gCon.textContent = ""; gRot.textContent = ""; gCaj.textContent = "";
   const c = caso(); if(!c) return;
-  const raizVal = estado.raiz || c.reportes[0];
-  const nRaiz = nodoReporte(raizVal); if(!nRaiz) return;
 
-  // --- fila 1: los reportes con los que se vincula el que está en análisis
-  const vinc = vinculosDe(nRaiz.id).sort((a,b)=>(b.confianza||0)-(a.confianza||0));
-  const relacionados = vinc.map(a=>{
-    const otro = a.a===nRaiz.id ? a.b : a.a;
-    return {arista:a, nodo:NODOS.get(otro)};
-  });
+  /* El árbol se puede colgar de dos cosas distintas:
+       del reporte en análisis -lo habitual-, y entonces la fila de abajo son
+       los reportes con los que se vinculó;
+       de un dato puesto en el centro, y entonces la fila de abajo son los
+       reportes en los que ese dato consta. Es la vista para investigar un
+       identificador en particular: se ve su alcance de una. */
+  const nCentro = estado.centro ? NODOS.get(estado.centro) : null;
+  const modoDato = !!(nCentro && otrosReportesDe(nCentro).length);
 
-  // --- fila 2: los datos de los reportes abiertos
+  let nRaiz, relacionados;
+  if(modoDato){
+    nRaiz = nCentro;
+    relacionados = otrosReportesDe(nCentro)
+      .map(rv=>({arista:null, nodo:nodoReporte(rv)}))
+      .filter(r=>r.nodo);
+  } else {
+    const raizVal = estado.raiz || c.reportes[0];
+    nRaiz = nodoReporte(raizVal); if(!nRaiz) return;
+    const vinc = vinculosDe(nRaiz.id).sort((a,b)=>(b.confianza||0)-(a.confianza||0));
+    relacionados = vinc.map(a=>({arista:a, nodo:NODOS.get(a.a===nRaiz.id?a.b:a.a)}));
+  }
+
+  // --- fila de abajo: los datos de los reportes abiertos
   const abiertos = relacionados.filter(r=>estado.abiertos.has(r.nodo.id));
-  if(estado.abiertos.has(nRaiz.id)) abiertos.unshift({nodo:nRaiz, arista:null});
+  if(!modoDato && estado.abiertos.has(nRaiz.id))
+    abiertos.unshift({nodo:nRaiz, arista:null});
   const entidades = [];
   const yaEnt = new Set();
+  if(modoDato) yaEnt.add(nCentro.id);      // ya está arriba, no se repite
   abiertos.forEach(r=>{
     datosDe(r.nodo.valor).forEach(m=>{
       if(yaEnt.has(m.id)) return;
@@ -807,78 +1107,173 @@ function dibujar(){
   entidades.forEach((e,i)=>pos.set(e.nodo.id,
     {x: xEnt + i*(ANCHO_CAJA+SEP_X), y: Y_ENT}));
 
+  // Posición efectiva: la que calcula la disposición, más lo que el operador
+  // haya corrido esa caja a mano.
+  const P = id => { const p = pos.get(id), m = estado.mov.get(id);
+                    return m ? {x:p.x+m.dx, y:p.y+m.dy} : p; };
   const abajo = p => ({x:p.x+ANCHO_CAJA/2, y:p.y+ALTO_CAJA});
   const arriba = p => ({x:p.x+ANCHO_CAJA/2, y:p.y});
 
-  // --- conectores: reporte en análisis -> relacionados
+  /* Realce. Al elegir un dato, el lienzo responde la pregunta que se hizo el
+     operador al tocarlo: a qué reportes llega ese dato. Todo lo demás se
+     apaga, que es lo único que vuelve legible una fila de diez líneas.
+     Al elegir una vinculación, se realzan sus dos reportes y los datos que la
+     sostienen. */
+  let focoDato = null;
+  const focoReps = new Set(), focoDatos = new Set();
+  if(estado.sel && estado.sel.tipo==="entidad" && NODOS.has(estado.sel.id)){
+    focoDato = estado.sel.id;
+    focoDatos.add(focoDato);
+    otrosReportesDe(NODOS.get(focoDato)).forEach(rv=>{
+      const nr = nodoReporte(rv); if(nr) focoReps.add(nr.id); });
+  } else if(estado.sel && estado.sel.tipo==="vinculo" && ARISTAS.has(estado.sel.id)){
+    const a = ARISTAS.get(estado.sel.id);
+    focoReps.add(a.a); focoReps.add(a.b);
+    (a.puente||[]).forEach(x=>{ if(x.nodo) focoDatos.add(RE(x.nodo)); });
+  }
+  const hayFoco = focoReps.size>0;
+  const repApagado = id => hayFoco && !focoReps.has(id);
+  const datoApagado = id => hayFoco && !focoDatos.has(id);
+
+  // --- conectores: la raíz -> la fila de abajo
   relacionados.forEach(r=>{
     const a = r.arista;
-    conector(abajo(pos.get(nRaiz.id)), arriba(pos.get(r.nodo.id)), {
-      clase: a.relacion==="POSIBLE_DUPLICADO_DE" ? "vinculo duplicado" : "vinculo",
-      rotulo: a.motivo, peso: a.confianza,
-      alClic: ()=>ir({tipo:"vinculo", id:a.id})});
+    if(!a){
+      // Modo dato: el dato consta en ese reporte. Es una relación observada,
+      // así que va llena y del color del dato, sin peso ni motivo.
+      conector(abajo(P(nRaiz.id)), arriba(P(r.nodo.id)), {
+        color: COLOR_TIPO(nRaiz.tipo), carril: CARRIL_VINC,
+        apagado: !coincide(r.nodo),
+        alClic: ()=>alternarFoco({tipo:"reporte", id:r.nodo.id})});
+      return;
+    }
+    const apagado = !coincide(r.nodo) ||
+      (hayFoco && !(focoReps.has(a.a) && focoReps.has(a.b)));
+    conector(abajo(P(nRaiz.id)), arriba(P(r.nodo.id)), {
+      clase: "vinculo"+(a.relacion==="POSIBLE_DUPLICADO_DE" ? " duplicado" : "")
+             +(a.origen==="inferida" ? " inferida" : ""),
+      carril: CARRIL_VINC,
+      rotulo: (a.relacion==="POSIBLE_DUPLICADO_DE" ? "posible duplicado, " : "")
+              + a.motivo,
+      peso: a.confianza, apagado: apagado,
+      realzado: hayFoco && !apagado,
+      alClic: ()=>alternarFoco({tipo:"vinculo", id:a.id})});
   });
 
-  // --- conectores: reporte abierto -> sus datos
+  // --- conectores: reporte abierto -> sus datos.
+  // Va del color del dato, igual que los cruces. Antes era una línea gris de
+  // estructura, y al elegir un dato el reporte del que cuelga quedaba
+  // encendido pero sin ninguna línea de su color: se leía como un reporte
+  // suelto en medio de la selección.
   entidades.forEach(e=>{
-    conector(abajo(pos.get(e.padre.id)), arriba(pos.get(e.nodo.id)), {
-      rotulo: null, alClic: ()=>ir({tipo:"entidad", id:e.nodo.id})});
+    conector(abajo(P(e.padre.id)), arriba(P(e.nodo.id)), {
+      rotulo: null, color: COLOR_TIPO(e.nodo.tipo), dato: e.nodo.id,
+      apagado: !coincide(e.nodo) || datoApagado(e.nodo.id),
+      realzado: focoDato===e.nodo.id,
+      alClic: ()=>alternarFoco({tipo:"entidad", id:e.nodo.id})});
   });
 
-  // --- cruces: el mismo dato en otros reportes de la fila
+  // --- cruces: el mismo dato en otros reportes de la fila.
+  // El color es el del tipo de dato, no un color de turno: así la línea que
+  // sube, la barra de la caja de la que sale y su punta de flecha son el mismo
+  // color, y dos IP distintas se leen como dos IP y no como dos cosas sueltas.
   let carril = Y_ENT + ALTO_CAJA + 40;
-  entidades.forEach((e,i)=>{
-    const color = PALETA[i % PALETA.length];
+  entidades.forEach(e=>{
+    const color = COLOR_TIPO(e.nodo.tipo);
     otrosReportesDe(e.nodo).forEach(rv=>{
       const nr = nodoReporte(rv);
       if(!nr || nr.id===e.padre.id || !pos.has(nr.id)) return;
-      conector(abajo(pos.get(e.nodo.id)), abajo(pos.get(nr.id)),
-        {clase:"cruce", color, carril, alClic: ()=>ir({tipo:"entidad", id:e.nodo.id})});
+      const apagado = !coincide(e.nodo) || datoApagado(e.nodo.id);
+      conector(abajo(P(e.nodo.id)), abajo(P(nr.id)),
+        {clase:"cruce", color, carril, dato:e.nodo.id, punto:true, apagado: apagado,
+         realzado: focoDato===e.nodo.id,
+         alClic: ()=>alternarFoco({tipo:"entidad", id:e.nodo.id})});
       carril += 13;
     });
   });
 
   // --- cajas
-  const at = attr(nRaiz);
-  caja(gCaj, pos.get(nRaiz.id).x, pos.get(nRaiz.id).y, {
-    titulo:"Reporte "+nRaiz.valor,
-    sub: at["Plataforma"] ? at["Plataforma"]+" · en análisis" : "en análisis",
-    clases:"raiz"+(estado.sel && estado.sel.id===nRaiz.id?" sel":""),
-    alClic:()=>ir({tipo:"reporte", id:nRaiz.id})});
-  const dRaiz = datosDe(nRaiz.valor).length;
-  if(dRaiz) botonMas(gCaj, pos.get(nRaiz.id).x+ANCHO_CAJA-16,
-    pos.get(nRaiz.id).y+ALTO_CAJA-14, estado.abiertos.has(nRaiz.id),
-    ()=>{ alternar(nRaiz.id); },
-    (estado.abiertos.has(nRaiz.id)?"Cerrar":"Abrir")+" los "+dRaiz+" datos de este reporte");
+  // Un reporte que quedó bajo una identidad ya confirmada por un operador lo
+  // dice en su propia caja. No se dibuja la identidad como si fuera un dato
+  // más: es una conclusión sobre la persona, no algo que el reporte informe.
+  const distintivoIdentidad = valor => {
+    const idn = identidadDe(valor);
+    return idn && otrosReportesDe(idn).length>1
+      ? {marca:"misma persona", marcaColor:COLOR_TIPO("IDENTIDAD"), idn:idn} : {};
+  };
+  // El ⊕ va sobre el borde de abajo, en el punto exacto del que cuelgan los
+  // datos: es el mismo lugar donde después aparece la rama que abre.
+  const extra = id => (estado.mov.has(id)?" movida":"")+
+                      (estado.sel && estado.sel.id===id?" sel":"");
+  const cajaReporte = (nodo, sub, clases) => {
+    const p = P(nodo.id);
+    const dist = distintivoIdentidad(nodo.valor);
+    const n = datosDe(nodo.valor).length;
+    const apagada = !coincide(nodo) || repApagado(nodo.id);
+    const el = caja(gCaj, p.x, p.y, {
+      titulo:"Reporte "+nodo.valor, sub:sub,
+      marca:dist.marca, marcaColor:dist.marcaColor,
+      clases: clases+extra(nodo.id)+(apagada?" apagada":"")
+              +(hayFoco && !apagada ? " realzada":""),
+      alClic:()=>ir({tipo:"reporte", id:nodo.id})});
+    arrastrable(el, nodo.id);
+    if(n) botonMas(gCaj, p.x+ANCHO_CAJA/2, p.y+ALTO_CAJA,
+      estado.abiertos.has(nodo.id), ()=>alternar(nodo.id),
+      (estado.abiertos.has(nodo.id)?"Cerrar":"Abrir")+" los "+n+
+      " dato(s) de este reporte");
+    return el;
+  };
+
+  if(modoDato){
+    const p = P(nRaiz.id);
+    const el = caja(gCaj, p.x, p.y, {
+      titulo:nRaiz.etiqueta, sub:nRaiz.tipoLegible+" · en el centro",
+      marca:"en "+relacionados.length+" reportes",
+      color: COLOR_TIPO(nRaiz.tipo),
+      clases:"raiz"+extra(nRaiz.id),
+      alClic:()=>ir({tipo:"entidad", id:nRaiz.id})});
+    arrastrable(el, nRaiz.id);
+  } else {
+    const at = attr(nRaiz);
+    cajaReporte(nRaiz,
+      at["Plataforma"] ? at["Plataforma"]+" · en análisis" : "en análisis", "raiz");
+  }
 
   relacionados.forEach(r=>{
-    const p = pos.get(r.nodo.id), a2 = attr(r.nodo);
-    const est = a2["Motivo del archivo"] ? legible(a2["Motivo del archivo"])
-                                         : legible(a2["Estado en SIPAR"]);
-    caja(gCaj, p.x, p.y, {
-      titulo:"Reporte "+r.nodo.valor, sub:est,
-      clases: (estado.sel && estado.sel.id===r.nodo.id?"sel":""),
-      alClic:()=>ir({tipo:"reporte", id:r.nodo.id})});
-    const n = datosDe(r.nodo.valor).length;
-    if(n) botonMas(gCaj, p.x+ANCHO_CAJA-16, p.y+ALTO_CAJA-14,
-      estado.abiertos.has(r.nodo.id), ()=>alternar(r.nodo.id),
-      (estado.abiertos.has(r.nodo.id)?"Cerrar":"Abrir")+" los "+n+" datos de este reporte");
+    const a2 = attr(r.nodo);
+    cajaReporte(r.nodo, a2["Motivo del archivo"] ? breve(a2["Motivo del archivo"])
+                                                 : breve(a2["Estado en SIPAR"]), "");
   });
 
-  entidades.forEach((e,i)=>{
-    const p = pos.get(e.nodo.id);
+  entidades.forEach(e=>{
+    const p = P(e.nodo.id);
     const enN = otrosReportesDe(e.nodo).length;
-    caja(gCaj, p.x, p.y, {
+    const afuera = fueraDelCaso(e.nodo).length;
+    const apagada = !coincide(e.nodo) || datoApagado(e.nodo.id);
+    // Si el dato no se repite dentro del caso pero sí en otros, se dice: la
+    // caja sin marca ni líneas parecía un dato que a nadie más le figura.
+    const el = caja(gCaj, p.x, p.y, {
       titulo:e.nodo.etiqueta, sub:e.nodo.tipoLegible,
-      marca: enN>1 ? "en "+enN+" reportes" : null,
-      color: PALETA[i % PALETA.length],
-      clases: (estado.sel && estado.sel.id===e.nodo.id?"sel":""),
-      alClic:()=>ir({tipo:"entidad", id:e.nodo.id})});
+      marca: enN>1 ? "en "+enN+" reportes" : (afuera ? "en otros casos" : null),
+      marcaColor: enN>1 ? null : "#8fa1bb",
+      color: COLOR_TIPO(e.nodo.tipo),
+      clases: extra(e.nodo.id)+(apagada?" apagada":"")
+              +(focoDato===e.nodo.id ? " realzada":""),
+      alClic:()=>alternarFoco({tipo:"entidad", id:e.nodo.id})});
+    arrastrable(el, e.nodo.id);
+    el.addEventListener("mouseenter",()=>marcarCruces(e.nodo.id,true));
+    el.addEventListener("mouseleave",()=>marcarCruces(e.nodo.id,false));
   });
 
-  document.getElementById("pie").textContent =
-    relacionados.length+" reporte(s) vinculado(s) · "+entidades.length+" dato(s) a la vista";
+  document.getElementById("pie").textContent = modoDato
+    ? nRaiz.etiqueta+" consta en "+relacionados.length+" reporte(s) del caso · "+
+      entidades.length+" dato(s) a la vista"
+    : relacionados.length+" reporte(s) vinculado(s) · "+entidades.length+" dato(s) a la vista";
+  const chip = document.getElementById("centrado");
+  chip.style.display = modoDato ? "" : "none";
+  if(modoDato) chip.textContent = "◎ "+nRaiz.etiqueta+"  ✕";
   document.getElementById("contraer").disabled = estado.abiertos.size===0;
+  document.getElementById("ordenar").disabled = estado.mov.size===0;
   if(!VP.encuadrado){ encuadrar(); VP.encuadrado = true; }
 }
 function alternar(id){
@@ -897,6 +1292,19 @@ function encuadrar(){
 }
 document.getElementById("ajustar").onclick = ()=>{ encuadrar(); };
 document.getElementById("contraer").onclick = ()=>{ estado.abiertos.clear(); dibujar(); };
+document.getElementById("ordenar").onclick = ()=>{
+  estado.mov.clear(); VP.encuadrado = false; dibujar(); };
+
+/* Poner un dato en el centro: el árbol se cuelga de él y la fila de abajo pasa
+   a ser la de los reportes en los que consta. Es la vista para investigar un
+   identificador -una cuenta, un dispositivo- en lugar de un reporte. */
+function centrarEn(id){
+  estado.centro = id || null;
+  estado.abiertos.clear(); estado.mov.clear();
+  VP.encuadrado = false;
+  ir(id ? {tipo:"entidad", id:id} : {tipo:"inicio"});
+}
+document.getElementById("centrado").onclick = ()=>centrarEn(null);
 
 svg.addEventListener("wheel",e=>{
   e.preventDefault();
@@ -920,10 +1328,19 @@ document.getElementById("cuerpo").addEventListener("click", e=>{
   if(!acc) return;
   if(acc.dataset.accion==="descargar") descargarInforme();
   if(acc.dataset.accion==="raiz"){
-    estado.raiz = acc.dataset.valor; estado.abiertos.clear();
+    estado.raiz = acc.dataset.valor; estado.abiertos.clear(); estado.mov.clear();
     VP.encuadrado = false; ir({tipo:"inicio"});
   }
   if(acc.dataset.accion==="abrir"){ estado.abiertos.add(acc.dataset.valor); dibujar(); }
+  if(acc.dataset.accion==="centrar"){ centrarEn(acc.dataset.valor); }
+  if(acc.dataset.accion==="descentrar"){ centrarEn(null); }
+  if(acc.dataset.accion==="otroCaso"){
+    const rv = acc.dataset.valor, c = casoDe(rv);
+    if(c){
+      cambiarCaso(c.id);
+      const nr = nodoReporte(rv); if(nr) ir({tipo:"reporte", id:nr.id});
+    }
+  }
 });
 function ficha(html){
   document.getElementById("cuerpo").innerHTML = html;
@@ -980,11 +1397,29 @@ function fichaCaso(){
         '</div></div>';
     });
   }
+  /* Un reporte que quedó solo tiene que poder decir por qué. Sin esto, "no
+     quedó vinculado" no se distingue de "nunca se lo comparó con nada". */
+  const desc = descartadosDelReporte(raizVal);
+  if(desc.length){
+    h += '<h2>Se evaluó y no alcanzó ('+desc.length+')</h2>';
+    desc.forEach(x=>{
+      const otro = x.a===raizVal ? x.b : x.a, oc = casoDe(otro);
+      h += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+esc(otro)+'">'+
+        '<div style="font-size:12.5px"><b>Reporte '+esc(otro)+'</b>'+
+        (oc && oc.id!==c.id ? ' <span class="sub">· '+esc(oc.etiqueta)+'</span>':'')+
+        '</div><div style="font-size:12px;color:var(--suave);margin-top:5px">'+
+        'Comparten '+esc((x.compartido||[]).map(y=>y.valor).filter(Boolean).join(", "))+
+        '.</div><div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
+        esc(x.motivo||"")+'</div></div>';
+    });
+  }
+
   h += '<h2>Otros reportes del caso</h2>';
-  c.reportes.forEach(r=>{
-    if(r===raizVal) return;
-    h += '<span class="chip boton" data-accion="raiz" data-valor="'+r+'">analizar '+esc(r)+'</span>';
-  });
+  const otros = c.reportes.filter(r=>r!==raizVal);
+  h += otros.length
+    ? otros.map(r=>'<span class="chip boton" data-accion="raiz" data-valor="'+r+
+        '">analizar '+esc(r)+'</span>').join("")
+    : '<div class="vacio">Ninguno: el caso es este solo reporte.</div>';
   ficha(h);
 }
 
@@ -1005,6 +1440,21 @@ function fichaReporte(id){
     ' y se recibió el '+String(at["Fecha de recepción"]||"—").slice(0,10)+'.'+
     ' Actualmente '+(legible(at["Motivo del archivo"]) || legible(at["Estado en SIPAR"]) || "sin estado")+'.');
 
+  /* La identidad unificada no se dibuja en el lienzo: no es un dato que el
+     reporte informe, sino una conclusión que un operador aprobó a partir de
+     esos datos. Se explica acá, con los reportes que quedaron agrupados. */
+  const idn = identidadDe(n.valor);
+  if(idn && otrosReportesDe(idn).length>1){
+    h += '<h2>Identidad unificada</h2>'+
+      '<div class="tarjeta" style="border-color:rgba(129,140,248,.4)">'+
+      '<div style="font-size:12.5px;color:var(--suave);line-height:1.6">'+
+      'Un operador confirmó que las menciones de persona de '+
+      otrosReportesDe(idn).map(r=>'<b>'+esc(r)+'</b>').join(', ')+
+      ' corresponden a la misma persona. No es un dato del reporte: es una '+
+      'decisión humana registrada, y se revierte desde el libro de validaciones.'+
+      '</div></div>';
+  }
+
   if(vinc.length){
     h += '<h2>Se vincula con ('+vinc.length+')</h2>';
     vinc.forEach(a=>{
@@ -1015,6 +1465,28 @@ function fichaReporte(id){
     });
   } else {
     h += '<h2>Vinculaciones</h2><div class="vacio">Ninguna.</div>';
+  }
+
+  /* Sin esto, un reporte que quedó solo no se distingue de uno que el sistema
+     nunca comparó. Acá se ve que sí se lo comparó, con qué, y por qué no
+     prosperó. Es lo que permite discutir la regla. */
+  const desc = descartadosDelReporte(n.valor);
+  if(desc.length){
+    h += '<h2>Coincidencias que no alcanzaron ('+desc.length+')</h2>'+prosa(
+      'Estos reportes comparten algún dato con éste y fueron evaluados, pero la '+
+      'coincidencia no alcanzó para proponer una vinculación. Quedan registradas '+
+      'para poder revisar el criterio.');
+    desc.forEach(x=>{
+      const otro = x.a===n.valor ? x.b : x.a;
+      const c = casoDe(otro);
+      h += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+esc(otro)+'">'+
+        '<div style="font-size:12.5px"><b>Reporte '+esc(otro)+'</b>'+
+        (c? ' <span class="sub">· '+esc(c.etiqueta)+'</span>':'')+'</div>'+
+        '<div style="font-size:12px;color:var(--suave);margin-top:5px">Comparten '+
+        esc((x.compartido||[]).map(y=>y.valor).filter(Boolean).join(", "))+'.</div>'+
+        '<div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
+        esc(x.motivo||"")+'</div></div>';
+    });
   }
 
   if(datos.length){
@@ -1046,15 +1518,81 @@ function fichaReporte(id){
 function fichaEntidad(id){
   const n = NODOS.get(id); if(!n){ fichaCaso(); return; }
   const enR = otrosReportesDe(n);
-  let h = '<span class="chip cy">'+esc(n.tipoLegible)+'</span><h3>'+esc(n.etiqueta)+'</h3>';
+  const col = COLOR_TIPO(n.tipo);
+  let h = '<span class="chip cy" style="border-color:'+col+'55;color:'+col+
+    '"><span class="pt"></span>'+esc(n.tipoLegible)+'</span><h3>'+esc(n.etiqueta)+'</h3>';
+  /* Investigar el dato en vez del reporte: el árbol se cuelga de él. Solo tiene
+     sentido si consta en más de un reporte del caso. */
+  if(estado.centro===id){
+    h += '<div class="fila"><button data-accion="descentrar">'+
+      'Volver al reporte en análisis</button></div>';
+  } else if(enR.length>1){
+    h += '<div class="fila"><button class="primario" data-accion="centrar" '+
+      'data-valor="'+id+'">Poner este dato en el centro</button></div>'+
+      '<div class="sub" style="margin-bottom:4px">El árbol se arma alrededor de '+
+      'este dato y muestra los reportes en los que consta.</div>';
+  }
+
+  /* Lo primero que hay que contestar cuando alguien toca un dato en el lienzo
+     es qué vinculaciones sostiene, no en qué reportes está: para eso ya se ven
+     las líneas. Acá va el porqué. */
+  const sostiene = VINCULOS.filter(a=>{
+    const rs = reportesCaso();
+    if(!(rs.has((NODOS.get(a.a)||{}).valor) && rs.has((NODOS.get(a.b)||{}).valor)))
+      return false;
+    return (a.puente||[]).some(x=>x.nodo && RE(x.nodo)===id);
+  });
+  if(sostiene.length){
+    h += '<h2>Vinculaciones que sostiene ('+sostiene.length+')</h2>';
+    sostiene.forEach(a=>{
+      const tramo = (a.puente||[]).find(x=>x.nodo && RE(x.nodo)===id) || {};
+      h += '<div class="tarjeta click" data-ir="vinculo|'+a.id+'">'+
+        chipPeso(a.confianza)+
+        '<div style="margin-top:4px;font-size:12.5px"><b>Reporte '+
+        esc((NODOS.get(a.a)||{}).valor)+'</b> con <b>Reporte '+
+        esc((NODOS.get(a.b)||{}).valor)+'</b></div>'+
+        '<div style="font-size:12px;color:var(--suave);margin-top:4px">'+
+        esc(tramo.texto || (tramo.sostiene===false
+          ? "Corrobora la vinculación sin sostenerla por sí solo."
+          : "Es uno de los datos objetivos en que se apoya la vinculación."))+
+        '</div></div>';
+    });
+  } else if(enR.length>1){
+    h += '<h2>Vinculaciones que sostiene</h2>'+prosa(
+      'Este dato aparece en más de un reporte del caso, pero la vinculación '+
+      'entre ellos no se apoya en él. Puede estar corroborando otra relación, '+
+      'o no alcanzar por sí solo para individualizar.');
+  }
+
   h += '<h2>Aparece en '+enR.length+' reporte(s) del caso</h2>';
   enR.forEach(r=>{
     const nr = nodoReporte(r);
     h += '<div class="tarjeta click" data-ir="reporte|'+(nr?nr.id:"")+'">'+
       '<div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div></div>';
   });
-  if(enR.length>1) h += '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">'+
-    'Este dato se repite: es de los que sostienen las vinculaciones del caso.</p></div>';
+
+  const fuera = fueraDelCaso(n);
+  if(fuera.length){
+    h += '<h2>También en otros casos ('+fuera.length+')</h2>'+prosa(
+      'Este mismo dato aparece en reportes que no forman parte de este caso. '+
+      'Que no haya una línea hacia ellos no significa que el sistema no lo '+
+      'haya visto: significa que la coincidencia no alcanzó para sostener una '+
+      'vinculación.');
+    fuera.forEach(r=>{
+      const c = casoDe(r);
+      h += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+esc(r)+'">'+
+        '<div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div>'+
+        '<div class="sub" style="margin-top:3px">'+esc(c?c.etiqueta:"otro caso")+
+        '</div></div>';
+    });
+  }
+
+  const desc = descartadosDelDato(id);
+  if(desc.length){
+    h += '<h2>Coincidencias que no alcanzaron ('+desc.length+')</h2>';
+    desc.forEach(x=>{ h += tarjetaDescartada(x, id); });
+  }
+
   h += '<h2>Datos</h2>'+tabla(n.atributos);
   const rel = D.aristas.filter(a=>!a.entreReportes && (RE(a.a)===id||RE(a.b)===id));
   const vistos = new Set();
@@ -1161,28 +1699,52 @@ function markdown(t){
   cerrar();
   return '<div class="prosa">'+out.join("")+"</div>";
 }
+/* El informe es del caso en curso. El general -de toda la corrida- existe como
+   archivo aparte, pero no es lo que el operador firma. */
+function textoInforme(){
+  const c = caso(), i = D.informe||{};
+  return (c && (i.porCaso||{})[c.id]) || i.texto || "";
+}
 function fichaInforme(){
-  const t = (D.informe||{}).texto||"";
+  const t = textoInforme();
   ficha('<div class="fila"><button data-accion="descargar">Descargar .md</button>'+
     '<button data-ir="inicio|">Volver</button></div>'+
     (t? markdown(t) : '<div class="vacio">Sin informe.</div>'));
 }
 function descargarInforme(){
-  const b = new Blob([(D.informe||{}).texto||""],{type:"text/markdown;charset=utf-8"});
+  const c = caso();
+  const b = new Blob([textoInforme()],{type:"text/markdown;charset=utf-8"});
   const u = URL.createObjectURL(b), a = document.createElement("a");
-  a.href = u; a.download = "informe_vinculaciones.md"; a.click();
+  a.href = u; a.download = "informe_"+(c?c.id:"vinculaciones")+".md"; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1000);
 }
 document.getElementById("btnInforme").onclick = ()=>ir({tipo:"informe"});
 
-/* ============================================================ panel ======= */
-document.getElementById("plegDer").onclick = ()=>{
-  const p = document.getElementById("der");
-  p.classList.toggle("plegado");
-  document.getElementById("plegDer").textContent = p.classList.contains("plegado")?"‹":"›";
-};
-(function(){
-  const asa = document.getElementById("asa"), panel = document.getElementById("der");
+/* ============================================================ paneles ===== */
+function plegable(idPanel, idBoton, abierto, cerrado){
+  const b = document.getElementById(idBoton), p = document.getElementById(idPanel);
+  b.onclick = ()=>{
+    /* Al redimensionar a mano queda un flex-basis en línea, y el estilo en
+       línea gana sobre la regla de plegado: el panel se vaciaba pero seguía
+       ocupando el ancho al que lo habían llevado. Se guarda ese ancho, se
+       suelta el estilo mientras está plegado y se devuelve al abrirlo. */
+    const cerrando = !p.classList.contains("plegado");
+    if(cerrando){
+      p.dataset.ancho = p.style.flexBasis || "";
+      p.style.flexBasis = "";
+    } else if(p.dataset.ancho){
+      p.style.flexBasis = p.dataset.ancho;
+    }
+    p.classList.toggle("plegado");
+    b.textContent = p.classList.contains("plegado") ? cerrado : abierto;
+    VP.encuadrado = false; dibujar();
+  };
+}
+plegable("der","plegDer","›","‹");
+plegable("izq","plegIzq","‹","☰");
+
+function redimensionable(idAsa, idPanel, lado){
+  const asa = document.getElementById(idAsa), panel = document.getElementById(idPanel);
   let act = null;
   asa.addEventListener("pointerdown",e=>{
     act = {x:e.clientX, w:panel.getBoundingClientRect().width};
@@ -1190,11 +1752,111 @@ document.getElementById("plegDer").onclick = ()=>{
     document.body.style.userSelect="none"; });
   asa.addEventListener("pointermove",e=>{
     if(!act) return; panel.classList.remove("plegado");
-    panel.style.flexBasis = Math.max(280,Math.min(760,act.w+(act.x-e.clientX)))+"px"; });
+    const delta = lado==="izq" ? (e.clientX-act.x) : (act.x-e.clientX);
+    panel.style.flexBasis = Math.max(260,Math.min(760,act.w+delta))+"px"; });
   asa.addEventListener("pointerup",e=>{
     act=null; asa.releasePointerCapture(e.pointerId);
-    panel.style.transition=""; document.body.style.userSelect=""; });
-})();
+    panel.style.transition=""; document.body.style.userSelect="";
+    VP.encuadrado = false; dibujar(); });
+}
+redimensionable("asa","der","der");
+redimensionable("asaIzq","izq","izq");
+
+/* ------------------------------------------------------------- filtros --- */
+function refrescar(reencuadrar){
+  if(reencuadrar) VP.encuadrado = false;
+  dibujar();
+}
+function pintarTipos(){
+  const cont = document.getElementById("tipos");
+  cont.innerHTML = "";
+  TIPOS_DATO.forEach(t=>{
+    const l = document.createElement("label");
+    l.innerHTML = '<input type="checkbox"'+(estado.tipos.has(t)?" checked":"")+'>'+
+      '<span class="sw" style="background:'+COLOR_TIPO(t)+'"></span>'+
+      esc(NOMBRE_TIPO(t));
+    l.title = (D.tipos[t]||{}).desc || "";
+    l.querySelector("input").onchange = ev=>{
+      if(ev.target.checked) estado.tipos.add(t); else estado.tipos.delete(t);
+      refrescar(true);
+    };
+    cont.appendChild(l);
+  });
+}
+/* Leyenda del único criterio de color y trazo del lienzo. Si hay que mirar el
+   dibujo y adivinar qué significa una línea, la línea no sirve. */
+function pintarLeyenda(){
+  const trazos = [
+    ["solid",  "#6b7f9e", "Consta en la fuente del reporte"],
+    ["dashed", "#22d3ee", "Derivada por una regla del sistema"],
+    ["dotted", "#a78bfa", "Hipótesis todavía sin validar"],
+  ];
+  document.getElementById("leyenda").innerHTML =
+    trazos.map(([e,c,t])=>
+      '<div style="display:flex;align-items:center;font-size:11.5px;'+
+      'color:var(--suave);margin:6px 0"><span class="trazo" style="border-top-style:'+
+      e+';border-top-color:'+c+'"></span>'+esc(t)+'</div>').join("")+
+    '<div class="rotuloGrupo">Y el color, de qué dato se trata</div>'+
+    '<div style="font-size:11.5px;color:var(--suave);line-height:1.6">'+
+    'Cada tipo de dato tiene su color, el mismo en la barra de la caja y en la '+
+    'línea que la lleva a los otros reportes donde ese dato aparece. '+
+    'El número en ámbar dice en cuántos reportes del caso aparece.</div>';
+}
+function pintarAlertas(){
+  const rs = reportesCaso();
+  const al = (D.alertas||[]).filter(a=>rs.has(a.reporte_archivado));
+  const cont = document.getElementById("alertas");
+  if(!al.length){
+    cont.innerHTML = '<div class="vacio">Ninguno en este caso.</div>'; return;
+  }
+  /* Un archivado puede recibir el dato que le faltaba desde varios reportes a
+     la vez. Es un antecedente a revisar, no tres: se agrupa por el reporte
+     archivado y se enumeran los que lo reactivan. */
+  const porArchivado = new Map();
+  al.forEach(a=>{
+    if(!porArchivado.has(a.reporte_archivado))
+      porArchivado.set(a.reporte_archivado, {motivo:a.motivo_archivo, quienes:[]});
+    porArchivado.get(a.reporte_archivado).quienes.push(a.reporte_disparador);
+  });
+  cont.innerHTML = [...porArchivado.entries()].map(([rid,g])=>
+    '<div class="tarjeta alarma click" data-rep="'+esc(rid)+'">'+
+    '<div style="font-size:12.5px"><b>Reporte '+esc(rid)+'</b></div>'+
+    '<div class="sub" style="margin-top:3px">'+esc(legible(g.motivo))+'</div>'+
+    '<div style="font-size:11.5px;color:var(--suave);margin-top:6px">'+
+    (g.quienes.length===1
+      ? 'Lo reactiva el reporte '+esc(g.quienes[0])+'.'
+      : 'Lo reactivan los reportes '+esc(g.quienes.slice(0,-1).join(", "))+
+        ' y '+esc(g.quienes[g.quienes.length-1])+'.')+
+    '</div></div>').join("");
+  cont.querySelectorAll("[data-rep]").forEach(el=>el.onclick=()=>{
+    const n = nodoReporte(el.dataset.rep); if(n) ir({tipo:"reporte", id:n.id});
+  });
+}
+document.getElementById("buscar").addEventListener("input", e=>{
+  estado.texto = e.target.value; refrescar(false); });
+document.getElementById("peso").addEventListener("input", e=>{
+  estado.pesoMin = Number(e.target.value)/100;
+  document.getElementById("pesov").textContent = num(estado.pesoMin);
+  refrescar(true); });
+document.getElementById("verPesos").onchange = e=>{
+  estado.verPesos = e.target.checked; refrescar(false); };
+document.getElementById("soloComp").onchange = e=>{
+  estado.soloCompartidos = e.target.checked; estado.abiertos.clear(); refrescar(true); };
+document.getElementById("meta").textContent =
+  (D.meta.reportes||0)+" reportes ingresados · ontología "+(D.meta.ontologia||"");
+/* Al recargar, el navegador devuelve los controles como estaban antes y no
+   como los declara el documento. Si el estado no se lee del control, el panel
+   dice una cosa y el lienzo muestra otra. */
+function sincronizarControles(){
+  estado.verPesos = document.getElementById("verPesos").checked;
+  estado.soloCompartidos = document.getElementById("soloComp").checked;
+  estado.pesoMin = Number(document.getElementById("peso").value)/100;
+  estado.texto = document.getElementById("buscar").value;
+  document.getElementById("pesov").textContent = num(estado.pesoMin);
+}
+sincronizarControles();
+pintarTipos();
+pintarLeyenda();
 
 /* ============================================================ arranque ==== */
 const sel = document.getElementById("selCaso");
@@ -1203,10 +1865,12 @@ CASOS.forEach(c=>{
   o.value = c.id; o.textContent = c.etiqueta; sel.appendChild(o);
 });
 function cambiarCaso(id){
-  estado.caso = id; estado.raiz = null; estado.abiertos.clear();
+  estado.caso = id; estado.raiz = null; estado.centro = null;
+  estado.abiertos.clear(); estado.mov.clear();
   VP.encuadrado = false;
   HIST.pila = []; HIST.pos = -1;
   sel.value = id;
+  pintarAlertas();
   ir({tipo:"inicio"});
 }
 sel.onchange = e=>cambiarCaso(e.target.value);
@@ -1216,8 +1880,11 @@ if(CASOS.length) cambiarCaso(CASOS[0].id); else ficha('<div class="vacio">Sin ca
 """
 
 
-def render(g, res, ruta, dossier=None, texto_informe=None):
+def render(g, res, ruta, dossier=None, texto_informe=None,
+           informes_por_caso=None):
     datos = _datos(g, res, dossier, texto_informe)
+    if datos.get("informe") is not None:
+        datos["informe"]["porCaso"] = informes_por_caso or {}
     html = PLANTILLA.replace("__DATOS__",
                              json.dumps(datos, ensure_ascii=False, default=str))
     with open(ruta, "w", encoding="utf-8") as fh:
