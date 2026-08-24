@@ -1,0 +1,62 @@
+{
+ "255553607": {
+  "estado": "en_analisis",
+  "motivo_archivo": null,
+  "fecha": "2026-08-20",
+  "operador": "op_04"
+ },
+ "900000101": {
+  "estado": "archivado",
+  "motivo_archivo": "sin_datos_de_usuario",
+  "fecha": "2026-06-05",
+  "operador": "op_02"
+ },
+ "900000102": {
+  "estado": "archivado",
+  "motivo_archivo": "no_atribuible_nat",
+  "fecha": "2026-03-14",
+  "operador": "op_07"
+ },
+ "900000103": {
+  "estado": "en_analisis",
+  "motivo_archivo": null,
+  "fecha": "2026-08-12",
+  "operador": "op_01"
+ },
+ "900000104": {
+  "estado": "archivado",
+  "motivo_archivo": "material_sin_relevancia",
+  "fecha": "2026-05-22",
+  "operador": "op_03"
+ },
+ "900000105": {
+  "estado": "en_analisis",
+  "motivo_archivo": null,
+  "fecha": "2026-08-20",
+  "operador": "op_04"
+ },
+ "900000106": {
+  "estado": "en_analisis",
+  "motivo_archivo": null,
+  "fecha": "2026-08-20",
+  "operador": "op_04"
+ },
+ "900000107": {
+  "estado": "archivado",
+  "motivo_archivo": "sin_ubicacion",
+  "fecha": "2026-01-20",
+  "operador": "op_05"
+ },
+ "900000108": {
+  "estado": "en_investigacion",
+  "motivo_archivo": null,
+  "fecha": "2026-08-16",
+  "operador": "op_05"
+ },
+ "900000109": {
+  "estado": "archivado",
+  "motivo_archivo": "sin_ubicacion",
+  "fecha": "2026-07-03",
+  "operador": "op_06"
+ }
+}

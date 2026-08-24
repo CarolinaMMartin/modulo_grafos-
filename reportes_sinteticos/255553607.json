@@ -1,0 +1,418 @@
+{
+ "disclaimer": "This Report is provided solely for informational purposes pursuant to NCMEC's congressional authorization and nonprofit mission. Please treat all information in this Report as confidential.",
+ "about": "The National Center for Missing & Exploited Children (NCMEC) was incorporated in 1984 by child advocates as a non-profit 501(c)(3) organization to serve as a national clearinghouse and resource center for families, victims, private organizations, law enforcement, and the public on missing and sexually exploited child issues. To further our mission to help find missing children, reduce child sexual exploitation, and prevent future victimization, NCMEC operates the CyberTipline and makes information submitted to the CyberTipline available to law enforcement and also uses this information to help identify trends and create child safety and prevention messages. As a clearinghouse, NCMEC also works with Electronic Service Providers, law enforcement and the public in a combined effort to reduce online child sexual abuse images. NCMEC is not an agent or instrumentality of the government or law enforcement agency and does not act in the capacity of or under the direction or control of a government or law enforcement agency. NCMEC does not investigate and cannot verify the accuracy of the information submitted by reporting parties.",
+ "reportId": 255553607,
+ "informational": false,
+ "potentialMemeReport": null,
+ "dateMadeAvailable": "2026-08-20T14:25:00Z",
+ "dateReceived": "2026-08-19T21:30:20Z",
+ "reportedInformation": {
+  "disclaimer": "The information in this section was submitted electronically to the CyberTipline by the Reporting Person, NCMEC Call Center, or Reporting ESP. The information appearing in this section is information received in the original submission. The reporting of information in this section, other than incidentType and incidentDateTime, is voluntary and undertaken at the initiative of the Reporting Person or Reporting ESP.",
+  "reportingEsp": {
+   "firstName": null,
+   "middleName": null,
+   "lastName": null,
+   "addresses": {
+    "addresses": [
+     {
+      "street1": "PO Box 69414",
+      "street2": null,
+      "city": "West Hollywood",
+      "postalCode": "90069",
+      "state": "CA",
+      "nonUsaState": null,
+      "country": null,
+      "type": "BUSINESS"
+     }
+    ]
+   },
+   "phones": null,
+   "emails": null,
+   "additionalContactInformation": null,
+   "espName": "Grindr",
+   "companyInformation": null,
+   "termsOfService": null,
+   "contactForLawEnforcement": {
+    "contactPerson": {
+     "firstName": "NOMBRE",
+     "middleName": null,
+     "lastName": "REMOVIDO",
+     "addresses": null,
+     "phones": null,
+     "emails": {
+      "emails": [
+       {
+        "value": "contacto@esp.example",
+        "type": null,
+        "verified": null,
+        "verificationDate": null
+       }
+      ]
+     },
+     "additionalContactInformation": null
+    },
+    "contactUrl": null
+   },
+   "links": {
+    "links": [
+     {
+      "rel": "associations",
+      "href": "/reports/255553607/associations/REPORTER/255550953"
+     },
+     {
+      "rel": "location-predictions",
+      "href": "/reports/255553607/location-predictions/REPORTER/255550953"
+     }
+    ]
+   },
+   "id": 255550953,
+   "associationsEntityType": "Reporter"
+  },
+  "reportingPerson": null,
+  "batchedReport": null,
+  "incidentSummary": {
+   "incidentType": "Child Sexual Molestation",
+   "additionalIncidentTypes": null,
+   "supplementToReportId": null,
+   "platform": "Grindr App",
+   "reportAnnotations": null,
+   "incidentDateTime": "2026-08-18T13:43:06Z",
+   "incidentDateRange": null,
+   "incidentDateTimeDescription": "We received [an] in-app report(s) claiming that the reported user involved/tried to involve a minor in sexual acts.",
+   "incidentOngoing": null,
+   "incidentLocation": null,
+   "accessDateTimes": [],
+   "espEscalation": "The user mentions having a 23-year-old and is offering them online for sexual activities.",
+   "endangeredReporterOrVictimReason": null,
+   "supportingMaterials": null,
+   "otherReportRecipients": null
+  },
+  "incidentDetails": {
+   "newsgroupIncident": [],
+   "chatIncident": [
+    {
+     "notes": [
+      {
+       "value": "[2026-08-17 08:27:54 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:28:18 UTC] Other User (Profile 555191763): [texto original removido para publicacion] \n[2026-08-17 08:29:01 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:29:35 UTC] Other User (Profile 555191763): [texto original removido para publicacion] \n[2026-08-17 08:29:53 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:31:02 UTC] Other User (Profile 555191763): [texto original removido para publicacion] \n[2026-08-17 08:31:54 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:32:21 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:32:26 UTC] Other User (Profile 555191763): [texto original removido para publicacion] \n[2026-08-17 08:32:54 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:34:02 UTC] Other User (Profile 555191763): [texto original removido para publicacion] \n[2026-08-17 08:34:12 UTC] Other User (Profile 555191763): [texto original removido para publicacion] \n[2026-08-17 08:34:22 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:34:38 UTC] Reported User (Profile 888658825): [texto original removido para publicacion] \n[2026-08-17 08:37:25 UTC] Reported User (Profile 888658825): [texto original removido para publicacion]"
+      }
+     ],
+     "additonalInformations": [
+      {
+       "value": "Chat transcript attached"
+      }
+     ],
+     "thirdPartyContent": null,
+     "links": {
+      "links": [
+       {
+        "rel": "associations",
+        "href": "/reports/255553607/associations/INCIDENT_LOCATION/214185702"
+       }
+      ]
+     },
+     "id": 214185702,
+     "associationsEntityType": "Incident Location",
+     "screenName": null,
+     "chatServiceOrClient": "Grindr",
+     "chatRoomName": null,
+     "webcamInvolved": null,
+     "urls": null
+    }
+   ],
+   "gamingIncident": [],
+   "cellPhoneIncident": [],
+   "emailIncident": [],
+   "peerToPeerIncident": [],
+   "webpageIncident": [],
+   "otherInternetIncident": [],
+   "nonInternetIncident": [],
+   "internetIncident": []
+  },
+  "childVictims": null,
+  "reportedPeople": {
+   "reportedPersons": [
+    {
+     "firstName": null,
+     "middleName": null,
+     "lastName": null,
+     "addresses": null,
+     "phones": null,
+     "emails": null,
+     "additionalContactInformation": null,
+     "preferredName": null,
+     "gender": null,
+     "preferredPronouns": null,
+     "languages": null,
+     "races": null,
+     "disabilities": null,
+     "additionalDisabilityInformation": null,
+     "relationshipToReporter": null,
+     "relationshipToChildVictim": null,
+     "accessToChildVictim": null,
+     "accessToChildren": null,
+     "accessToFirearms": null,
+     "convictedSexOffender": null,
+     "awareOfReport": null,
+     "gangAffiliation": null,
+     "dateOfBirth": null,
+     "approximateAge": null,
+     "ageAssertionDiscrepancy": null,
+     "physicalDescription": null,
+     "vehicleDescription": null,
+     "vehicleTagNumber": null,
+     "occupation": null,
+     "espService": null,
+     "screenName": null,
+     "screenNames": null,
+     "displayNames": {
+      "displayNames": [
+       {
+        "value": "lechero"
+       }
+      ]
+     },
+     "onlineProfile": null,
+     "profileBio": "[texto original removido para publicacion]",
+     "espUserId": "888658825",
+     "compromisedAccount": null,
+     "ipAddress": null,
+     "sourceInformation": {
+      "sourceCaptures": [
+       {
+        "captureType": "IP Address",
+        "valueType": null,
+        "value": "181.46.66.242",
+        "eventName": "LOGIN",
+        "dateTime": "2026-08-17T08:52:15Z",
+        "possibleProxy": null,
+        "port": 19096
+       },
+       {
+        "captureType": "Device ID",
+        "valueType": "IDFA",
+        "value": "b534375433e0e502",
+        "eventName": "LOGIN",
+        "dateTime": null,
+        "possibleProxy": null,
+        "port": null
+       }
+      ]
+     },
+     "priorCybertipReports": null,
+     "espGroupId": null,
+     "thirdPartyUser": null,
+     "accountTemporarilyDisabled": null,
+     "accountPermanentlyDisabled": null,
+     "espEstimatedLocations": {
+      "espEstimatedLocations": [
+       {
+        "city": "Monte Grande",
+        "region": "B",
+        "countryCode": "AR",
+        "verified": false,
+        "timestamp": "2026-08-17T08:52:15Z"
+       }
+      ]
+     },
+     "allEmailsReported": null,
+     "associatedAccounts": null,
+     "additionalInformations": [
+      {
+       "value": "User account has been suspended"
+      }
+     ],
+     "links": {
+      "links": [
+       {
+        "rel": "associations",
+        "href": "/reports/255553607/associations/REPORTED_PERSON/257242493"
+       },
+       {
+        "rel": "location-predictions",
+        "href": "/reports/255553607/location-predictions/REPORTED_PERSON/257242493"
+       }
+      ]
+     },
+     "id": 257242493,
+     "associationsEntityType": "Reported Person"
+    }
+   ]
+  },
+  "intendedRecipients": null,
+  "lawEnforcementInformation": null,
+  "additionalInformations": [
+   {
+    "value": "REPORTE REDACTADO: el texto libre y los datos de contacto fueron removidos. Los identificadores tecnicos se conservan para que la logica de vinculacion siga siendo verificable."
+   }
+  ],
+  "uploadedFiles": null
+ },
+ "automatedInformation": {
+  "disclaimer": "Upon receipt of a CyberTipline report, NCMEC Systems may conduct automated processes on the information submitted in the reported information section. The information found in this section of this CyberTipline Report has been automatically generated by NCMEC Systems. If the CyberTipline Report was submitted by a member of the public, this section will contain no data.",
+  "explanations": {
+   "geoLookup": "When a reporting party voluntarily reports an IP address and/or phone number, NCMEC Systems will geographically resolve the IP address and/or phone number via publicly-available online queries. The results of the lookups are included in this section.\n\nGeolocation data is approximate and may not display a user's exact location. Please be aware that the geolocation information provided is not exact but is providing a reliable estimate of location based on identifiers voluntarily provided by the reporting party."
+  },
+  "externalDeconfliction": null,
+  "autoGeneratedNotes": {
+   "geoLookups": {
+    "reportedPersonGeoLookups": [
+     {
+      "ipAddress": "181.46.66.242",
+      "country": "AR",
+      "region": "B",
+      "city": "Monte Grande",
+      "postalCode": "1842",
+      "latitude": "-34.815",
+      "longitude": "-58.4693",
+      "metropolitanCode": null,
+      "areaCode": null,
+      "esp": "TeleCentro",
+      "organization": "TeleCentro",
+      "types": [
+       "residential"
+      ]
+     }
+    ],
+    "childVictimGeoLookups": [],
+    "imageGeoLookups": [],
+    "internetGeoLookups": []
+   },
+   "phoneGeoLookups": null,
+   "autoCloses": [],
+   "autoRefers": []
+  },
+  "companyInformation": null
+ },
+ "additionalNcmecInformation": {
+  "disclaimer": "This section contains information collected by NCMEC staff based on the information electronically submitted by the Reporting Person, NCMEC Call Center or Reporting ESP. This may contain a variety of additional information, including data gathered from searches on publicly-available, open-source websites. Any searches conducted by NCMEC staff will be documented and any search results will be saved to the electronic filing system when possible. The CyberTipline cannot confirm the accuracy of information found in public records or whether the results are affiliated with any parties relating to this report.",
+  "contactInformation": "If you need further information regarding the contents of this Report, please contact the CyberTipline at CyberTipline@ncmec.org or 1-877-446-2632, ext. 6702. For information regarding possible identified children seen in the uploaded files, please contact NCMEC's Child Victim Identification Program (CVIP) at cvip@ncmec.org or 1-877-446-2632, ext. 6705.",
+  "priority": {
+   "value": "Report submitted by a registered Electronic Service Provider",
+   "priorityId": "E"
+  },
+  "ncmecClassification": "Child Sexual Molestation",
+  "reportTags": {
+   "groups": [
+    {
+     "tags": [
+      {
+       "value": "Child Sexual Molestation"
+      }
+     ],
+     "name": "IT2"
+    },
+    {
+     "tags": [
+      {
+       "value": "Manual Review"
+      }
+     ],
+     "name": "Report Action"
+    }
+   ]
+  },
+  "uploadedFileViewability": null,
+  "escalationReason": "Grindr reported: \"The user mentions having a 23-year-old and is offering them online for sexual activities.\"",
+  "internationalCountry": "Argentina",
+  "dateTimeProcessed": "2026-08-20T14:25:44Z",
+  "missingChildCaseNumber": null,
+  "sentToLawEnforcement": true,
+  "sentToChild": false,
+  "commercialWebsite": false,
+  "involvesMail": false,
+  "associatedCybertipReports": null,
+  "executiveSummary": {
+   "value": "[texto original removido para publicacion]"
+  },
+  "notes": {
+   "notes": [
+    {
+     "value": "[texto original removido para publicacion]",
+     "type": "NCMEC Note",
+     "dateTime": "2026-08-20T14:24:54Z",
+     "sequence": null
+    },
+    {
+     "value": "[texto original removido para publicacion]",
+     "type": "NCMEC Note",
+     "dateTime": "2026-08-20T14:25:18Z",
+     "sequence": null
+    }
+   ]
+  },
+  "supplementFiles": null
+ },
+ "lawEnforcementContactInformation": {
+  "disclaimer": "The report was made available to the Law Enforcement Agency or Agencies listed below.",
+  "lawEnforcementContacts": [
+   {
+    "agency": "Argentina Judicial Investigation Center (CIJ)",
+    "officer": {
+     "firstName": "NOMBRE",
+     "middleName": null,
+     "lastName": "REMOVIDO",
+     "addresses": {
+      "addresses": [
+       {
+        "street1": null,
+        "street2": null,
+        "city": null,
+        "postalCode": null,
+        "state": null,
+        "nonUsaState": null,
+        "country": "AR",
+        "type": null
+       }
+      ]
+     },
+     "phones": {
+      "phones": [
+       {
+        "value": "+540000000000",
+        "type": null,
+        "verified": null,
+        "verificationDate": null,
+        "countryCallingCode": null,
+        "extension": null
+       }
+      ]
+     },
+     "emails": {
+      "emails": [
+       {
+        "value": "contacto@organismo.example",
+        "type": null,
+        "verified": null,
+        "verificationDate": null
+       },
+       {
+        "value": "contacto@organismo.example",
+        "type": null,
+        "verified": null,
+        "verificationDate": null
+       }
+      ]
+     },
+     "additionalContactInformation": null,
+     "title": "REMOVIDO"
+    },
+    "dateTimeMadeAvailable": "2026-08-20T14:25:00Z",
+    "leaFeedback": null,
+    "referralType": "NCMEC_ANALYST"
+   }
+  ]
+ },
+ "federalAgencies": null,
+ "links": {
+  "links": [
+   {
+    "rel": "associations",
+    "href": "/reports/255553607/associations"
+   },
+   {
+    "rel": "location-predictions",
+    "href": "/reports/255553607/location-predictions"
+   }
+  ]
+ }
+}

@@ -1,0 +1,23 @@
+# --- material que no sale de la maquina -------------------------------------
+# Originales sin redactar de reportes reales. Se conservan localmente.
+_privado/
+reporte anonimizado.txt
+
+# Documentacion institucional del proyecto (no es codigo)
+*.pdf
+
+# --- salidas generadas -------------------------------------------------------
+# Todo esto se regenera con: python grafo/construir.py
+grafo/salida/
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# --- sistema -----------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
