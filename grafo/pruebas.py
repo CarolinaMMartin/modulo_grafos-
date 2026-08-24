@@ -346,6 +346,26 @@ def main():
         check("la vinculacion manual persiste y conserva su id al reconstruir",
               ids1 == ids2 and ids1, str((ids1, ids2)))
 
+        # ------------------------------------------------------------------
+        print(chr(10)+"== La decision se toma en pantalla, no en la consola ==")
+        with open(os.path.join(BASE, "servidor.py"), "r", encoding="utf-8") as fh:
+            srv = fh.read()
+        check("el servidor escucha solo en esta computadora",
+              '("127.0.0.1"' in srv and "0.0.0.0" not in srv)
+        check("toda escritura pasa por un libro encadenado",
+              "LibroVinculos" in srv and "LibroValidaciones" in srv)
+        check("despues de escribir se reconstruye el grafo entero",
+              "reconstruir()" in srv)
+        check("el servidor no sirve archivos arbitrarios",
+              "SimpleHTTPRequestHandler" not in srv and "translate_path" not in srv)
+        check("el visor pide el fundamento antes de registrar",
+              "motivoObligatorio" in render_html.PLANTILLA
+              and "dlgMotivo" in render_html.PLANTILLA)
+        check("el visor ya no le pide a nadie que copie un comando",
+              "Copiar el comando" not in render_html.PLANTILLA)
+        check("abierto como archivo suelto, el boton explica en vez de fallar",
+              "Hay que abrir la aplicación" in render_html.PLANTILLA)
+
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

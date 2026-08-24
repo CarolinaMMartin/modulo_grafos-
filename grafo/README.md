@@ -11,8 +11,24 @@ Todo corre local, sin dependencias externas ni servicios de red.
 ## Ejecutar
 
 ```bash
+python servidor.py
+```
+
+Abre el visor en el navegador. **Es la forma de usarlo**: los botones que
+registran decisiones —vincular, revertir— solo funcionan acá, porque son los que
+escriben en el libro. Escucha solo en esta computadora y no autentica a nadie:
+el campo "quién lo dispone" sirve para saber quién dijo qué, no para acreditar
+identidad.
+
+Para generar las salidas sin levantar nada:
+
+```bash
 python construir.py
 ```
+
+Eso deja `salida/grafo.html`, que se abre con doble clic pero sirve solo para
+mirar: un archivo suelto no puede guardar nada. Si se toca un botón de decisión,
+el visor lo dice en lugar de fingir que anduvo.
 
 ```bash
 python pruebas.py
@@ -26,8 +42,6 @@ python generar_sinteticos.py
 ```
 
 ## Cómo se usa el visor
-
-Abrir `salida/grafo.html` en el navegador.
 
 **La pregunta que responde es una sola: este reporte, ¿tiene vinculaciones que
 justifiquen reabrirlo?** Todo lo demás está subordinado a eso.
@@ -98,20 +112,22 @@ cima del árbol y reconstruye la vista alrededor de él.
 ### Vincular a mano
 
 Si el sistema no vinculó dos reportes y a criterio del operador sí tienen que
-ver, la vinculación se establece a mano y queda registrada con su nombre y su
-fundamento:
+ver, en la ficha de cada coincidencia que no alcanzó hay un botón **Vincular
+estos reportes**. Se abre un cuadro que pide quién lo dispone y el fundamento
+—obligatorio, y va al informe—, se registra en el libro, se reconstruye el grafo
+y la pantalla vuelve al mismo reporte con el aviso de lo que quedó asentado.
+
+La vinculación se dibuja con su propio trazo, entra en el informe del caso y
+agrupa los dos reportes en el mismo legajo. No lleva peso: no hay nada calculado
+que ponderar. Se revierte desde su ficha, y el registro anterior no se borra.
+
+Los mismos actos por consola, para quien esté trabajando en el código:
 
 ```bash
 python validar.py vincular 900000104 900000109 --usuario op_04 --motivo "..."
+python validar.py vinculos
+python validar.py desvincular 900000104 900000109 --usuario op_04
 ```
-
-Se materializa en la próxima construcción con origen `afirmada`, se dibuja con
-su propio trazo, entra en el informe del caso y agrupa los dos reportes en el
-mismo legajo. No lleva peso: no hay nada calculado que ponderar. Se revierte con
-`desvincular`, y el registro anterior no se borra.
-
-En cada coincidencia que no alcanzó, el visor deja el comando armado con los dos
-reportes ya puestos, listo para copiar.
 
 ### Cómo leer las líneas
 
@@ -207,7 +223,7 @@ no borra: marca la arista como no vigente y conserva la historia.
 grafo/
   construir.py             orquestador: ingesta -> análisis -> salidas
   validar.py               CLI de validación humana
-  pruebas.py               invariantes no negociables (79 chequeos)
+  pruebas.py               invariantes no negociables (86 chequeos)
   generar_sinteticos.py    dataset sintético de prueba
   MODELO_DATOS.md          generado desde la ontología, no editar a mano
   ESTADO.md                qué está implementado y qué no

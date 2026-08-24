@@ -560,6 +560,31 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
 .cita{font-family:var(--mono);font-size:11px;color:var(--tenue);word-break:break-all;
   background:#0a1120;border:1px solid var(--borde);border-radius:8px;padding:9px 11px}
 .vacio{color:var(--tenue);font-size:12.5px;font-style:italic}
+/* --- dialogo de decision --------------------------------------------------
+   El operador no entra a una consola. Todo lo que registra una decision se
+   pide en pantalla, con el fundamento a la vista de quien lo escribe. */
+#velo{position:fixed;inset:0;background:rgba(3,6,12,.74);display:none;
+  align-items:center;justify-content:center;z-index:50}
+#velo.visible{display:flex}
+.modal{width:min(580px,92vw);max-height:88vh;overflow-y:auto;background:var(--panel);
+  border:1px solid var(--cyan-borde);border-radius:14px;padding:22px 24px 20px;
+  box-shadow:0 24px 70px rgba(0,0,0,.65)}
+.modal h3{margin:0 0 8px;font-size:16px}
+.modal .intro{font-size:12.5px;color:var(--suave);line-height:1.65;margin-bottom:4px}
+.modal label{display:block;font-size:10.5px;color:var(--cyan);margin:16px 0 6px;
+  text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.modal textarea{width:100%;min-height:104px;padding:10px 12px;border:1px solid var(--borde);
+  border-radius:8px;font:inherit;font-size:13px;line-height:1.6;background:#0a1120;
+  color:var(--texto);outline:none;resize:vertical}
+.modal textarea:focus{border-color:var(--cyan-borde)}
+.modal .ayuda{font-size:11.5px;color:var(--tenue);margin-top:6px;line-height:1.55}
+.modal .mal{font-size:12px;color:var(--alarma);min-height:17px;margin-top:10px}
+.modal .pie{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+#aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;
+  background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.42);
+  color:#6ee7b7;padding:11px 18px;border-radius:10px;font-size:12.5px;
+  display:none;max-width:80vw}
+#aviso.visible{display:block}
 #pie{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--tenue);
   font-family:var(--mono);pointer-events:none;background:rgba(6,10,18,.85);
   border-radius:8px;padding:6px 10px}
@@ -645,6 +670,9 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
   <button class="plegar" id="plegDer" title="Plegar la ficha">›</button>
   <div class="contenido" id="cuerpo"></div>
 </aside>
+
+<div id="velo"><div class="modal" id="modal"></div></div>
+<div id="aviso"></div>
 
 <script>
 const D = __DATOS__;
@@ -732,13 +760,152 @@ function descartadosDelReporte(valor){
 function casoDe(valorReporte){
   return CASOS.find(c=>c.reportes.includes(valorReporte));
 }
-/* El visor es un archivo suelto: no tiene con quién hablar ni sesión de
-   usuario, así que no puede escribir en el libro. Lo que sí puede es dejar el
-   comando exacto listo para copiar, con los dos reportes ya puestos. */
-function copiable(cmd){
-  return '<div class="cita" style="margin-top:6px">'+esc(cmd)+'</div>'+
-    '<div class="fila"><button data-accion="copiar" data-cmd="'+esc(cmd)+
-    '">Copiar el comando</button></div>';
+/* ================================================== decisiones del operador ==
+   Servido por `servidor.py`, el botón escribe de verdad: el servidor registra
+   en el libro, reconstruye el grafo y la pantalla se actualiza. Abierto como
+   archivo suelto no hay a quién pedirle nada, y ahí el botón explica cómo
+   abrir la aplicación en lugar de fingir que funciona.
+
+   Quien usa esto no entra a una consola. Todo lo que haya que declarar —quién
+   dispone la decisión y con qué fundamento— se pide en pantalla. */
+const EN_APP = location.protocol === "http:" || location.protocol === "https:";
+
+function operadorGuardado(){
+  try { return localStorage.getItem("bcij_operador") || ""; } catch(e){ return ""; }
+}
+function recordarOperador(v){
+  try { localStorage.setItem("bcij_operador", v); } catch(e){}
+}
+function avisar(texto){
+  if(!texto) return;
+  const a = document.getElementById("aviso");
+  a.textContent = texto; a.classList.add("visible");
+  setTimeout(()=>a.classList.remove("visible"), 7000);
+}
+function cerrarDialogo(){
+  document.getElementById("velo").classList.remove("visible");
+  document.getElementById("modal").innerHTML = "";
+}
+function dialogo(cfg){
+  const velo = document.getElementById("velo"), m = document.getElementById("modal");
+  m.innerHTML =
+    '<h3>'+esc(cfg.titulo)+'</h3>'+
+    '<div class="intro">'+cfg.intro+'</div>'+
+    '<label for="dlgOperador">Quién lo dispone</label>'+
+    '<input type="text" id="dlgOperador" placeholder="su identificación de operador" value="'+
+      esc(operadorGuardado())+'">'+
+    '<label for="dlgMotivo">'+esc(cfg.etiquetaMotivo)+'</label>'+
+    '<textarea id="dlgMotivo" placeholder="Escriba acá el fundamento de la decisión."></textarea>'+
+    '<div class="ayuda">'+cfg.ayuda+'</div>'+
+    '<div class="mal" id="dlgMal"></div>'+
+    '<div class="pie"><button id="dlgCancelar">Cancelar</button>'+
+    '<button class="primario" id="dlgAceptar">'+esc(cfg.aceptar)+'</button></div>';
+  velo.classList.add("visible");
+  const inpU = document.getElementById("dlgOperador");
+  const inpM = document.getElementById("dlgMotivo");
+  const mal = document.getElementById("dlgMal");
+  const btn = document.getElementById("dlgAceptar");
+  (operadorGuardado() ? inpM : inpU).focus();
+  document.getElementById("dlgCancelar").onclick = cerrarDialogo;
+  btn.onclick = ()=>{
+    const usuario = inpU.value.trim(), motivo = inpM.value.trim();
+    if(!usuario){ mal.textContent = "Falta indicar quién dispone la decisión."; return; }
+    if(cfg.motivoObligatorio && motivo.length < 10){
+      mal.textContent = "El fundamento es obligatorio y queda asentado en el "+
+        "informe del caso: conviene que se entienda por sí solo.";
+      return;
+    }
+    recordarOperador(usuario);
+    mal.textContent = ""; btn.disabled = true; btn.textContent = "Registrando...";
+    cfg.alAceptar(usuario, motivo).then(
+      msg=>recargarCon(msg),
+      err=>{ btn.disabled = false; btn.textContent = cfg.aceptar;
+             mal.textContent = String(err && err.message ? err.message : err); });
+  };
+}
+/* El servidor reconstruye el grafo entero después de escribir, de modo que lo
+   que se ve sale siempre de una corrida completa y nunca de un parche en
+   memoria. Se recarga conservando el caso en el que estaba el operador. */
+function recargarCon(mensaje){
+  /* Se guarda el REPORTE en análisis, no el legajo. El identificador de legajo
+     es posicional: al vincular dos reportes los legajos se renumeran, y volver
+     a "L003" deja al operador en un caso que no tiene nada que ver con el que
+     estaba mirando. El reporte, en cambio, sigue siendo el mismo. */
+  try {
+    sessionStorage.setItem("bcij_aviso", mensaje || "");
+    const c = caso();
+    const r = estado.raiz || (c && c.reportes[0]);
+    if(r) sessionStorage.setItem("bcij_reporte", r);
+  } catch(e){}
+  location.reload();
+}
+function pedir(ruta, cuerpo){
+  return fetch(ruta, {method:"POST", headers:{"Content-Type":"application/json"},
+                      body: JSON.stringify(cuerpo)})
+    .then(r=>r.json().then(j=>({ok:r.ok, j})))
+    .then(function(res){
+      if(!res.ok || !res.j.ok) throw new Error(res.j.error || "no se pudo registrar");
+      return res.j;
+    });
+}
+function sinApp(que){
+  const velo = document.getElementById("velo"), m = document.getElementById("modal");
+  m.innerHTML =
+    '<h3>Hay que abrir la aplicación</h3>'+
+    '<div class="intro">Está viendo el archivo del grafo, que sirve para mirar: '+
+    'no puede guardar nada. Para '+esc(que)+' hay que abrir la aplicación, que es '+
+    'la que registra las decisiones.</div>'+
+    '<div class="cita" style="margin-top:14px">python grafo/servidor.py</div>'+
+    '<div class="ayuda">Eso abre el visor en el navegador con los botones '+
+    'habilitados. Se corre una sola vez y queda andando.</div>'+
+    '<div class="pie"><button class="primario" id="dlgCerrar">Entendido</button></div>';
+  velo.classList.add("visible");
+  document.getElementById("dlgCerrar").onclick = cerrarDialogo;
+}
+
+function accionVincular(a, b){
+  if(!EN_APP) return sinApp("vincular estos reportes");
+  dialogo({
+    titulo: "Vincular los reportes "+a+" y "+b,
+    intro: 'El sistema no los vinculó: los comparó y las coincidencias no '+
+      'alcanzaron para sostenerlo por sí solas. Usted puede establecer la '+
+      'vinculación por su propio criterio. Va a quedar registrada como suya, '+
+      'con su fundamento, y los dos reportes van a pasar a tratarse como un '+
+      'mismo caso.',
+    etiquetaMotivo: "Fundamento de la vinculación",
+    ayuda: 'Queda asentado en el informe del caso y en el libro de '+
+      'vinculaciones. La vinculación se conserva hasta que alguien la revierta, '+
+      'y la reversión también queda asentada.',
+    motivoObligatorio: true,
+    aceptar: "Vincular",
+    alAceptar: function(usuario, motivo){
+      return pedir("/api/vincular", {reporte_a:a, reporte_b:b,
+                                     usuario:usuario, motivo:motivo})
+        .then(()=>"Reportes "+a+" y "+b+" vinculados. Quedaron en el mismo caso.");
+    }
+  });
+}
+function accionDesvincular(a, b){
+  if(!EN_APP) return sinApp("revertir esta vinculación");
+  dialogo({
+    titulo: "Revertir la vinculación entre "+a+" y "+b,
+    intro: 'La vinculación deja de aplicarse, pero el registro anterior no se '+
+      'borra: la historia de la decisión se conserva completa.',
+    etiquetaMotivo: "Motivo de la reversión",
+    ayuda: 'Puede dejarlo vacío, aunque conviene asentar por qué se revierte.',
+    motivoObligatorio: false,
+    aceptar: "Revertir",
+    alAceptar: function(usuario, motivo){
+      return pedir("/api/desvincular", {reporte_a:a, reporte_b:b,
+                                        usuario:usuario, motivo:motivo})
+        .then(()=>"Vinculación entre "+a+" y "+b+" revertida.");
+    }
+  });
+}
+/* Botón para una coincidencia que el sistema evaluó y descartó. */
+function botonVincular(a, b){
+  return '<div class="fila"><button class="primario" data-accion="vincular" '+
+    'data-a="'+esc(a)+'" data-b="'+esc(b)+'">Vincular estos reportes</button></div>';
 }
 
 /* Tarjeta de una coincidencia que se evaluó y no prosperó. */
@@ -1356,11 +1523,8 @@ document.getElementById("cuerpo").addEventListener("click", e=>{
   if(acc.dataset.accion==="abrir"){ estado.abiertos.add(acc.dataset.valor); dibujar(); }
   if(acc.dataset.accion==="centrar"){ centrarEn(acc.dataset.valor); }
   if(acc.dataset.accion==="descentrar"){ centrarEn(null); }
-  if(acc.dataset.accion==="copiar"){
-    navigator.clipboard.writeText(acc.dataset.cmd).then(
-      ()=>{ acc.textContent = "Copiado"; setTimeout(()=>{ acc.textContent = "Copiar el comando"; },1600); },
-      ()=>{ acc.textContent = "No se pudo copiar"; });
-  }
+  if(acc.dataset.accion==="vincular"){ accionVincular(acc.dataset.a, acc.dataset.b); }
+  if(acc.dataset.accion==="desvincular"){ accionDesvincular(acc.dataset.a, acc.dataset.b); }
   if(acc.dataset.accion==="otroCaso"){
     const rv = acc.dataset.valor, c = casoDe(rv);
     if(c){
@@ -1438,8 +1602,7 @@ function fichaCaso(){
         'Comparten '+esc((x.compartido||[]).map(y=>y.valor).filter(Boolean).join(", "))+
         '.</div><div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
         esc(x.motivo||"")+'</div></div>'+
-        copiable("python grafo/validar.py vincular "+raizVal+" "+otro+
-                 " --usuario TU_USUARIO --motivo \"...\"");
+        botonVincular(raizVal, otro);
     });
     h += '<div class="prosa"><p style="font-size:11.5px;color:var(--tenue)">'+
       'Si a su criterio estos reportes sí tienen que ver, la vinculación se '+
@@ -1520,8 +1683,7 @@ function fichaReporte(id){
         esc((x.compartido||[]).map(y=>y.valor).filter(Boolean).join(", "))+'.</div>'+
         '<div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
         esc(x.motivo||"")+'</div></div>'+
-        copiable("python grafo/validar.py vincular "+n.valor+" "+otro+
-                 " --usuario TU_USUARIO --motivo \"...\"");
+        botonVincular(n.valor, otro);
     });
   }
 
@@ -1681,8 +1843,9 @@ function fichaVinculo(id){
     h += '<h2>Cómo se revierte</h2>'+prosa(
       'Desde el mismo libro, con otro registro. El anterior no se borra: la '+
       'historia de la decisión se conserva.')+
-      copiable("python grafo/validar.py desvincular "+NODOS.get(a.a).valor+" "+
-               NODOS.get(a.b).valor+" --usuario TU_USUARIO");
+      '<div class="fila"><button data-accion="desvincular" data-a="'+
+      esc(NODOS.get(a.a).valor)+'" data-b="'+esc(NODOS.get(a.b).valor)+
+      '">Revertir esta vinculación</button></div>';
   }
   if(sost.length){
     h += '<h2>Lo que sostiene la vinculación</h2>';
@@ -1933,7 +2096,33 @@ function cambiarCaso(id){
 }
 sel.onchange = e=>cambiarCaso(e.target.value);
 window.addEventListener("resize", ()=>{ VP.encuadrado = false; dibujar(); });
-if(CASOS.length) cambiarCaso(CASOS[0].id); else ficha('<div class="vacio">Sin casos.</div>');
+document.getElementById("velo").addEventListener("click", e=>{
+  if(e.target.id==="velo") cerrarDialogo(); });
+window.addEventListener("keydown", e=>{
+  if(e.key==="Escape" &&
+     document.getElementById("velo").classList.contains("visible")) cerrarDialogo(); });
+
+/* Después de registrar una decisión el servidor reconstruye y la página se
+   recarga. Se vuelve al caso donde estaba el operador y se le dice qué pasó:
+   sin eso, la pantalla parpadea y no queda claro si quedó registrado. */
+let casoInicial = CASOS.length ? CASOS[0].id : null;
+let reporteInicial = null, avisoPendiente = "";
+try {
+  const r = sessionStorage.getItem("bcij_reporte");
+  const c = r && CASOS.find(x=>x.reportes.includes(r));
+  if(c){ casoInicial = c.id; reporteInicial = r; }
+  avisoPendiente = sessionStorage.getItem("bcij_aviso") || "";
+  sessionStorage.removeItem("bcij_reporte");
+  sessionStorage.removeItem("bcij_aviso");
+} catch(e){}
+
+if(casoInicial){
+  cambiarCaso(casoInicial);
+  if(reporteInicial){ estado.raiz = reporteInicial; VP.encuadrado = false; ir({tipo:"inicio"}); }
+} else {
+  ficha('<div class="vacio">Sin casos.</div>');
+}
+avisar(avisoPendiente);
 </script></body></html>
 """
 

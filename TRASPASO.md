@@ -60,9 +60,10 @@ Cuantico/
   _privado/                  originales sin redactar (fuera del repositorio)
   grafo/
     construir.py             orquestador
-    validar.py               CLI de validación humana
+    servidor.py              la aplicación: es lo que permite decidir en pantalla
+    validar.py               CLI de validación humana (equivalente, para técnicos)
     informe_ia.py            informe vía modelo local (opcional)
-    pruebas.py               79 invariantes
+    pruebas.py               86 invariantes
     generar_sinteticos.py    generador del dataset
     README.md                cómo se usa
     ESTADO.md                qué está implementado, simplificado o ausente
@@ -112,10 +113,21 @@ pip install networkx
 ```
 
 ```bash
+python grafo/servidor.py
+```
+
+Abre el visor en el navegador. **Es la forma de usarlo**: los botones que
+registran decisiones solo funcionan acá.
+
+Para generar las salidas sin levantar nada:
+
+```bash
 python grafo/construir.py
 ```
 
-Después, abrir `grafo/salida/grafo.html`.
+Eso deja `grafo/salida/grafo.html`, que se puede abrir con doble clic, pero
+sirve solo para mirar: un archivo suelto no puede guardar nada. Si se toca un
+botón de decisión, el visor lo dice en lugar de fingir que anduvo.
 
 ```bash
 python grafo/pruebas.py
@@ -138,16 +150,18 @@ python grafo/validar.py auditar
 ### Vincular a mano
 
 Cuando el sistema no vinculó dos reportes y el operador, con el expediente
-delante, concluye que sí tienen que ver:
+delante, concluye que sí tienen que ver: en el visor, cada coincidencia que no
+alcanzó trae el botón **Vincular estos reportes**. Se abre un cuadro que pide
+quién lo dispone y el fundamento, se registra, se reconstruye el grafo y la
+pantalla vuelve al mismo reporte con el aviso de lo que quedó asentado.
+
+Los mismos actos por consola, para quien esté trabajando en el código:
 
 ```bash
 python grafo/validar.py vincular 900000104 900000109 --usuario op_04 --motivo "..."
 python grafo/validar.py vinculos
 python grafo/validar.py desvincular 900000104 900000109 --usuario op_04
 ```
-
-El `--motivo` es obligatorio y viaja al informe. El visor deja el comando
-armado, con los dos reportes ya puestos, en cada coincidencia que no alcanzó.
 
 ### Informe
 
@@ -337,7 +351,39 @@ Propiedades que la distinguen:
 Vive en `estado/vinculos_manuales.jsonl`, con la misma cadena de hashes y las
 mismas limitaciones que el libro de validaciones.
 
-### 4.14 Blocking, para que escale
+### 4.14 La decisión se toma en pantalla, no en la consola
+
+El visor nació como un HTML autocontenido, y eso fue correcto mientras servía
+para mirar: se abre con doble clic y no necesita nada levantado. Dejó de
+alcanzar en el momento en que el operador tuvo que poder **vincular** dos
+reportes, porque un archivo abierto con doble clic no puede escribir en ningún
+lado.
+
+La primera versión dejaba el comando armado para copiar y pegar en una consola.
+No sirve: **quien usa esto es abogado y no entra a una consola.** Un botón que
+en realidad no hace nada es peor que no tener el botón.
+
+Por eso existe `servidor.py`: el mínimo que hace falta para que el botón
+funcione de verdad. Es Python de biblioteca estándar, sin dependencias.
+
+- Escucha **solo en 127.0.0.1**. No queda expuesto a la red.
+- Toda escritura pasa por el libro append-only encadenado por hash. El servidor
+  no toca el grafo.
+- Después de cada escritura **reconstruye el grafo entero** desde los reportes.
+  Lo que se ve en pantalla siempre sale de una corrida completa, nunca de un
+  parche en memoria.
+- La página se recarga y **vuelve al reporte donde estaba el operador**, con un
+  aviso de lo que quedó registrado.
+- No hay autenticación. El campo *«quién lo dispone»* es **atribución, no
+  identidad verificada**: sirve para saber quién dijo qué, no para probar que
+  fue esa persona. En la Bóveda lo reemplaza la sesión institucional. Está
+  dicho en el arranque del servidor y en `ESTADO.md`.
+- Abierto como archivo suelto, el botón **explica cómo abrir la aplicación** en
+  lugar de fallar en silencio.
+
+Es un servidor de piloto, sin hardening, y no se despliega así.
+
+### 4.15 Blocking, para que escale
 
 Comparar todos contra todos es `O(n²)`. Se construye un índice
 `identificador → reportes` y solo se comparan pares que ya comparten algo. El
@@ -714,8 +760,14 @@ El visor es del caso, pero el circuito alrededor no existe:
 
 ### Técnico
 
-- **Botón de validar en la interfaz.** Hoy la aprobación es por CLI porque no
-  hay sesión de usuario.
+- **Validar y rechazar desde la interfaz.** La vinculación manual ya se hace en
+  pantalla (§4.14) y el servidor expone `/api/decidir`, pero el visor todavía no
+  tiene el botón: la aprobación de relaciones y la unificación de identidades
+  siguen siendo por CLI. Es el mismo circuito, falta el control.
+- **Identificador de caso estable.** El legajo se numera por posición: al
+  vincular dos reportes, todos los legajos se renumeran y "L003" pasa a ser otro
+  caso. El visor ya no depende de eso —guarda el reporte, no el legajo—, pero
+  cualquier cosa que referencie un caso desde afuera se va a romper.
 - **Casos con muchos datos.** Existe el filtro *«solo los datos que comparte con
   otro reporte»*, pero sale apagado. Si en casos reales hay reportes con muchas
   más entidades, habría que invertirlo: mostrar por defecto solo los
