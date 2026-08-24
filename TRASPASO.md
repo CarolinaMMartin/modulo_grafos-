@@ -62,7 +62,7 @@ Cuantico/
     construir.py             orquestador
     validar.py               CLI de validación humana
     informe_ia.py            informe vía modelo local (opcional)
-    pruebas.py               69 invariantes
+    pruebas.py               79 invariantes
     generar_sinteticos.py    generador del dataset
     README.md                cómo se usa
     ESTADO.md                qué está implementado, simplificado o ausente
@@ -83,23 +83,25 @@ Cuantico/
       informe.py             informe técnico en Markdown
       docs_modelo.py         genera MODELO_DATOS.md
       jurisdiccion.py        SIN CONECTAR — ver sección 8
-    estado/validaciones.jsonl  decisiones humanas registradas
+    estado/validaciones.jsonl        decisiones sobre relaciones existentes
+    estado/vinculos_manuales.jsonl   vinculaciones que dispuso una persona
     salida/                    resultados de la última corrida (no versionado)
     salida/informes_por_caso/  un informe por caso, que es el que se firma
 ```
 
 ### Resultado sobre el dataset de prueba
 
-10 reportes → 65 nodos, 115 aristas (84 observadas, 28 derivadas, 3 inferidas),
-**0 incumplimientos de procedencia**.
+10 reportes → 65 nodos, 116 aristas (84 observadas, 28 derivadas, 3 inferidas,
+1 afirmada por un operador), **0 incumplimientos de procedencia**.
 
 - **8 vinculaciones** propuestas, peso promedio 0,95.
 - **4 descartadas**, todas informadas con su motivo.
+- **1 vinculación establecida a mano** por un operador, con su fundamento.
 - **5 antecedentes archivados** reactivados.
 - **1 contradicción** por desplazamiento implausible.
 - **3 hipótesis de identidad**, 1 unificada por decisión humana registrada.
-- **5 casos** (legajos): L001 con 4 reportes, L002 y L003 con 2, y 2 reportes
-  sueltos. Cada uno con su informe.
+- **4 casos** (legajos), cada uno con su informe. L003 existe porque un operador
+  vinculó a mano dos reportes que se habían archivado por insuficiencia.
 
 ---
 
@@ -132,6 +134,20 @@ python grafo/validar.py identidades
 python grafo/validar.py unificar e_95a74f9390f1562c --usuario op_04
 python grafo/validar.py auditar
 ```
+
+### Vincular a mano
+
+Cuando el sistema no vinculó dos reportes y el operador, con el expediente
+delante, concluye que sí tienen que ver:
+
+```bash
+python grafo/validar.py vincular 900000104 900000109 --usuario op_04 --motivo "..."
+python grafo/validar.py vinculos
+python grafo/validar.py desvincular 900000104 900000109 --usuario op_04
+```
+
+El `--motivo` es obligatorio y viaja al informe. El visor deja el comando
+armado, con los dos reportes ya puestos, en cada coincidencia que no alcanzó.
 
 ### Informe
 
@@ -288,7 +304,40 @@ La única excepción son las coincidencias descartadas, que sí nombran reportes
 afuera: es el registro de *"se comparó y no alcanzó"*, y el informe aclara
 expresamente que esos reportes no integran el caso.
 
-### 4.13 Blocking, para que escale
+### 4.13 Una persona puede vincular lo que el sistema no vinculó
+
+El caso es real y frecuente: dos reportes se archivaron por insuficiencia y el
+operador, con el expediente delante, concluye que tienen que ver. Eso el sistema
+no lo puede deducir; lo que sí tiene que hacer es conservarlo.
+
+Esa vinculación **no es ninguna de las tres categorías** de `CLAUDE.md` §10.1: no
+consta en la fuente, no sale de una regla, y no es una hipótesis del sistema
+esperando validación —ya es la decisión—. Meterla en cualquiera de las tres sería
+mezclar justamente lo que el proyecto pide no mezclar.
+
+Por eso se agregó un cuarto origen, **`afirmada`**, con su propia relación
+`VINCULADO_POR_OPERADOR`. Es un apartamiento del documento rector y **queda
+pendiente de validar con los especialistas** (§9.7).
+
+Propiedades que la distinguen:
+
+- **No lleva peso.** No hay nada calculado que ponderar, y un número ahí sería
+  precisión inventada. La ficha lo dice con todas las letras.
+- **Nace validada**, porque la validación *es* el acto que la crea. Pero registra
+  quién la dispuso, cuándo y con qué fundamento, como cualquier otra.
+- **Conserva procedencia completa**: fuente `operador:<usuario>`, locator al
+  registro del libro, método y versión, explicación en prosa.
+- **Agrupa los dos reportes en el mismo caso**, que es lo que el operador está
+  afirmando al establecerla. Entra a la proyección sin pasar por el umbral, y
+  ninguna derivada la pisa.
+- **Se revierte con otro registro**, nunca borrando el anterior.
+- **Sobrevive a reconstruir el grafo**, porque el identificador se recalcula
+  igual desde el libro. Hay un invariante que lo verifica.
+
+Vive en `estado/vinculos_manuales.jsonl`, con la misma cadena de hashes y las
+mismas limitaciones que el libro de validaciones.
+
+### 4.14 Blocking, para que escale
 
 Comparar todos contra todos es `O(n²)`. Se construye un índice
 `identificador → reportes` y solo se comparan pares que ya comparten algo. El
@@ -613,12 +662,21 @@ Los valores por prestador son estimados. Hay que confirmarlos con cada uno.
 Parcial y escrita a mano en `jurisdiccion.py` (hoy desconectado). Requiere
 validación institucional si se retoma la Etapa 2.
 
-### 9.5 Volumen real
+### 9.5 El cuarto origen
+
+`afirmada` no está en `CLAUDE.md` §10.1, que enumera tres. Se agregó porque una
+vinculación que dispone una persona no entra en ninguna de las tres sin
+desdibujarlas (§4.13). Hay que validar con los especialistas si la categoría es
+correcta, cómo se llama, y qué efecto tiene sobre una actuación: en particular,
+si una vinculación manual debe poder disparar por sí sola la revisión de un
+archivado, cosa que hoy **no** hace.
+
+### 9.6 Volumen real
 
 No hay medición de cuántos reportes, nodos y aristas hay en el histórico. Sin
 eso no se puede decidir si hace falta una base de grafos distribuida.
 
-### 9.6 Punto pendiente de la conversación
+### 9.7 Punto pendiente de la conversación
 
 En un mensaje quedó un **"3."** sin completar, después de pedir (1) el visor
 acotado al caso y (2) el inventario de tecnologías. Nunca se aclaró qué era.

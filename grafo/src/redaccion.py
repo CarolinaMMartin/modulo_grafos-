@@ -94,6 +94,24 @@ def redactar(d, caso=None):
         a(u"### Reportes %s y %s\n" % (v["reporte_a"], v["reporte_b"]))
         a(v["fundamento"] + u"\n")
 
+    a(u"## III bis. Vinculaciones establecidas por un operador\n")
+    manuales = d.get("vinculaciones_manuales") or []
+    if not manuales:
+        a(u"No se estableció ninguna vinculación por decisión de un operador.\n")
+    else:
+        a(u"Las siguientes vinculaciones no las propuso el sistema. Las dispuso "
+          u"una persona por su propio criterio, y por eso no llevan peso: no hay "
+          u"un cálculo que ponderar, hay una decisión y su fundamento.\n")
+        for m in manuales:
+            a(u"### Reportes %s y %s\n" % (m["reporte_a"], m["reporte_b"]))
+            a(u"Vinculación establecida por %s%s.\n"
+              % (m.get("dispuesta_por") or u"un operador",
+                 u" el %s" % m["fecha"][:10] if m.get("fecha") else u""))
+            if m.get("motivo"):
+                a(u"Fundamento registrado: «%s»\n" % m["motivo"])
+            a(u"Se conserva hasta que se revierta desde el libro de "
+              u"vinculaciones, y la reversión también queda asentada.\n")
+
     a(u"## IV. Peso de las vinculaciones\n")
     p = d["pesos"]
     if p.get("cantidad"):

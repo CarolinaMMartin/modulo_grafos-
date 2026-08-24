@@ -19,8 +19,16 @@ ONTOLOGIA_VERSION = "0.3.0"
 OBSERVADA = "observada"   # surge directamente de un campo de la fuente
 DERIVADA = "derivada"     # regla determinista reproducible sobre datos observados
 INFERIDA = "inferida"     # similitud / modelo / LLM / GNN -> hipotesis
+# Cuarta categoria, que no produce el sistema sino una persona. CLAUDE.md 10.1
+# enumera tres porque describe lo que el sistema deriva de la evidencia; una
+# vinculacion que un operador establece por su propio criterio no es ninguna de
+# esas tres, y meterla dentro de cualquiera de ellas seria mezclar lo que el
+# proyecto pide no mezclar: no consta en la fuente, no sale de una regla, y no
+# es una hipotesis del sistema a la espera de validacion -ya es la decision-.
+# Queda pendiente de validar con los especialistas (ver TRASPASO 9).
+AFIRMADA = "afirmada"     # la establecio una persona, bajo su responsabilidad
 
-ORIGENES = (OBSERVADA, DERIVADA, INFERIDA)
+ORIGENES = (OBSERVADA, DERIVADA, INFERIDA, AFIRMADA)
 
 ESTADOS_VALIDACION = (
     "pendiente",      # propuesta por el sistema, sin revision humana
@@ -35,6 +43,10 @@ ESTADO_INICIAL = {
     OBSERVADA: "validada",
     DERIVADA: "pendiente",
     INFERIDA: "pendiente",
+    # Una afirmacion humana nace validada porque la validacion ES el acto que
+    # la crea. Igual queda registrada con quien, cuando y por que, y se revierte
+    # desde el mismo libro.
+    AFIRMADA: "validada",
 }
 
 # ---------------------------------------------------------------------------
@@ -122,6 +134,13 @@ RELACIONES = {
     "RESPONDE_A": dict(origen=DERIVADA, desc="Respuesta de prestador -> oficio"),
     "IDENTIFICADO_COMO": dict(origen=DERIVADA,
                               desc="Mencion -> identidad unificada por decision humana"),
+
+    # -- afirmadas: no las produce el sistema, las dispone una persona -------
+    "VINCULADO_POR_OPERADOR": dict(
+        origen=AFIRMADA,
+        desc="Reporte -> reporte. Vinculacion que un operador establece por su "
+             "propio criterio, con fundamento registrado. No la propuso el "
+             "sistema y no se recalcula: se conserva hasta que se revierta"),
 
     # -- inferidas: hipotesis, siempre pendientes de validacion --------------
     "POSIBLE_MISMA_IDENTIDAD": dict(origen=INFERIDA,
@@ -274,6 +293,7 @@ ETIQUETA_RELACION = {
     "ASIGNADA_A": u"está asignada al prestador",
     "PERTENECE_A_JURISDICCION": u"competencia propuesta",
     "COINCIDE_CON": u"coincide con",
+    "VINCULADO_POR_OPERADOR": u"vinculado por un operador con",
     "POSIBLE_DUPLICADO_DE": u"sería un duplicado de",
     "CONTRADICE": u"contradice",
     "RESPONDE_A": u"responde a",
@@ -286,6 +306,7 @@ ETIQUETA_ORIGEN = {
     OBSERVADA: u"Consta en la fuente",
     DERIVADA: u"Derivada por regla",
     INFERIDA: u"Hipótesis a validar",
+    AFIRMADA: u"Establecida por un operador",
 }
 
 DESCRIPCION_ORIGEN = {
@@ -296,6 +317,10 @@ DESCRIPCION_ORIGEN = {
               u"debe ser revisada por una persona.",
     INFERIDA: u"Es una hipótesis producida por similitud o por un modelo. No "
               u"acredita nada por sí sola y requiere validación humana.",
+    AFIRMADA: u"La estableció una persona por su propio criterio, no el "
+              u"sistema. No surge de la fuente ni de una regla: queda "
+              u"registrada con quién la dispuso, cuándo y con qué fundamento, "
+              u"y puede revertirse.",
 }
 
 ETIQUETA_ESTADO = {

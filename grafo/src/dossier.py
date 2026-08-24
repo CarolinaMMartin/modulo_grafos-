@@ -99,6 +99,17 @@ def construir(g, res):
              peso_total=x["confianza"], motivo=x["motivo"],
              elementos=[_regla(y) for y in x["disparos"]])
         for x in res.get("vinculacion", {}).get("descartados", [])]
+    # Vinculaciones que dispuso una persona. Van en el dossier -y por lo tanto
+    # en el informe- separadas de las que propuso el sistema: es una afirmacion
+    # de quien firma, no un hallazgo del analisis.
+    dossier["vinculaciones_manuales"] = [
+        dict(reporte_a=g.G.nodes[u]["valor"], reporte_b=g.G.nodes[v]["valor"],
+             dispuesta_por=d.get("dispuesta_por") or d.get("validated_by"),
+             fecha=d.get("validated_at"),
+             motivo=d.get("motivo_operador"),
+             fundamento=d.get("explicacion"))
+        for u, v, k, d in g.aristas(origen=ont.AFIRMADA)
+        if d["relation_type"] == "VINCULADO_POR_OPERADOR"]
     dossier["antecedentes_reactivados"] = [
         dict(reporte_archivado=a["reporte_archivado"],
              motivo_de_archivo=a["motivo_archivo"],
@@ -165,6 +176,8 @@ def recortar(d, reportes):
     e["pesos"] = _resumen_pesos(e["vinculaciones"])
     e["vinculaciones_descartadas"] = [x for x in d["vinculaciones_descartadas"]
                                       if toca(x)]
+    e["vinculaciones_manuales"] = [x for x in d.get("vinculaciones_manuales", [])
+                                   if toca(x)]
     e["antecedentes_reactivados"] = [
         a for a in d["antecedentes_reactivados"]
         if a["reporte_archivado"] in rs or a["reporte_que_lo_reactiva"] in rs]

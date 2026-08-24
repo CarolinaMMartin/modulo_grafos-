@@ -289,10 +289,14 @@ def _datos(g, res, dossier=None, texto_informe=None):
                 camino_a=_camino(g, u, n_dato),
                 camino_b=_camino(g, v, n_dato)))
         puente.sort(key=lambda z: (not z["sostiene"], -(z["peso"] or 0)))
-        motivo = u", ".join(
-            MOTIVO_CORTO.get(_tipo_crudo(x), u"dato compartido")
-            for x in (d.get("detalle_reglas") or [])
-            if not x.get("corrobora_solamente")) or u"dato compartido"
+        if d["relation_type"] == "VINCULADO_POR_OPERADOR":
+            # No hay dato compartido que mostrar: la vinculacion es la decision.
+            motivo = u"lo vinculó un operador"
+        else:
+            motivo = u", ".join(
+                MOTIVO_CORTO.get(_tipo_crudo(x), u"dato compartido")
+                for x in (d.get("detalle_reglas") or [])
+                if not x.get("corrobora_solamente")) or u"dato compartido"
         aristas.append(dict(
             puente=puente,
             motivo=motivo,
@@ -301,7 +305,10 @@ def _datos(g, res, dossier=None, texto_informe=None):
             relacionLegible=ont.ETIQUETA_RELACION.get(d["relation_type"],
                                                       d["relation_type"]),
             entreReportes=d["relation_type"] in ("COINCIDE_CON",
-                                                 "POSIBLE_DUPLICADO_DE"),
+                                                 "POSIBLE_DUPLICADO_DE",
+                                                 "VINCULADO_POR_OPERADOR"),
+            dispuestaPor=d.get("dispuesta_por"),
+            motivoOperador=d.get("motivo_operador"),
             origen=d["origin"],
             origenLegible=ont.ETIQUETA_ORIGEN[d["origin"]],
             origenDesc=ont.DESCRIPCION_ORIGEN[d["origin"]],
@@ -480,7 +487,7 @@ svg.arrastrando{cursor:grabbing}
 .caja{cursor:grab}
 .caja.moviendo{cursor:grabbing}
 .caja.movida rect.cuerpo{filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))}
-.caja rect.cuerpo{fill:#0e1728;stroke:#2b3a55;stroke-width:1.4;rx:7;
+.caja rect.cuerpo{fill:#0e1728;stroke:#3a4f70;stroke-width:1.5;rx:7;
   transition:stroke .18s,fill .18s}
 .caja:hover rect.cuerpo{stroke:var(--cyan)}
 .caja.sel rect.cuerpo{stroke:#fff;stroke-width:2}
@@ -499,6 +506,7 @@ svg.arrastrando{cursor:grabbing}
 .caja.apagada rect.cuerpo{stroke:#22314c;stroke-width:1.4}
 
 .mas{cursor:pointer}
+.mas.apagada{opacity:.16}
 .mas circle{fill:#0d1626;stroke:var(--ambar);stroke-width:1.4;transition:fill .18s}
 .mas:hover circle{fill:rgba(251,191,36,.25)}
 .mas path{stroke:var(--ambar);stroke-width:1.6;stroke-linecap:round}
@@ -520,6 +528,9 @@ svg.arrastrando{cursor:grabbing}
    letras. */
 .con.duplicado{stroke-dasharray:4 4}
 .con.inferida{stroke:#a78bfa;stroke-width:1.8;stroke-dasharray:2 4}
+/* La afirmada por una persona: raya y punto, el trazo con el que se marca a
+   mano un plano. No lleva peso porque no hay nada calculado. */
+.con.afirmada{stroke:#7dd3fc;stroke-width:2.6;stroke-dasharray:14 4 3 4}
 .con.cruce{stroke-width:1.7;opacity:.72}
 .con.realzada{opacity:1;stroke-width:2.8;filter:drop-shadow(0 0 4px currentColor)}
 .con.origen{stroke-width:0}
@@ -721,6 +732,15 @@ function descartadosDelReporte(valor){
 function casoDe(valorReporte){
   return CASOS.find(c=>c.reportes.includes(valorReporte));
 }
+/* El visor es un archivo suelto: no tiene con quién hablar ni sesión de
+   usuario, así que no puede escribir en el libro. Lo que sí puede es dejar el
+   comando exacto listo para copiar, con los dos reportes ya puestos. */
+function copiable(cmd){
+  return '<div class="cita" style="margin-top:6px">'+esc(cmd)+'</div>'+
+    '<div class="fila"><button data-accion="copiar" data-cmd="'+esc(cmd)+
+    '">Copiar el comando</button></div>';
+}
+
 /* Tarjeta de una coincidencia que se evaluó y no prosperó. */
 function tarjetaDescartada(x, idDato){
   const c = (x.compartido||[]).find(y=>y.nodo && RE(y.nodo)===idDato);
@@ -931,9 +951,9 @@ function arrastrable(el, id){
     window.addEventListener("pointerup", soltar);
   });
 }
-function botonMas(g, x, y, abierto, alClic, ayuda){
+function botonMas(g, x, y, abierto, alClic, ayuda, apagado){
   const el = document.createElementNS(SVGNS,"g");
-  el.setAttribute("class","mas");
+  el.setAttribute("class","mas"+(apagado?" apagada":""));
   el.setAttribute("transform","translate("+x+","+y+")");
   const c = document.createElementNS(SVGNS,"circle");
   c.setAttribute("r",9); el.appendChild(c);
@@ -1143,7 +1163,7 @@ function dibujar(){
       // así que va llena y del color del dato, sin peso ni motivo.
       conector(abajo(P(nRaiz.id)), arriba(P(r.nodo.id)), {
         color: COLOR_TIPO(nRaiz.tipo), carril: CARRIL_VINC,
-        apagado: !coincide(r.nodo),
+        apagado: !coincide(r.nodo) || repApagado(r.nodo.id),
         alClic: ()=>alternarFoco({tipo:"reporte", id:r.nodo.id})});
       return;
     }
@@ -1151,7 +1171,8 @@ function dibujar(){
       (hayFoco && !(focoReps.has(a.a) && focoReps.has(a.b)));
     conector(abajo(P(nRaiz.id)), arriba(P(r.nodo.id)), {
       clase: "vinculo"+(a.relacion==="POSIBLE_DUPLICADO_DE" ? " duplicado" : "")
-             +(a.origen==="inferida" ? " inferida" : ""),
+             +(a.origen==="inferida" ? " inferida" : "")
+             +(a.origen==="afirmada" ? " afirmada" : ""),
       carril: CARRIL_VINC,
       rotulo: (a.relacion==="POSIBLE_DUPLICADO_DE" ? "posible duplicado, " : "")
               + a.motivo,
@@ -1213,14 +1234,15 @@ function dibujar(){
     const el = caja(gCaj, p.x, p.y, {
       titulo:"Reporte "+nodo.valor, sub:sub,
       marca:dist.marca, marcaColor:dist.marcaColor,
+      reservaDer: n ? 28 : 0,
       clases: clases+extra(nodo.id)+(apagada?" apagada":"")
               +(hayFoco && !apagada ? " realzada":""),
       alClic:()=>ir({tipo:"reporte", id:nodo.id})});
     arrastrable(el, nodo.id);
-    if(n) botonMas(gCaj, p.x+ANCHO_CAJA/2, p.y+ALTO_CAJA,
+    if(n) botonMas(gCaj, p.x+ANCHO_CAJA-19, p.y+45,
       estado.abiertos.has(nodo.id), ()=>alternar(nodo.id),
       (estado.abiertos.has(nodo.id)?"Cerrar":"Abrir")+" los "+n+
-      " dato(s) de este reporte");
+      " dato(s) de este reporte", apagada);
     return el;
   };
 
@@ -1334,6 +1356,11 @@ document.getElementById("cuerpo").addEventListener("click", e=>{
   if(acc.dataset.accion==="abrir"){ estado.abiertos.add(acc.dataset.valor); dibujar(); }
   if(acc.dataset.accion==="centrar"){ centrarEn(acc.dataset.valor); }
   if(acc.dataset.accion==="descentrar"){ centrarEn(null); }
+  if(acc.dataset.accion==="copiar"){
+    navigator.clipboard.writeText(acc.dataset.cmd).then(
+      ()=>{ acc.textContent = "Copiado"; setTimeout(()=>{ acc.textContent = "Copiar el comando"; },1600); },
+      ()=>{ acc.textContent = "No se pudo copiar"; });
+  }
   if(acc.dataset.accion==="otroCaso"){
     const rv = acc.dataset.valor, c = casoDe(rv);
     if(c){
@@ -1410,8 +1437,15 @@ function fichaCaso(){
         '</div><div style="font-size:12px;color:var(--suave);margin-top:5px">'+
         'Comparten '+esc((x.compartido||[]).map(y=>y.valor).filter(Boolean).join(", "))+
         '.</div><div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
-        esc(x.motivo||"")+'</div></div>';
+        esc(x.motivo||"")+'</div></div>'+
+        copiable("python grafo/validar.py vincular "+raizVal+" "+otro+
+                 " --usuario TU_USUARIO --motivo \"...\"");
     });
+    h += '<div class="prosa"><p style="font-size:11.5px;color:var(--tenue)">'+
+      'Si a su criterio estos reportes sí tienen que ver, la vinculación se '+
+      'establece a mano con el comando de arriba y queda registrada con su '+
+      'nombre y su fundamento. El sistema la conserva y agrupa los dos reportes '+
+      'en el mismo caso.</p></div>';
   }
 
   h += '<h2>Otros reportes del caso</h2>';
@@ -1485,7 +1519,9 @@ function fichaReporte(id){
         '<div style="font-size:12px;color:var(--suave);margin-top:5px">Comparten '+
         esc((x.compartido||[]).map(y=>y.valor).filter(Boolean).join(", "))+'.</div>'+
         '<div style="font-size:12px;color:var(--tenue);margin-top:6px">'+
-        esc(x.motivo||"")+'</div></div>';
+        esc(x.motivo||"")+'</div></div>'+
+        copiable("python grafo/validar.py vincular "+n.valor+" "+otro+
+                 " --usuario TU_USUARIO --motivo \"...\"");
     });
   }
 
@@ -1621,12 +1657,33 @@ function fichaVinculo(id){
   const a = ARISTAS.get(id); if(!a){ fichaCaso(); return; }
   const sost = (a.puente||[]).filter(x=>x.sostiene);
   const corr = (a.puente||[]).filter(x=>!x.sostiene);
+  const manual = a.origen==="afirmada";
   let h = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;'+
-    'color:var(--cyan)">Por qué se vinculan</div>'+
+    'color:var(--cyan)">'+(manual?"Vinculación establecida":"Por qué se vinculan")+'</div>'+
     '<h3>Reporte '+esc(NODOS.get(a.a).valor)+' y Reporte '+esc(NODOS.get(a.b).valor)+'</h3>'+
     chipPeso(a.confianza)+'<span class="chip">'+esc(a.origenLegible)+'</span>'+
     '<span class="chip'+(a.estado==="validada"?" ok":a.estado==="rechazada"?" al":"")+'">'+
     esc(a.estadoLegible)+'</span>';
+
+  /* Una vinculación manual no tiene "lo que la sostiene": lo que la sostiene es
+     el criterio de quien la dispuso, y eso es lo que hay que mostrar. */
+  if(manual){
+    h += '<h2>Quién la dispuso</h2>'+prosa(
+      'La estableció '+(a.dispuestaPor||"un operador")+
+      (a.validado_en ? ' el '+String(a.validado_en).slice(0,10) : '')+
+      '. No la propuso el sistema: no consta en la fuente ni surge de una regla, '+
+      'y por eso no lleva peso — no hay nada calculado que ponderar.');
+    if(a.motivoOperador){
+      h += '<h2>Fundamento registrado</h2><div class="tarjeta cyan">'+
+        '<div style="font-size:12.5px;color:var(--texto);line-height:1.6">'+
+        esc(a.motivoOperador)+'</div></div>';
+    }
+    h += '<h2>Cómo se revierte</h2>'+prosa(
+      'Desde el mismo libro, con otro registro. El anterior no se borra: la '+
+      'historia de la decisión se conserva.')+
+      copiable("python grafo/validar.py desvincular "+NODOS.get(a.a).valor+" "+
+               NODOS.get(a.b).valor+" --usuario TU_USUARIO");
+  }
   if(sost.length){
     h += '<h2>Lo que sostiene la vinculación</h2>';
     sost.forEach(p=>{
@@ -1790,6 +1847,7 @@ function pintarLeyenda(){
     ["solid",  "#6b7f9e", "Consta en la fuente del reporte"],
     ["dashed", "#22d3ee", "Derivada por una regla del sistema"],
     ["dotted", "#a78bfa", "Hipótesis todavía sin validar"],
+    ["dashed", "#7dd3fc", "Establecida por un operador"],
   ];
   document.getElementById("leyenda").innerHTML =
     trazos.map(([e,c,t])=>

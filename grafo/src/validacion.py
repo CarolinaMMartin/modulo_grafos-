@@ -113,6 +113,139 @@ class LibroValidaciones(object):
                     integridad=self.verificar())
 
 
+class LibroVinculos(object):
+    """Vinculaciones que establece una persona, no el sistema.
+
+    Existe porque el circuito real las necesita: dos reportes se archivaron por
+    falta de prueba y un operador, con el expediente delante, concluye que
+    tienen que ver. El sistema no lo dedujo y no puede deducirlo; la decision es
+    de la persona y el sistema tiene que poder conservarla.
+
+    Mismo mecanismo que el libro de validaciones: append-only, encadenado por
+    hash y con las mismas limitaciones (ver el encabezado del modulo). Lo que
+    cambia es que aca no se decide sobre una arista existente sino que se crea
+    una, y por eso el registro guarda el par de reportes y no un arista_id: el
+    identificador se calcula despues, al materializarla, y sale igual en cada
+    corrida.
+
+    Una vinculacion manual se revierte con otro registro, nunca borrando el
+    anterior. La historia de la decision se conserva.
+    """
+
+    ACCIONES = ("vincular", "desvincular")
+    METODO = "vinculacion_manual"
+    METODO_VERSION = "1.0"
+
+    def __init__(self, ruta):
+        self.ruta = ruta
+        self._registros = None
+
+    def registros(self, recargar=False):
+        if self._registros is None or recargar:
+            self._registros = []
+            if os.path.exists(self.ruta):
+                with open(self.ruta, "r", encoding="utf-8") as fh:
+                    for linea in fh:
+                        linea = linea.strip()
+                        if linea:
+                            self._registros.append(json.loads(linea))
+        return self._registros
+
+    def _ultimo_hash(self):
+        regs = self.registros()
+        return regs[-1]["hash"] if regs else "genesis"
+
+    def registrar(self, reporte_a, reporte_b, accion, usuario, motivo="", ts=None):
+        if accion not in self.ACCIONES:
+            raise ValueError("accion invalida: %s" % accion)
+        if not usuario:
+            raise ValueError("toda vinculacion manual debe identificar al usuario")
+        if accion == "vincular" and not motivo:
+            raise ValueError("una vinculacion manual debe declarar su fundamento")
+        a, b = sorted((str(reporte_a), str(reporte_b)))
+        if a == b:
+            raise ValueError("no se puede vincular un reporte consigo mismo")
+        reg = dict(
+            secuencia=len(self.registros()) + 1,
+            reporte_a=a, reporte_b=b,
+            accion=accion, usuario=usuario, motivo=motivo,
+            ts=ts or datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            prev_hash=self._ultimo_hash(),
+        )
+        reg["hash"] = _hash_registro(reg)
+        with open(self.ruta, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(reg, ensure_ascii=False) + "\n")
+        self._registros.append(reg)
+        return reg
+
+    def verificar(self):
+        problemas = []
+        prev = "genesis"
+        for i, reg in enumerate(self.registros(recargar=True), start=1):
+            esperado = dict(reg)
+            h = esperado.pop("hash", None)
+            if reg.get("prev_hash") != prev:
+                problemas.append("registro %d: prev_hash no encadena" % i)
+            if _hash_registro(esperado) != h:
+                problemas.append("registro %d: hash no coincide con el contenido" % i)
+            prev = h
+        return problemas
+
+    def vigentes(self):
+        """Ultimo estado de cada par. Un par revertido no vuelve a aparecer."""
+        estado = {}
+        for reg in self.registros(recargar=True):
+            estado[(reg["reporte_a"], reg["reporte_b"])] = reg
+        return [r for r in estado.values() if r["accion"] == "vincular"]
+
+    def aplicar(self, g):
+        """Materializa en el grafo las vinculaciones vigentes.
+
+        Se corre antes de agrupar en legajos: una vinculacion manual tiene que
+        poner los dos reportes en el mismo caso, que es lo que el operador
+        espera al establecerla.
+        """
+        creadas, huerfanas = [], []
+        historial = {}
+        for reg in self.registros(recargar=True):
+            historial.setdefault((reg["reporte_a"], reg["reporte_b"]), []).append(reg)
+
+        for reg in self.vigentes():
+            na = ont.nid("REPORTE", reg["reporte_a"])
+            nb = ont.nid("REPORTE", reg["reporte_b"])
+            if na not in g.G or nb not in g.G:
+                huerfanas.append(reg)
+                continue
+            aid = g.arista(
+                na, nb, "VINCULADO_POR_OPERADOR",
+                source_evidence_id="operador:%s" % reg["usuario"],
+                source_locator="libro:vinculos_manuales#%d" % reg["secuencia"],
+                explicacion=(
+                    u"Los reportes %s y %s quedaron vinculados por decisión de "
+                    u"%s, el %s. No la propuso el sistema: no consta en la "
+                    u"fuente ni surge de una regla. El fundamento registrado es: "
+                    u"«%s». La vinculación se conserva hasta que se revierta "
+                    u"desde el libro, y la reversión también queda asentada."
+                    % (reg["reporte_a"], reg["reporte_b"], reg["usuario"],
+                       reg["ts"][:10], reg["motivo"])),
+                metodo=self.METODO, metodo_version=self.METODO_VERSION,
+                atributos=dict(
+                    dispuesta_por=reg["usuario"],
+                    motivo_operador=reg["motivo"],
+                    historial_vinculo=historial[(reg["reporte_a"], reg["reporte_b"])],
+                ))
+            if aid:
+                d = g.G.edges[na, nb, aid]
+                d["validated_by"] = reg["usuario"]
+                d["validated_at"] = reg["ts"]
+                creadas.append(dict(reporte_a=reg["reporte_a"],
+                                    reporte_b=reg["reporte_b"],
+                                    arista_id=aid, usuario=reg["usuario"],
+                                    motivo=reg["motivo"], ts=reg["ts"]))
+        return dict(creadas=creadas, huerfanas=huerfanas,
+                    integridad=self.verificar())
+
+
 def _hash_registro(reg):
     crudo = json.dumps(reg, ensure_ascii=False, sort_keys=True)
     return "sha256:" + hashlib.sha256(crudo.encode("utf-8")).hexdigest()

@@ -21,7 +21,7 @@ eligen en el selector de la barra superior.
 python grafo/pruebas.py
 ```
 
-69 invariantes sobre las reglas que el proyecto declara no negociables.
+79 invariantes sobre las reglas que el proyecto declara no negociables.
 
 ## Qué hay acá
 

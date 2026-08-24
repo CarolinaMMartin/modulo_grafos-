@@ -161,8 +161,8 @@ Una IP aislada no identifica a una persona. Se valora junto con fecha, hora, pre
 
 ## 8. Estado de la última construcción
 
-- Nodos: **65** · Aristas: **115**
-- Por origen: derivada 28, inferida 3, observada 84
+- Nodos: **65** · Aristas: **116**
+- Por origen: afirmada 1, derivada 28, inferida 3, observada 84
 - Incumplimientos de procedencia: **0**
 
 | Tipo de nodo | Cantidad |

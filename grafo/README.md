@@ -95,12 +95,31 @@ cima del árbol y reconstruye la vista alrededor de él.
 - El panel izquierdo trae la búsqueda dentro del caso, los antecedentes a
   revisar, el peso mínimo, los tipos de dato y la leyenda.
 
+### Vincular a mano
+
+Si el sistema no vinculó dos reportes y a criterio del operador sí tienen que
+ver, la vinculación se establece a mano y queda registrada con su nombre y su
+fundamento:
+
+```bash
+python validar.py vincular 900000104 900000109 --usuario op_04 --motivo "..."
+```
+
+Se materializa en la próxima construcción con origen `afirmada`, se dibuja con
+su propio trazo, entra en el informe del caso y agrupa los dos reportes en el
+mismo legajo. No lleva peso: no hay nada calculado que ponderar. Se revierte con
+`desvincular`, y el registro anterior no se borra.
+
+En cada coincidencia que no alcanzó, el visor deja el comando armado con los dos
+reportes ya puestos, listo para copiar.
+
 ### Cómo leer las líneas
 
 Un solo criterio, y está en la leyenda del panel izquierdo:
 
 - el **trazo** dice de dónde sale la relación — lleno: consta en la fuente;
-  rayado: derivada por una regla; punteado: hipótesis sin validar;
+  rayado: derivada por una regla; punteado: hipótesis sin validar; raya y punto:
+  la estableció un operador;
 - el **color** dice de qué tipo de dato se trata, y es el mismo en la barra de
   la caja, en la línea y en su punta de flecha.
 
@@ -188,7 +207,7 @@ no borra: marca la arista como no vigente y conserva la historia.
 grafo/
   construir.py             orquestador: ingesta -> análisis -> salidas
   validar.py               CLI de validación humana
-  pruebas.py               invariantes no negociables (69 chequeos)
+  pruebas.py               invariantes no negociables (79 chequeos)
   generar_sinteticos.py    dataset sintético de prueba
   MODELO_DATOS.md          generado desde la ontología, no editar a mano
   ESTADO.md                qué está implementado y qué no

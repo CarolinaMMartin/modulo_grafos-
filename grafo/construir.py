@@ -7,9 +7,10 @@ Orquestador del corte vertical de grafos (CLAUDE.md 21).
   3. vinculacion DERIVADA entre reportes + contradicciones
   4. hipotesis INFERIDAS de identidad
   5. alertas de reapertura tipadas por motivo de archivo
-  6. algoritmos clasicos: legajos, comunidades, centralidades, candidatos
-  7. re-aplicacion de las validaciones humanas registradas
-  8. salidas: grafo.json, grafo.graphml, grafo.html, informe.md, dossier
+  6. vinculaciones AFIRMADAS que dispuso un operador
+  7. algoritmos clasicos: legajos, comunidades, centralidades, candidatos
+  8. re-aplicacion de las validaciones humanas registradas
+  9. salidas: grafo.json, grafo.graphml, grafo.html, informe.md, dossier
 
 La clasificacion jurisdiccional y la derivacion territorial quedan FUERA de esta
 etapa por decision del proyecto. El modulo src/jurisdiccion.py se conserva sin
@@ -88,14 +89,22 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
     # 5. alertas
     resultado["alertas"] = mod_alertas.generar(g)
 
-    # 6. algoritmos clasicos
+    # 6. vinculaciones que dispuso una persona.
+    # Van antes de agrupar en legajos: si un operador vinculo dos reportes, el
+    # sistema tiene que tratarlos como un mismo caso, que es exactamente lo que
+    # esa persona esta afirmando.
+    libro_vinculos = validacion.LibroVinculos(
+        os.path.join(BASE, "estado", "vinculos_manuales.jsonl"))
+    resultado["vinculos_manuales"] = libro_vinculos.aplicar(g)
+
+    # 7. algoritmos clasicos
     resultado["legajos"] = analisis.legajos_logicos(g)
     resultado["comunidades"] = analisis.comunidades(g)
     resultado["centralidades"] = analisis.centralidades(g)
     resultado["candidatos_enlace"] = analisis.candidatos_de_enlace(g)
     resultado["cobertura"] = analisis.cobertura_de_datos(g)
 
-    # 7. validaciones humanas previas
+    # 8. validaciones humanas previas
     libro = validacion.LibroValidaciones(os.path.join(BASE, "estado", "validaciones.jsonl"))
     resultado["validaciones"] = libro.aplicar(g)
     # Recien ahora, con las decisiones humanas aplicadas, se pueden unificar
@@ -105,7 +114,7 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
 
     resultado["resumen_grafo"] = g.resumen()
 
-    # 8. salidas
+    # 9. salidas
     g.guardar_json(os.path.join(dir_salida, "grafo.json"))
     g.guardar_graphml(os.path.join(dir_salida, "grafo.graphml"))
     with open(os.path.join(dir_salida, "analisis.json"), "w", encoding="utf-8") as fh:
@@ -170,6 +179,9 @@ def main():
           % (len(res["identidades"]), len(res["identidades_unificadas"])))
     print("Alertas de reapertura   : %d (silenciadas %d)"
           % (len(res["alertas"]["alertas"]), len(res["alertas"]["silenciadas"])))
+    print("Vinculos manuales       : %d (revertidos o huerfanos %d)"
+          % (len(res["vinculos_manuales"]["creadas"]),
+             len(res["vinculos_manuales"]["huerfanas"])))
     print("Legajos logicos         : %d" % len(res["legajos"]))
     print("Cola de revision humana : %d" % len(res["cola_revision"]))
     print("Incumplimientos de proc.: %d" % r["incumplimientos"])

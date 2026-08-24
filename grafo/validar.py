@@ -38,6 +38,7 @@ import ontologia as ont                 # noqa: E402
 import validacion                       # noqa: E402
 
 LIBRO = os.path.join(BASE, "estado", "validaciones.jsonl")
+LIBRO_VINCULOS = os.path.join(BASE, "estado", "vinculos_manuales.jsonl")
 
 
 def _grafo():
@@ -183,6 +184,68 @@ def cmd_unificar(args):
     print("\nEn el visor, activa 'Unificar identidades' para verlo colapsado.")
 
 
+def cmd_vincular(args):
+    """Vinculacion que dispone una persona, no el sistema.
+
+    El caso real: dos reportes se archivaron por falta de prueba y el operador,
+    con el expediente delante, concluye que tienen que ver. Eso no lo puede
+    deducir el sistema. Lo que el sistema tiene que hacer es conservarlo, con
+    quien lo dispuso y por que.
+    """
+    g, res = _grafo()
+    faltan = [r for r in (args.reporte_a, args.reporte_b)
+              if ont.nid("REPORTE", r) not in g.G]
+    if faltan and not args.forzar:
+        print("No existe(n) el/los reporte(s): %s" % ", ".join(faltan))
+        print("Se cancela. Usar --forzar para registrarlo igual.")
+        return
+
+    libro = validacion.LibroVinculos(LIBRO_VINCULOS)
+    reg = libro.registrar(args.reporte_a, args.reporte_b, "vincular",
+                          args.usuario, args.motivo)
+    print("Vinculacion registrada #%d" % reg["secuencia"])
+    print("  %s  <->  %s" % (reg["reporte_a"], reg["reporte_b"]))
+    print("  por %s el %s" % (reg["usuario"], reg["ts"]))
+    print("  fundamento: %s" % reg["motivo"])
+    print("")
+    print("Se materializa en la proxima construccion, con origen 'afirmada'.")
+    print("Los dos reportes van a quedar en el mismo caso.")
+
+
+def cmd_desvincular(args):
+    libro = validacion.LibroVinculos(LIBRO_VINCULOS)
+    a, b = sorted((args.reporte_a, args.reporte_b))
+    if (a, b) not in {(r["reporte_a"], r["reporte_b"]) for r in libro.vigentes()}:
+        print("No hay una vinculacion manual vigente entre %s y %s." % (a, b))
+        return
+    reg = libro.registrar(a, b, "desvincular", args.usuario, args.motivo)
+    print("Vinculacion revertida #%d  %s <-> %s  por %s"
+          % (reg["secuencia"], a, b, reg["usuario"]))
+    print("El registro anterior no se borra: la historia de la decision queda.")
+
+
+def cmd_vinculos(args):
+    libro = validacion.LibroVinculos(LIBRO_VINCULOS)
+    regs = libro.registros()
+    problemas = libro.verificar()
+    print("VINCULACIONES ESTABLECIDAS POR UN OPERADOR")
+    print("No las propuso el sistema: no constan en la fuente ni salen de una")
+    print("regla. Se conservan hasta que alguien las revierta.")
+    print("")
+    print("Registros en el libro: %d" % len(regs))
+    print("Integridad de la cadena: %s"
+          % ("correcta" if not problemas else "; ".join(problemas)))
+    vig = {(r["reporte_a"], r["reporte_b"]) for r in libro.vigentes()}
+    for r in regs:
+        estado = "[VIGENTE]  " if (r["accion"] == "vincular"
+                                   and (r["reporte_a"], r["reporte_b"]) in vig)                  else "[revertida]" if r["accion"] == "desvincular" else "[pisada]   "
+        print("  #%d %s %s <-> %s  por %s el %s"
+              % (r["secuencia"], estado, r["reporte_a"], r["reporte_b"],
+                 r["usuario"], r["ts"]))
+        if r["motivo"]:
+            print("        %s" % r["motivo"])
+
+
 def cmd_auditar(args):
     libro = validacion.LibroValidaciones(LIBRO)
     regs = libro.registros()
@@ -222,6 +285,26 @@ def main():
     p = sub.add_parser("auditar", help="verifica la cadena de hashes del libro")
     p.set_defaults(func=cmd_auditar)
 
+    p = sub.add_parser("vincular",
+                       help="establece a mano una vinculacion entre dos reportes")
+    p.add_argument("reporte_a")
+    p.add_argument("reporte_b")
+    p.add_argument("--usuario", required=True)
+    p.add_argument("--motivo", required=True,
+                   help="fundamento de la decision; queda en el informe")
+    p.add_argument("--forzar", action="store_true")
+    p.set_defaults(func=cmd_vincular)
+
+    p = sub.add_parser("desvincular", help="revierte una vinculacion manual")
+    p.add_argument("reporte_a")
+    p.add_argument("reporte_b")
+    p.add_argument("--usuario", required=True)
+    p.add_argument("--motivo", default="")
+    p.set_defaults(func=cmd_desvincular)
+
+    p = sub.add_parser("vinculos", help="lista las vinculaciones manuales")
+    p.set_defaults(func=cmd_vinculos)
+
     p = sub.add_parser("decidir", help="registra una decision")
     p.add_argument("arista")
     p.add_argument("decision", choices=list(validacion.DECISIONES))
@@ -233,7 +316,8 @@ def main():
     # Forma corta: validar.py <arista> <decision> --usuario X
     argv = sys.argv[1:]
     if argv and argv[0] not in ("cola", "ver", "auditar", "decidir",
-                                "identidades", "unificar", "-h", "--help"):
+                                "identidades", "unificar", "vincular",
+                                "desvincular", "vinculos", "-h", "--help"):
         argv = ["decidir"] + argv
 
     args = ap.parse_args(argv)

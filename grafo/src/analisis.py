@@ -26,12 +26,24 @@ ADVERTENCIA_CENTRALIDAD = (
 
 
 def proyeccion_reportes(g, umbral=None):
-    """Grafo no dirigido reporte-reporte a partir de vinculos derivados."""
+    """Grafo no dirigido reporte-reporte: lo que el sistema derivo, mas lo que
+    un operador afirmo.
+
+    Una vinculacion manual entra sin pasar por el umbral y con el peso maximo
+    posible. No es que el sistema este seguro: es que ahi no hay calculo. La
+    dispuso una persona, y por eso los dos reportes tienen que caer en el mismo
+    legajo -que es lo que esa persona esta afirmando-.
+    """
     umbral = ont.UMBRAL_CLUSTER if umbral is None else umbral
     P = nx.Graph()
     for n in g.nodos_tipo("REPORTE"):
         P.add_node(n, **{k: v for k, v in g.G.nodes[n].items()
                          if not isinstance(v, (dict, list))})
+    for u, v, k, d in g.aristas(origen=ont.AFIRMADA):
+        if d["relation_type"] != "VINCULADO_POR_OPERADOR":
+            continue
+        P.add_edge(u, v, peso=ont.CONFIANZA_MAXIMA,
+                   relacion=d["relation_type"], arista_id=d["arista_id"])
     for u, v, k, d in g.aristas(origen=ont.DERIVADA):
         if d["relation_type"] not in ("COINCIDE_CON", "POSIBLE_DUPLICADO_DE"):
             continue
@@ -39,8 +51,12 @@ def proyeccion_reportes(g, umbral=None):
             continue
         if (d.get("confidence") or 0) < umbral:
             continue
-        if P.has_edge(u, v) and P[u][v]["peso"] >= d["confidence"]:
-            continue
+        if P.has_edge(u, v):
+            # Una vinculacion manual no la pisa ninguna derivada.
+            if P[u][v]["relacion"] == "VINCULADO_POR_OPERADOR":
+                continue
+            if P[u][v]["peso"] >= d["confidence"]:
+                continue
         P.add_edge(u, v, peso=d["confidence"], relacion=d["relation_type"],
                    arista_id=d["arista_id"])
     return P

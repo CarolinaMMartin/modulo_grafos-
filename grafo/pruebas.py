@@ -77,8 +77,14 @@ def main():
         check("ninguna inferencia nace validada", not inferidas_validadas,
               str(inferidas_validadas[:3]))
         derivadas_sin_conf = [d["arista_id"] for _, _, _, d in g.aristas(vigentes=False)
-                              if d["origin"] != ont.OBSERVADA and d.get("confidence") is None]
+                              if d["origin"] in (ont.DERIVADA, ont.INFERIDA)
+                              and d.get("confidence") is None]
         check("toda derivada e inferida tiene confianza", not derivadas_sin_conf)
+        # Una afirmacion humana no lleva confianza: no hay nada calculado que
+        # ponderar, y un numero ahi seria precision inventada.
+        check("ninguna afirmada lleva confianza",
+              all(d.get("confidence") is None
+                  for _, _, _, d in g.aristas(origen=ont.AFIRMADA, vigentes=False)))
         check("ninguna confianza llega a 1.0",
               all((d.get("confidence") or 0) <= ont.CONFIANZA_MAXIMA
                   for _, _, _, d in g.aristas(vigentes=False)))
@@ -253,7 +259,8 @@ def main():
         print("\n== El informe es del caso, no del archivo ==")
         d_total = mod_dossier.construir(g, res)
         casos = render_html.casos_de(g, res)
-        check("hay un caso por legajo y uno por reporte suelto", len(casos) == 5)
+        check("hay un caso por legajo y uno por reporte suelto", len(casos) == 4,
+              str([c["id"] for c in casos]))
 
         caso = [c for c in casos if c["id"] == "L001"][0]
         recorte = mod_dossier.recortar(d_total, caso["reportes"])
@@ -304,6 +311,40 @@ def main():
               str(sorted(de_conector & colores_dato)))
         check("cada tipo de dato tiene un color distinto",
               len(colores_dato) == len(render_html.TIPOS_EN_TARJETA))
+
+        # ------------------------------------------------------------------
+        print(chr(10)+"== Vinculaciones que dispone una persona ==")
+        vm = res["vinculos_manuales"]
+        check("el libro de vinculos manuales es integro", not vm["integridad"],
+              str(vm["integridad"]))
+        check("la vinculacion manual del dataset se materializo",
+              len(vm["creadas"]) == 1, str(vm))
+        afirmadas = list(g.aristas(origen=ont.AFIRMADA, vigentes=False))
+        check("la vinculacion manual no se confunde con una derivada",
+              all(d["relation_type"] == "VINCULADO_POR_OPERADOR"
+                  for _, _, _, d in afirmadas))
+        check("registra quien la dispuso y cuando",
+              all(d.get("validated_by") and d.get("validated_at")
+                  for _, _, _, d in afirmadas))
+        check("registra el fundamento del operador",
+              all(d.get("motivo_operador") for _, _, _, d in afirmadas))
+        check("nace validada, porque la validacion es el acto que la crea",
+              all(d["validation_status"] == "validada" for _, _, _, d in afirmadas))
+        check("conserva la procedencia completa igual que cualquier otra",
+              all(d.get("source_evidence_id") and d.get("source_locator")
+                  and d.get("explicacion") for _, _, _, d in afirmadas))
+        # Lo que el operador espera al vincular: que queden en el mismo caso.
+        juntos = [c for c in casos
+                  if "900000104" in c["reportes"] and "900000109" in c["reportes"]]
+        check("los reportes vinculados a mano quedan en el mismo caso",
+              len(juntos) == 1, str([c["reportes"] for c in casos]))
+        # Y que sobreviva a reconstruir el grafo desde cero.
+        g2, res2 = _corrida(tmp)
+        ids1 = sorted(d["arista_id"] for _, _, _, d in afirmadas)
+        ids2 = sorted(d["arista_id"]
+                      for _, _, _, d in g2.aristas(origen=ont.AFIRMADA, vigentes=False))
+        check("la vinculacion manual persiste y conserva su id al reconstruir",
+              ids1 == ids2 and ids1, str((ids1, ids2)))
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

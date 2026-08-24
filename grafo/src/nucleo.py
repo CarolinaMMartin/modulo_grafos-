@@ -123,7 +123,10 @@ class Grafo(object):
             faltantes.append("source_locator")
         if not explicacion:
             faltantes.append("explicacion")
-        if origen != ont.OBSERVADA and confianza is None:
+        # Una afirmacion humana no lleva confianza: ponerle un numero seria
+        # inventar una precision que nadie calculo. Lo que sí lleva es quien la
+        # dispuso y con que fundamento.
+        if origen in (ont.DERIVADA, ont.INFERIDA) and confianza is None:
             faltantes.append("confidence")
         if faltantes:
             problema = dict(relacion=relacion, u=u, v=v, faltantes=faltantes)

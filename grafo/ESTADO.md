@@ -39,6 +39,7 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Componentes, comunidades (Louvain), centralidades, puentes | **implementada** | `src/analisis.py` |
 | Baseline de link prediction (Adamic-Adar) sin materializar aristas | **implementada** | `analisis.candidatos_de_enlace` |
 | Libro append-only de validaciones encadenado por hash | **implementada** | `src/validacion.py` |
+| Vinculación que establece un operador cuando el sistema no vinculó, con origen propio `afirmada` | **implementada** | `validacion.LibroVinculos`, `validar.py vincular` |
 | Re-aplicación de decisiones humanas tras reconstruir | **implementada** | `validacion.aplicar` |
 | Visor interactivo con filtros y foco progresivo | **implementada** | `src/render_html.py` |
 | Informe con trazabilidad a la fuente | **implementada** | `src/informe.py` |
@@ -53,10 +54,18 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | El libro de validaciones es un archivo local | Detecta modificación de registros previos, **no** impide reescribir el archivo entero, ni sella el tiempo | Almacenamiento append-only del lado del servidor o anclaje externo |
 | Sin control de acceso | Cualquiera que corra el script ve todo | Permisos por rol, caso, jurisdicción y sensibilidad |
 | El informe del visor se redacta con plantillas | Texto correcto pero rígido. Además la versión que redacta `informe_ia.py` no llega al visor: escribe el informe general, no los de cada caso | Un modelo local vía `informe_ia.py`, y decidir si redacta uno por caso |
-| La unificación de identidades se aprueba por CLI | No hay botón en la interfaz | Un control en el visor, cuando exista la aplicación con sesión de usuario |
+| La unificación de identidades y la vinculación manual se hacen por CLI | No hay botón en la interfaz. El visor deja el comando armado y listo para copiar, con los dos reportes ya puestos | Un control en el visor, cuando exista la aplicación con sesión de usuario |
 | Visor propio en SVG, con disposición en árbol calculada a mano | Alcanza y se lee bien para un caso. Los reportes vinculados van todos en una fila: con más de siete u ocho el lienzo se vuelve tan ancho que deja de leerse | Un algoritmo de dibujo por capas con ruteo de aristas, o una librería especializada |
 | La legibilidad del lienzo se verifica midiendo rectángulos en pantalla desde la consola | Es una auditoría manual, no una prueba automática | Llevarla a `pruebas.py` con un navegador headless |
 | Ventanas temporales de IP por prestador, estimadas | El supuesto viaja en la explicación de cada arista, pero no está verificado | Confirmar tiempos de lease con cada prestador |
+
+### Apartamiento del documento rector
+
+`CLAUDE.md` §10.1 enumera **tres** clases de relación. El módulo declara una
+cuarta, `afirmada`, para las vinculaciones que dispone una persona: no constan
+en la fuente, no salen de una regla y no son hipótesis del sistema a la espera
+de validación. Está documentado en `TRASPASO.md` §4.13 y **pendiente de validar
+con los especialistas** (§9.5). No debe presentarse como ontología aprobada.
 
 ## 3. Qué está ausente
 
