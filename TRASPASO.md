@@ -63,7 +63,7 @@ Cuantico/
     servidor.py              la aplicación: es lo que permite decidir en pantalla
     validar.py               CLI de validación humana (equivalente, para técnicos)
     informe_ia.py            informe vía modelo local (opcional)
-    pruebas.py               86 invariantes
+    pruebas.py               89 invariantes
     generar_sinteticos.py    generador del dataset
     README.md                cómo se usa
     ESTADO.md                qué está implementado, simplificado o ausente
@@ -92,17 +92,25 @@ Cuantico/
 
 ### Resultado sobre el dataset de prueba
 
-10 reportes → 65 nodos, 116 aristas (84 observadas, 28 derivadas, 3 inferidas,
-1 afirmada por un operador), **0 incumplimientos de procedencia**.
+Con el libro de vinculaciones tal como quedó al cierre de la sesión: 10 reportes
+→ 65 nodos, 118 aristas (84 observadas, 28 derivadas, 3 inferidas, 3 afirmadas
+por un operador), **0 incumplimientos de procedencia**.
 
-- **8 vinculaciones** propuestas, peso promedio 0,95.
+- **8 vinculaciones** propuestas por reglas, peso promedio 0,95.
 - **4 descartadas**, todas informadas con su motivo.
-- **1 vinculación establecida a mano** por un operador, con su fundamento.
+- **3 vinculaciones establecidas a mano**, cada una con su fundamento. Una es
+  el ejemplo del dataset (900000104 ↔ 900000109, dos archivados por
+  insuficiencia); **las otras dos son pruebas del circuito** y conviene
+  revertirlas desde el visor antes de mostrar esto.
 - **5 antecedentes archivados** reactivados.
 - **1 contradicción** por desplazamiento implausible.
 - **3 hipótesis de identidad**, 1 unificada por decisión humana registrada.
-- **4 casos** (legajos), cada uno con su informe. L003 existe porque un operador
-  vinculó a mano dos reportes que se habían archivado por insuficiencia.
+- **3 casos** (legajos), cada uno con su informe.
+
+Estos números **se mueven** con el libro: vincular dos reportes a mano cambia
+la cantidad de aristas y reagrupa los legajos. Las pruebas no dependen de ellos
+—verifican propiedades, no cantidades—, y el número de corrida sale siempre de
+`python grafo/construir.py`.
 
 ---
 
@@ -133,7 +141,7 @@ botón de decisión, el visor lo dice en lugar de fingir que anduvo.
 python grafo/pruebas.py
 ```
 
-69 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
+89 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
 de diseño, no de presentación.
 
 ### Validación humana

@@ -223,7 +223,7 @@ no borra: marca la arista como no vigente y conserva la historia.
 grafo/
   construir.py             orquestador: ingesta -> análisis -> salidas
   validar.py               CLI de validación humana
-  pruebas.py               invariantes no negociables (86 chequeos)
+  pruebas.py               invariantes no negociables (89 chequeos)
   generar_sinteticos.py    dataset sintético de prueba
   MODELO_DATOS.md          generado desde la ontología, no editar a mano
   ESTADO.md                qué está implementado y qué no

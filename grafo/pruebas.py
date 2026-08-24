@@ -259,10 +259,20 @@ def main():
         print("\n== El informe es del caso, no del archivo ==")
         d_total = mod_dossier.construir(g, res)
         casos = render_html.casos_de(g, res)
-        check("hay un caso por legajo y uno por reporte suelto", len(casos) == 4,
+        # El identificador de legajo es posicional: al vincular dos reportes a
+        # mano se renumeran todos. Ninguna prueba puede depender de el, ni de
+        # cuantas vinculaciones manuales haya en el libro en un momento dado:
+        # un operador usando la aplicacion no puede poner en rojo la suite.
+        agrupados = {r for l in res["legajos"] for r in l["reportes"]}
+        sueltos = len(g.nodos_tipo("REPORTE")) - len(agrupados)
+        check("hay un caso por legajo y uno por reporte suelto",
+              len(casos) == len(res["legajos"]) + sueltos,
               str([c["id"] for c in casos]))
+        check("ningun reporte queda fuera de todo caso",
+              sorted(r for c in casos for r in c["reportes"])
+              == sorted(g.G.nodes[n]["valor"] for n in g.nodos_tipo("REPORTE")))
 
-        caso = [c for c in casos if c["id"] == "L001"][0]
+        caso = [c for c in casos if "255553607" in c["reportes"]][0]
         recorte = mod_dossier.recortar(d_total, caso["reportes"])
         check("el dossier del caso solo trae sus reportes",
               sorted(r["reporte"] for r in recorte["reportes"])
@@ -279,7 +289,7 @@ def main():
         check("el informe del caso lo dice en el titulo", caso["etiqueta"] in texto)
         check("el informe remite a la carpeta de archivo provisorio",
               u"carpeta de archivo provisorio" in texto)
-        ajenos = [c["reportes"][0] for c in casos if c["id"] != "L001"]
+        ajenos = [c["reportes"][0] for c in casos if c["id"] != caso["id"]]
         check("el informe no detalla reportes de otros casos",
               not any(u"**Reporte %s**" % r in texto for r in ajenos))
 
@@ -317,8 +327,12 @@ def main():
         vm = res["vinculos_manuales"]
         check("el libro de vinculos manuales es integro", not vm["integridad"],
               str(vm["integridad"]))
-        check("la vinculacion manual del dataset se materializo",
-              len(vm["creadas"]) == 1, str(vm))
+        libro_vm = validacion.LibroVinculos(
+            os.path.join(BASE, "estado", "vinculos_manuales.jsonl"))
+        check("se materializan todas las vinculaciones vigentes, y solo esas",
+              len(vm["creadas"]) == len(libro_vm.vigentes()) and vm["creadas"],
+              "%d creadas / %d vigentes" % (len(vm["creadas"]),
+                                            len(libro_vm.vigentes())))
         afirmadas = list(g.aristas(origen=ont.AFIRMADA, vigentes=False))
         check("la vinculacion manual no se confunde con una derivada",
               all(d["relation_type"] == "VINCULADO_POR_OPERADOR"

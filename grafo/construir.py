@@ -145,9 +145,15 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
     for caso in render_html.casos_de(g, resultado):
         recorte = mod_dossier.recortar(dossier, caso["reportes"])
         informes_por_caso[caso["id"]] = redaccion.redactar(recorte, caso=caso)
+    # Se vacia antes de escribir. Los casos se renumeran cuando cambian las
+    # vinculaciones, y un informe viejo de un caso que ya no existe es peor que
+    # no tenerlo: alguien lo abre y lee una composicion que ya no es.
     dir_casos = os.path.join(dir_salida, "informes_por_caso")
     if not os.path.isdir(dir_casos):
         os.makedirs(dir_casos)
+    for viejo in os.listdir(dir_casos):
+        if viejo.startswith("informe_") and viejo.endswith(".md"):
+            os.remove(os.path.join(dir_casos, viejo))
     for cid, texto in informes_por_caso.items():
         with open(os.path.join(dir_casos, "informe_%s.md" % cid), "w",
                   encoding="utf-8") as fh:
