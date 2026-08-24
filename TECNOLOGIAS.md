@@ -25,7 +25,7 @@ esta etapa lo que hay que validar es la lógica, no el despliegue.
 | Módulo | Para qué se usa acá |
 |---|---|
 | `json` | Lectura de los reportes de NCMEC y escritura de todas las salidas estructuradas. |
-| `hashlib` | SHA-256 para el hash de las fuentes y para el encadenado del libro de validaciones. SHA-1 truncado para los identificadores de arista. |
+| `hashlib` | SHA-256 para el hash de las fuentes y para el encadenado del libro de validaciones. SHA-1 truncado para los identificadores de arista (ver la pregunta abierta más abajo). |
 | `ipaddress` | Validación de direcciones IP y detección de rangos privados y CGNAT. |
 | `re` | Normalización de teléfonos y alias; extracción de los identificadores de perfil de las transcripciones. |
 | `unicodedata` | Descomposición NFD para quitar diacríticos al normalizar nombres visibles. |
@@ -62,6 +62,33 @@ método, locator, fuente)`. Al incluir la fuente, dos reportes que dicen lo mism
 producen dos aristas. Al ser determinista, reconstruir el grafo produce los
 mismos identificadores, y las validaciones humanas registradas antes siguen
 aplicando.
+
+### Pregunta abierta: el identificador de arista
+
+Hoy el identificador de cada arista es un SHA-1 truncado calculado sobre
+`(origen, destino, relación, método, locator, fuente)`. Es un identificador
+**propio de este módulo**, elegido porque cumple lo único que el diseño exige:
+ser determinista, para que reconstruir el grafo devuelva los mismos
+identificadores y las validaciones humanas registradas antes sigan aplicando.
+
+Queda pendiente definir si debería usar el esquema de identificadores del resto
+del sistema —el de la Bóveda, SIPAR o el contenedor `.qaif`— en lugar de uno
+propio. Para decidirlo hace falta saber:
+
+- qué esquema usa hoy cada sistema y si es estable en el tiempo;
+- si ese identificador puede calcularse localmente o requiere pedirlo a un
+  servicio, porque el grafo se reconstruye entero en cada corrida y no puede
+  depender de un servicio externo para volver a producir los mismos ids;
+- si hay un requisito de trazabilidad que obligue a que el mismo objeto tenga
+  el mismo identificador en todos los sistemas.
+
+Mientras no esté resuelto conviene no acoplarse: el identificador actual está
+aislado en una sola función (`nucleo.Grafo._id_arista`) y cambiarlo es un
+reemplazo local, siempre que el nuevo esquema también sea determinista. Lo que
+**no** puede cambiarse sin costo es esa propiedad: un identificador aleatorio o
+asignado por un servicio rompería la re-aplicación de las decisiones humanas.
+
+Está anotado también en las preguntas abiertas de `CLAUDE.md` §19.
 
 ### Modelo de procedencia
 

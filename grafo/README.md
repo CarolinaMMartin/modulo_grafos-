@@ -46,18 +46,44 @@ Cada línea lleva escrito qué relación representa —*opera con la cuenta*, *f
 observada desde la IP*, *coincide con · 0,99*—, de modo que no haga falta
 interpretar la forma del dibujo para entender qué está vinculado con qué.
 
-### Recorrido
+### El grafo se abre en cascada
 
-- **Vinculaciones** — solo los reportes del caso y las líneas entre ellos, con
-  su peso.
-- **Por qué** — agrega únicamente las cadenas que sostienen esas vinculaciones.
-  Nada que no explique algo.
-- **Todo el caso** — el detalle completo, siempre dentro del caso.
+No hay niveles de detalle. Se empieza con los reportes del caso y se va abriendo
+de a un paso, con coherencia:
 
-**Clic en una línea entre dos reportes** abre *Por qué se vinculan*: el grafo se
-reordena en una sola cadena horizontal y la ficha escribe el recorrido paso a
-paso, con cada eslabón clickeable.
+1. **Al abrir** se ven solo los reportes del caso y las líneas entre ellos, con
+   su peso. Cada reporte lleva un indicador ámbar `+N`: cuántas entidades cuelgan
+   de él sin mostrar.
+2. **Clic en un reporte** → aparecen sus datos: cuentas, teléfonos, IP,
+   dispositivos, nombres visibles, ubicaciones. La ficha los lista agrupados por
+   tipo, y junto a cada uno indica en cuántos *otros* reportes del caso aparece
+   ese mismo dato.
+3. **Clic en una de esas entidades** —por ejemplo el nombre visible `lechero`—
+   → el grafo se reacomoda tomándola como punto de partida, y la ficha dice en
+   qué reportes del caso aparece.
+4. Y así sucesivamente. El indicador `−` cierra lo que se abrió desde ahí.
 
+`Abrir todo` despliega el caso completo de una vez. `Contraer` vuelve al punto
+de partida.
+
+Un clic en el vacío del lienzo **no** descarta el recorrido.
+
+### Lo que no se dibuja
+
+- **Las plataformas y los prestadores.** Todos los reportes de Grindr comparten
+  Grindr: no distingue nada. Se informan en la ficha del reporte, bajo *Origen*.
+  Se pueden mostrar desde los filtros, si hiciera falta.
+- **Entidades de otros casos.** El visor nunca sale del caso en curso.
+- **Aristas paralelas.** Cuando tres reportes afirman la misma relación entre
+  las mismas dos entidades, se dibuja una sola línea y la etiqueta aclara *en 3
+  reportes*. Las tres siguen existiendo en el grafo, cada una con su fuente:
+  son evidencia separada.
+
+### Otras acciones
+
+- **Clic en una línea entre dos reportes** abre *Por qué se vinculan*: el grafo
+  se reordena en una sola cadena horizontal y la ficha escribe el recorrido paso
+  a paso.
 - **‹ Volver / Siguiente ›** recorren el historial, como en un navegador.
   También con `Alt + ←` y `Alt + →`.
 - **Reorganizar** rota entre *En secuencia*, *Orgánica* y *Por tipo de dato*.

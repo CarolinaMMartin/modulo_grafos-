@@ -25,6 +25,8 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Vista "por qué se vinculan": cadena completa entre dos reportes | **implementada** | `render_html._camino`, `dispPorQue` |
 | Visor acotado al caso en curso, con selector de caso | **implementada** | `render_html._casos`, `conjuntoVisible` |
 | Disposición lineal por defecto y etiqueta de relación sobre cada arista | **implementada** | `dispSecuencia`, `etiquetaArista` |
+| Apertura en cascada: un clic, un paso, con indicador de cuánto falta | **implementada** | `abrir`, `vecinosAbribles`, capa de indicadores |
+| Colapso visual de aristas paralelas, informando en cuántos reportes constan | **implementada** | `GRUPO` / `MIEMBROS` en `aplicar` |
 | Informe embebido en el visor, descargable | **implementada** | `src/redaccion.py` |
 | Contra-evidencia por desplazamiento implausible | **implementada** | `resolucion.detectar_contradicciones` |
 | Alertas de reapertura tipadas por motivo de archivo | **implementada** | `src/alertas.py` |

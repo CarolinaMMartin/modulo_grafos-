@@ -88,6 +88,10 @@ def _layout(g):
             for n, p in pos.items()}
 
 
+PREFERENCIA_CAMINO = {"PERSONA_MENCION": 0, "IDENTIDAD": 0, "CUENTA": 1,
+                      "EVENTO": 3, "ORGANIZACION": 4}
+
+
 def _camino(g, n_rep, n_destino):
     """Cadena de nodos que va del reporte al dato compartido, dentro de ese reporte.
 
@@ -104,6 +108,10 @@ def _camino(g, n_rep, n_destino):
         vecinos.setdefault(v, set()).add(u)
     if n_rep not in vecinos or n_destino not in vecinos:
         return []
+
+    def _preferencia(n):
+        return (PREFERENCIA_CAMINO.get(g.G.nodes[n].get("tipo"), 2), n)
+
     previo, cola, vistos = {n_rep: None}, [n_rep], {n_rep}
     while cola:
         actual = cola.pop(0)
@@ -113,7 +121,11 @@ def _camino(g, n_rep, n_destino):
                 camino.append(actual)
                 actual = previo[actual]
             return list(reversed(camino))
-        for sig in sorted(vecinos.get(actual, ())):
+        # A igual longitud hay varios caminos posibles: por la persona
+        # mencionada o por el chat. Se prefiere la persona, que es la entidad
+        # que el operador esta buscando; "el reporte, a traves de esta persona,
+        # opera con esta cuenta" se lee solo.
+        for sig in sorted(vecinos.get(actual, ()), key=_preferencia):
             if sig not in vistos:
                 vistos.add(sig)
                 previo[sig] = actual
@@ -254,7 +266,12 @@ def _datos(g, res, dossier=None, texto_informe=None):
     salida = dict(
         nodos=nodos, aristas=aristas, identidades=identidades,
         tipos={t: dict(color=m["color"],
-                       legible=ont.ETIQUETA_TIPO.get(t, t), desc=m["desc"])
+                       legible=ont.ETIQUETA_TIPO.get(t, t), desc=m["desc"],
+                       # Las organizaciones -plataforma que reporta, prestador
+                       # de internet- no aportan a la vinculacion: todos los
+                       # reportes de Grindr comparten Grindr. Se informan en la
+                       # ficha y no compiten por atencion en el lienzo.
+                       informativo=(t == "ORGANIZACION"))
                for t, m in ont.TIPOS_NODO.items()},
         meta=dict(corrida=res.get("corrida"),
                   ontologia=res.get("ontologia_version"),
@@ -425,8 +442,16 @@ svg.arrastrandoLienzo{cursor:grabbing}
   paint-order:stroke;stroke:#060a12;stroke-width:3;stroke-linejoin:round}
 .nodo.sel text{fill:#fff}
 .nodo.apagado{opacity:0;pointer-events:none}
-.nodo .pin{fill:var(--ambar);opacity:0;transition:opacity .2s}
-.nodo.fijado .pin{opacity:.9}
+.nodo .pin{fill:none;stroke:var(--ambar);stroke-width:1.2;stroke-dasharray:2 2;
+  opacity:0;transition:opacity .2s}
+.nodo.fijado .pin{opacity:.8}
+.abrir{cursor:pointer}
+.abrir circle{fill:#0d1626;stroke:var(--ambar);stroke-width:1.4;
+  transition:fill .18s}
+.abrir:hover circle{fill:rgba(251,191,36,.22)}
+.abrir text{fill:var(--ambar);font-size:8.5px;font-family:var(--mono);
+  text-anchor:middle;pointer-events:none}
+.abrir.oculto{display:none}
 .etiquetaGrupo{font-size:11px;fill:#4d5f7d;font-family:var(--mono);
   text-transform:uppercase;letter-spacing:.12em;pointer-events:none}
 
@@ -517,10 +542,9 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
       <button id="adelante" title="Siguiente (Alt + →)">Siguiente ›</button>
     </div>
     <select id="selCaso" class="solo" title="Caso en curso"></select>
-    <div class="grupo" id="niveles">
-      <button data-nivel="0">Vinculaciones</button>
-      <button data-nivel="1">Por qué</button>
-      <button data-nivel="2">Todo el caso</button>
+    <div class="grupo">
+      <button id="abrirTodo" title="Abrir todo el caso de una vez">Abrir todo</button>
+      <button id="contraer" title="Volver a los reportes">Contraer</button>
     </div>
     <button class="solo" id="reorganizar">Reorganizar</button>
     <button class="solo primario" id="btnInforme">Informe</button>
@@ -533,6 +557,7 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
       <g id="garistas"></g>
       <g id="gpesos"></g>
       <g id="gnodos"></g>
+      <g id="gbadges"></g>
     </g>
   </svg>
   <div id="pie"></div>
@@ -567,6 +592,18 @@ const UNIF = new Map(Object.entries(D.identidades||{}));
 const HAY_UNIF = UNIF.size > 0;
 const RE = id => (estado.unificar && UNIF.get(id)) || id;
 const VINCULOS = D.aristas.filter(a=>a.entreReportes);
+
+/* Aristas paralelas: la misma relacion entre los mismos dos nodos, afirmada por
+   reportes distintos. Cada una es evidencia separada y por eso existen todas en
+   el grafo, pero dibujar tres lineas identicas solo ensucia. Se dibuja una y se
+   informa en cuantos reportes consta. */
+const GRUPO = new Map(), MIEMBROS = new Map();
+D.aristas.forEach(a=>{
+  const clave = [a.a, a.b].sort().join("|")+"|"+a.relacion;
+  GRUPO.set(a.id, clave);
+  if(!MIEMBROS.has(clave)) MIEMBROS.set(clave,[]);
+  MIEMBROS.get(clave).push(a.id);
+});
 const CASOS = D.casos || [];
 
 /* El visor trabaja sobre UN caso por vez. No es un explorador del archivo
@@ -588,15 +625,41 @@ function vinculosDelCaso(){
   return VINCULOS.filter(a=>rs.has((NODOS.get(a.a)||{}).valor) &&
                             rs.has((NODOS.get(a.b)||{}).valor));
 }
+/* Vecinos de una entidad que vale la pena abrir.
+   Se excluyen las organizaciones -la plataforma que reporta, el prestador de
+   internet-: todos los reportes de Grindr comparten Grindr, asi que no
+   distinguen nada. Se informan en la ficha. */
+function vecinosAbribles(id){
+  const out = new Set();
+  (ADY.get(id)||new Set()).forEach(v0=>{
+    const v = RE(v0);
+    const n = NODOS.get(v);
+    if(!n || v===RE(id)) return;
+    if(!enElCaso(v)) return;
+    if(!estado.tipos.has(n.tipo)) return;
+    out.add(v);
+  });
+  return out;
+}
+function abrir(id){ estado.expandidos.add(RE(id)); }
+function cerrar(id){
+  const r = RE(id);
+  estado.expandidos.delete(r);
+  // Cerrar una entidad tambien recoge lo que se habia abierto desde ella y ya
+  // no tiene por que seguir en pantalla.
+  const vis = conjuntoVisible();
+  [...estado.expandidos].forEach(x=>{ if(!vis.has(x)) estado.expandidos.delete(x); });
+}
+
 function esCompartido(id){
   const n = NODOS.get(id); if(!n || n.tipo==="REPORTE") return false;
   const rs = reportesDelCaso();
   return (n.reportes||[]).filter(r=>rs.has(r)).length >= 2;
 }
 
-const estado = {tipos:new Set(Object.keys(D.tipos)),
+const estado = {tipos:new Set(Object.keys(D.tipos).filter(t=>!D.tipos[t].informativo)),
                 origenes:new Set(["observada","derivada","inferida"]),
-                conf:0, nivel:0, disposicion:"secuencia", rechazadas:false,
+                conf:0, expandidos:new Set(), disposicion:"secuencia", rechazadas:false,
                 verPesos:true, verEtiquetas:true, texto:"", unificar:true,
                 caso:null, foco:null, vista:{tipo:"inicio"}};
 
@@ -649,7 +712,13 @@ function botonesHist(){
 function mostrar(v){
   estado.vista = v;
   if(v.tipo==="inicio") pintarInicio();
-  else if(v.tipo==="nodo") pintarNodo(v.id);
+  else if(v.tipo==="nodo"){
+    // Elegir una entidad -desde el lienzo o desde la ficha- la abre. Es el
+    // mismo gesto en los dos lados.
+    estado.foco = v.id;
+    if(v.id && enElCaso(v.id)) abrir(v.id);
+    pintarNodo(v.id);
+  }
   else if(v.tipo==="arista") pintarArista(v.id);
   else if(v.tipo==="porque") pintarPorQue(v.id);
   else if(v.tipo==="informe") pintarInforme();
@@ -931,8 +1000,9 @@ document.getElementById("reorganizar").onclick = ()=>{
 const SVGNS = "http://www.w3.org/2000/svg";
 const gG = document.getElementById("ggrupos"), gA = document.getElementById("garistas");
 const gP = document.getElementById("gpesos"), gN = document.getElementById("gnodos");
+const gB = document.getElementById("gbadges");
 const elA = new Map(), elZ = new Map(), elN = new Map(), elP = new Map();
-const TETIQ = new Map(), CURV = new Map();
+const TETIQ = new Map(), CURV = new Map(), elB = new Map();
 
 D.aristas.forEach(a=>{
   if(!NODOS.has(a.a)||!NODOS.has(a.b)) return;
@@ -986,8 +1056,8 @@ D.nodos.forEach(n=>{
   } else { f = document.createElementNS(SVGNS,"circle"); f.setAttribute("r",r); }
   f.setAttribute("class","cuerpo"); f.setAttribute("fill",n.color); g.appendChild(f);
   const pin = document.createElementNS(SVGNS,"circle");
-  pin.setAttribute("class","pin"); pin.setAttribute("r",3);
-  pin.setAttribute("cx",r-1); pin.setAttribute("cy",-r+1); g.appendChild(pin);
+  pin.setAttribute("class","pin"); pin.setAttribute("r",r+4);
+  g.appendChild(pin);
   const tx = document.createElementNS(SVGNS,"text");
   tx.setAttribute("x",r+6); tx.setAttribute("y",4);
   tx.textContent = (n.etiqueta||"").slice(0,28); g.appendChild(tx);
@@ -995,6 +1065,23 @@ D.nodos.forEach(n=>{
   ti.textContent = n.tipoLegible+": "+n.etiqueta; g.appendChild(ti);
   gN.appendChild(g); elN.set(n.id,g);
   arrastrable(g,n);
+
+  // Indicador de apertura: dice cuantas entidades cuelgan todavia de esta y
+  // permite abrirlas o volver a cerrarlas. Va en su propia capa para no
+  // interferir con el arrastre del nodo.
+  const b = document.createElementNS(SVGNS,"g");
+  b.setAttribute("class","abrir oculto");
+  const bc = document.createElementNS(SVGNS,"circle");
+  bc.setAttribute("r",7.5); b.appendChild(bc);
+  const bt = document.createElementNS(SVGNS,"text");
+  bt.setAttribute("y",3); b.appendChild(bt);
+  const btl = document.createElementNS(SVGNS,"title"); b.appendChild(btl);
+  b.addEventListener("click",e=>{
+    e.stopPropagation();
+    if(estado.expandidos.has(RE(n.id))) cerrar(n.id); else abrir(n.id);
+    aplicar();
+  });
+  gB.appendChild(b); elB.set(n.id,b);
 });
 function pintarGrupos(){
   gG.textContent = "";
@@ -1031,6 +1118,12 @@ function pintarPos(){
   SIM.forEach((s,id)=>{
     const el = elN.get(id);
     if(el) el.setAttribute("transform","translate("+s.x.toFixed(1)+","+s.y.toFixed(1)+")");
+    const b = elB.get(id);
+    if(b){
+      const n = NODOS.get(id), r = n ? radio(n) : 8;
+      b.setAttribute("transform","translate("+(s.x+r+3).toFixed(1)+","+
+                     (s.y-r-3).toFixed(1)+")");
+    }
   });
 }
 
@@ -1059,7 +1152,11 @@ function arrastrable(el,n){
     if(!mov) return;
     mov = false; el.classList.remove("moviendo"); el.releasePointerCapture(ev.pointerId);
     if(movido){ el.classList.add("fijado"); recalentar(0.5); }
-    else { if(estado.disposicion==="fuerzas") SIM.get(n.id).fijo = false; ir({tipo:"nodo", id:n.id}); }
+    else {
+      if(estado.disposicion==="fuerzas") SIM.get(n.id).fijo = false;
+      abrir(n.id);                       // abrir en cascada: un clic, un paso
+      ir({tipo:"nodo", id:n.id});
+    }
   });
   el.addEventListener("dblclick",ev=>{
     ev.stopPropagation(); SIM.get(n.id).fijo = false;
@@ -1094,54 +1191,45 @@ function tramosDelPuente(a){
 function conjuntoVisible(){
   const v = estado.vista;
   const txt = estado.texto.trim().toLowerCase();
-  const delCaso = D.nodos.filter(n=>enElCaso(n.id));
-  const reportesCaso = delCaso.filter(n=>n.tipo==="REPORTE").map(n=>n.id);
-  const vincCaso = vinculosDelCaso();
-  let base = new Set();
 
+  // La vista "por que" es una excepcion: muestra exactamente la cadena que
+  // explica una vinculacion, sin depender de lo que el operador haya abierto.
   if(v.tipo==="porque"){
-    // Solo lo que explica ESA vinculación: los dos reportes y las cadenas.
     const a = ARISTAS.get(v.id);
-    if(a){ base = nodosDelPuente(a); base.add(RE(a.a)); base.add(RE(a.b)); }
-  } else if(estado.nivel===0){
-    base = new Set(reportesCaso);
-  } else if(estado.nivel===1){
-    // "Por qué": los reportes del caso y únicamente las cadenas que sostienen
-    // sus vinculaciones. Nada de lo que no explique algo.
-    base = new Set(reportesCaso);
-    let relevantes = vincCaso;
-    if(estado.foco) relevantes = vincCaso.filter(a=>a.a===estado.foco||a.b===estado.foco);
-    if(!relevantes.length) relevantes = vincCaso;
-    relevantes.forEach(a=>nodosDelPuente(a).forEach(x=>base.add(x)));
-    if(v.tipo==="nodo" && (NODOS.get(v.id)||{}).tipo!=="REPORTE"){
-      base.add(v.id); (ADY.get(v.id)||new Set()).forEach(x=>base.add(RE(x)));
+    const fin = new Set();
+    if(a){
+      nodosDelPuente(a).forEach(x=>fin.add(x));
+      fin.add(RE(a.a)); fin.add(RE(a.b));
     }
-  } else {
-    base = new Set(delCaso.map(n=>n.id));
+    return fin;
   }
 
-  // Una relacion elegida desde la ficha tiene que poder verse: se traen sus dos
-  // extremos aunque el nivel de detalle no los incluyera.
+  // Punto de partida: los reportes del caso. Nada mas.
+  const base = new Set(D.nodos.filter(n=>n.tipo==="REPORTE" && enElCaso(n.id))
+                              .map(n=>n.id));
+  // Y lo que colgó de cada cosa que el operador fue abriendo.
+  estado.expandidos.forEach(id=>{
+    if(!enElCaso(id)) return;
+    base.add(id);
+    vecinosAbribles(id).forEach(x=>base.add(x));
+  });
+  if(v.tipo==="nodo" && v.id && enElCaso(v.id)) base.add(RE(v.id));
   if(v.tipo==="arista"){
     const a = ARISTAS.get(v.id);
     if(a){ base.add(RE(a.a)); base.add(RE(a.b)); }
   }
 
+  if(!txt) return base;
   const fin = new Set();
-  base.forEach(id0=>{
-    const id = RE(id0);
+  base.forEach(id=>{
     const n = NODOS.get(id); if(!n) return;
-    if(!enElCaso(id)) return;                     // nunca se sale del caso
-    const colapsada = estado.unificar && UNIF.has(id0) && id!==id0;
-    if(!colapsada && estado.nivel>1 && v.tipo!=="porque" && !estado.tipos.has(n.tipo)) return;
-    if(txt){
-      const blob = (n.etiqueta+" "+n.tipoLegible+" "+n.atributos.map(x=>x[1]).join(" ")).toLowerCase();
-      if(!blob.includes(txt)) return;
-    }
-    fin.add(id);
+    const blob = (n.etiqueta+" "+n.tipoLegible+" "+
+                  n.atributos.map(x=>x[1]).join(" ")).toLowerCase();
+    if(blob.includes(txt) || (v.tipo==="nodo" && id===RE(v.id))) fin.add(id);
   });
   return fin;
 }
+
 function aplicar(reacomodar){
   const v = estado.vista;
   const vis = conjuntoVisible();
@@ -1155,7 +1243,6 @@ function aplicar(reacomodar){
     const p = elA.get(a.id); if(!p) return;
     const ea = RE(a.a), eb = RE(a.b);
     let ok = estado.origenes.has(a.origen) && vis.has(ea) && vis.has(eb) && ea!==eb;
-    if(ok && estado.nivel===0 && v.tipo!=="porque" && !a.entreReportes) ok = false;
     if(ok && foco && !a.entreReportes && !tramos.has(ea+"|"+eb)) ok = false;
     if(ok && foco && a.entreReportes && a.id!==foco.id) ok = false;
     if(ok && a.confianza!=null) ok = a.confianza >= estado.conf;
@@ -1170,6 +1257,25 @@ function aplicar(reacomodar){
   });
   // Con muchas aristas las etiquetas se pisan y estorban: por encima de ese
   // umbral se deja solo el peso de las vinculaciones entre reportes.
+  // De cada grupo de aristas paralelas se dibuja solo la primera visible.
+  const representante = new Map();
+  visiblesA.forEach(([a, ok])=>{
+    if(!ok) return;
+    const clave = GRUPO.get(a.id);
+    if(!representante.has(clave)) representante.set(clave, a.id);
+  });
+  let dibujadas = 0;
+  visiblesA.forEach(([a, ok], i)=>{
+    const clave = GRUPO.get(a.id);
+    const soyRepre = representante.get(clave) === a.id;
+    if(ok && !soyRepre){
+      elA.get(a.id).classList.add("apagada");
+      elZ.get(a.id).style.pointerEvents = "none";
+      visiblesA[i][1] = false;
+    } else if(ok) dibujadas++;
+  });
+  cuenta = dibujadas;
+
   const pocasAristas = cuenta <= 90;
   const yaEtiquetado = new Set();
   visiblesA.forEach(([a, ok])=>{
@@ -1187,6 +1293,10 @@ function aplicar(reacomodar){
       const clave = [RE(a.a), RE(a.b)].sort().join("|")+"|"+a.relacionLegible;
       if(yaEtiquetado.has(clave)) mostrar = false; else yaEtiquetado.add(clave);
     }
+    if(mostrar && !a.entreReportes){
+      const n = (MIEMBROS.get(GRUPO.get(a.id))||[]).length;
+      tx.textContent = a.relacionLegible + (n>1 ? "  ·  en "+n+" reportes" : "");
+    }
     tx.style.opacity = mostrar ? 1 : 0;
   });
   elN.forEach((el,id)=>el.classList.toggle("sel", v.tipo==="nodo" && RE(v.id)===id));
@@ -1194,8 +1304,21 @@ function aplicar(reacomodar){
   document.getElementById("pie").textContent =
     vis.size+(vis.size===1?" entidad · ":" entidades · ")+
     cuenta+(cuenta===1?" relación":" relaciones");
-  document.querySelectorAll("#niveles button").forEach(b=>
-    b.classList.toggle("activo",+b.dataset.nivel===estado.nivel && v.tipo!=="porque"));
+  document.getElementById("contraer").disabled = estado.expandidos.size===0;
+
+  // Indicadores de apertura sobre cada entidad visible.
+  D.nodos.forEach(n=>{
+    const b = elB.get(n.id); if(!b) return;
+    if(!vis.has(n.id) || v.tipo==="porque"){ b.classList.add("oculto"); return; }
+    const abierto = estado.expandidos.has(RE(n.id));
+    const ocultos = [...vecinosAbribles(n.id)].filter(x=>!vis.has(x)).length;
+    if(!abierto && ocultos===0){ b.classList.add("oculto"); return; }
+    b.classList.remove("oculto");
+    b.querySelector("text").textContent = ocultos>0 ? "+"+ocultos : "−";
+    b.querySelector("title").textContent = ocultos>0
+      ? "Abrir "+ocultos+" entidad(es) vinculada(s) a "+n.etiqueta
+      : "Cerrar lo que se abrió desde "+n.etiqueta;
+  });
 
   if(reacomodar!==false){
     if(v.tipo==="porque") aplicarDisposicion("porque", v.id);
@@ -1210,7 +1333,8 @@ Object.entries(D.tipos).forEach(([t,m])=>{
   const usados = D.nodos.filter(n=>n.tipo===t).length;
   if(!usados) return;
   const l = document.createElement("label");
-  l.innerHTML = '<input type="checkbox" class="ftipo" value="'+t+'" checked>'+
+  l.innerHTML = '<input type="checkbox" class="ftipo" value="'+t+'"'+
+    (m.informativo ? '' : ' checked')+'>'+
     '<span class="sw" style="background:'+m.color+'"></span>'+esc(m.legible)+
     ' <span style="color:var(--tenue);font-family:var(--mono);font-size:11px">'+usados+'</span>';
   l.title = m.desc; cont.appendChild(l);
@@ -1249,6 +1373,7 @@ CASOS.forEach(c=>{
 });
 function cambiarCaso(id){
   estado.caso = id;
+  estado.expandidos.clear();
   const c = casoActual();
   estado.foco = c ? ont_id(c.reportes[0]) : null;
   sel.value = id;
@@ -1258,13 +1383,14 @@ function cambiarCaso(id){
 function ont_id(valorReporte){ return "REPORTE::"+String(valorReporte).toLowerCase(); }
 sel.onchange = e=>cambiarCaso(e.target.value);
 
-document.querySelectorAll("#niveles button").forEach(b=>b.onclick=()=>{
-  estado.nivel = +b.dataset.nivel;
-  if(estado.vista.tipo==="porque"){
-    const a = ARISTAS.get(estado.vista.id);
-    ir({tipo:"nodo", id:a? a.a : null});
-  } else aplicar();
-});
+document.getElementById("abrirTodo").onclick = ()=>{
+  D.nodos.forEach(n=>{ if(enElCaso(n.id)) estado.expandidos.add(n.id); });
+  aplicar();
+};
+document.getElementById("contraer").onclick = ()=>{
+  estado.expandidos.clear();
+  ir({tipo:"inicio"});
+};
 
 /* ================================================ plegado y redimensionado ==== */
 function plegable(idPanel,idBoton,abierto,cerrado){
@@ -1326,9 +1452,23 @@ function cadenaHTML(ids, destacado){
     const n = NODOS.get(id)||{};
     const txt = esc(n.etiqueta||id);
     return id===destacado ? "<b>"+txt+"</b>" :
-      '<span class="chip boton" onclick="irANodo(\''+id+'\')">'+txt+'</span>';
+      '<span class="chip boton" data-ir="nodo|'+id+'">'+txt+'</span>';
   }).join('<span class="fl">→</span>')+'</div>';
 }
+// Navegacion delegada: la ficha se arma como texto y los botones se declaran
+// con data-ir="tipo|id". Evita escapar comillas dentro del HTML generado, que
+// es donde se colaban los errores.
+document.getElementById("cuerpo").addEventListener("click", e=>{
+  const nav = e.target.closest("[data-ir]");
+  if(nav){
+    const [tipo, id] = nav.dataset.ir.split("|");
+    ir(id ? {tipo, id} : {tipo});
+    return;
+  }
+  const acc = e.target.closest("[data-accion]");
+  if(acc && acc.dataset.accion === "descargar") descargarInforme();
+});
+
 function ficha(html){
   document.getElementById("cuerpo").innerHTML = html;
   document.getElementById("der").classList.remove("plegado");
@@ -1356,7 +1496,7 @@ function pintarInicio(){
     const n = NODOS.get("REPORTE::"+rid.toLowerCase());
     if(!n) return;
     const at = Object.fromEntries(n.atributos);
-    h += '<div class="tarjeta click" onclick="irANodo(\''+n.id+'\')">'+
+    h += '<div class="tarjeta click" data-ir="nodo|'+n.id+'">'+
       '<div style="font-size:12.5px"><b>Reporte '+esc(rid)+'</b>'+
       (estado.foco===n.id? ' <span class="chip cy">en curso</span>':'')+'</div>'+
       '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">'+
@@ -1372,7 +1512,7 @@ function pintarInicio(){
       '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Clic en '+
       'cualquiera para ver la cadena completa que une a los dos reportes.</p></div>';
     vinc.forEach(a=>{
-      h += '<div class="tarjeta click" onclick="irAPorQue(\''+a.id+'\')">'+
+      h += '<div class="tarjeta click" data-ir="porque|'+a.id+'">'+
         chipPeso(a.confianza)+(a.relacion==="POSIBLE_DUPLICADO_DE"?
           '<span class="chip am">posible duplicado</span>':'')+
         '<div style="margin-top:4px;font-size:12.5px"><b>'+esc(etq(a.a))+'</b>'+
@@ -1393,7 +1533,7 @@ function pintarInicio(){
       'en más de un reporte. Son los que sostienen las vinculaciones.</p></div>';
     compartidos.sort((a,b)=>(b.reportes||[]).length-(a.reportes||[]).length)
       .forEach(n=>{
-      h += '<div class="tarjeta click" onclick="irANodo(\''+n.id+'\')">'+
+      h += '<div class="tarjeta click" data-ir="nodo|'+n.id+'">'+
         '<span class="chip">'+esc(n.tipoLegible)+'</span>'+
         '<div style="margin-top:3px;font-size:12.5px"><b>'+esc(n.etiqueta)+'</b></div>'+
         '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">en los '+
@@ -1406,7 +1546,7 @@ function pintarInicio(){
   if(alertasCaso.length){
     h += '<h2>Antecedentes a revisar en este caso</h2>';
     alertasCaso.forEach(al=>{
-      h += '<div class="tarjeta click" onclick="irAPorQue(\''+al.arista_id+'\')">'+
+      h += '<div class="tarjeta click" data-ir="porque|'+al.arista_id+'">'+
         '<span class="chip '+(al.prioridad==="alta"?"am":"cy")+'"><span class="pt">'+
         '</span>'+esc(al.prioridad)+'</span>'+
         '<div style="margin-top:4px;font-size:12.5px">Reporte <b>'+
@@ -1434,7 +1574,7 @@ function pintarPorQue(id){
     sost.forEach(p=>{
       h += '<div class="tarjeta cyan">'+chipPeso(p.peso)+
         '<div style="font-size:12.5px;margin:2px 0 8px"><b>'+esc(p.tipo)+'</b> '+
-        '<span class="chip boton" onclick="irANodo(\''+p.nodo+'\')">'+esc(p.valor)+'</span></div>'+
+        '<span class="chip boton" data-ir="nodo|'+p.nodo+'">'+esc(p.valor)+'</span></div>'+
         '<div style="font-size:11px;color:var(--tenue);margin-bottom:2px">Cómo llega desde '+
         esc(etq(a.a))+'</div>'+cadenaHTML(p.camino_a, p.nodo)+
         '<div style="font-size:11px;color:var(--tenue);margin:6px 0 2px">Cómo llega desde '+
@@ -1448,7 +1588,7 @@ function pintarPorQue(id){
     corr.forEach(p=>{
       h += '<div class="tarjeta">'+chipPeso(p.peso)+
         '<div style="font-size:12.5px;margin-top:2px"><b>'+esc(p.tipo)+'</b> '+
-        '<span class="chip boton" onclick="irANodo(\''+p.nodo+'\')">'+esc(p.valor)+'</span></div>'+
+        '<span class="chip boton" data-ir="nodo|'+p.nodo+'">'+esc(p.valor)+'</span></div>'+
         '</div>';
     });
   }
@@ -1457,47 +1597,122 @@ function pintarPorQue(id){
     ["Método",a.metodo], ["Evidencia de origen",a.fuente],
     ["Revisada por",a.validado_por||"sin revisar"],
     ["Identificador",a.id]]);
-  h += '<div class="fila"><button onclick="irAArista(\''+a.id+'\')">Ver la relación en detalle</button></div>';
+  h += '<div class="fila"><button data-ir="arista|'+a.id+'">Ver la relación en detalle</button></div>';
   ficha(h);
 }
 
 function pintarNodo(id){
   if(!id || !NODOS.has(id)){ pintarInicio(); return; }
   const n = NODOS.get(id);
+  const rs = reportesDelCaso();
   const rel = D.aristas.filter(a=>a.a===id||a.b===id);
   const conRep = rel.filter(a=>a.entreReportes);
-  const otras = rel.filter(a=>!a.entreReportes);
   let h = '<span class="chip cy">'+esc(n.tipoLegible)+'</span><h3>'+esc(n.etiqueta||"")+'</h3>';
 
-  if(conRep.length){
-    h += '<h2>Se vincula con ('+conRep.length+')</h2>';
-    conRep.sort((a,b)=>(b.confianza||0)-(a.confianza||0)).forEach(a=>{
-      const otro = a.a===id?a.b:a.a;
-      h += '<div class="tarjeta click" onclick="irAPorQue(\''+a.id+'\')">'+
-        chipPeso(a.confianza)+
-        '<div style="margin-top:4px;font-size:12.5px"><b>'+esc(etq(otro))+'</b></div>'+
-        '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">por '+
-        ((a.puente||[]).filter(x=>x.sostiene).map(x=>esc(x.tipo.toLowerCase())).join(", ")||"—")+
-        ' · clic para ver por qué</div></div>';
+  if(n.tipo==="REPORTE"){
+    if(conRep.length){
+      h += '<h2>Se vincula con ('+conRep.length+')</h2>';
+      conRep.sort((a,b)=>(b.confianza||0)-(a.confianza||0)).forEach(a=>{
+        const otro = a.a===id?a.b:a.a;
+        h += '<div class="tarjeta click" data-ir="porque|'+a.id+'">'+chipPeso(a.confianza)+
+          '<div style="margin-top:4px;font-size:12.5px"><b>'+esc(etq(otro))+'</b></div>'+
+          '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">por '+
+          ((a.puente||[]).filter(x=>x.sostiene).map(x=>esc(x.tipo.toLowerCase()))
+            .join(", ")||"—")+' · clic para ver por qué</div></div>';
+      });
+    }
+
+    // Los datos del reporte, agrupados por tipo. Cada entidad ya sabe en que
+    // reportes aparece, asi que no hace falta recorrer el grafo: alcanza con
+    // preguntar quien menciona a este.
+    const porTipo = new Map();
+    D.nodos.forEach(m=>{
+      if(m.tipo==="REPORTE" || m.id===id) return;
+      if((D.tipos[m.tipo]||{}).informativo) return;
+      if(!(m.reportes||[]).includes(n.valor)) return;
+      if(!porTipo.has(m.tipo)) porTipo.set(m.tipo,[]);
+      porTipo.get(m.tipo).push(m);
     });
-  }
-  h += '<h2>Datos</h2>'+tabla(n.atributos);
-  if(n.transcripciones&&n.transcripciones.length){
-    h += '<h2>Texto restringido</h2><div class="prosa"><p>Este hecho tiene '+
-      n.transcripciones.length+' transcripción(es) que no se incorporan al grafo. '+
-      'Se conservan aparte, por hash, en <span class="cita">salida/textos_restringidos.json</span>.</p></div>';
-  }
-  if(otras.length){
-    h += '<h2>Otras relaciones ('+otras.length+')</h2>';
-    otras.forEach(a=>{
-      const otro = a.a===id?a.b:a.a, inv = a.a!==id;
-      h += '<div class="tarjeta click'+(a.relacion==="CONTRADICE"?" alarma":"")+
-        '" onclick="irAArista(\''+a.id+'\')">'+chipOrigen(a)+
-        '<div style="margin-top:4px;font-size:12.5px">'+
-        (inv ? '<span style="color:var(--tenue)">'+esc(etq(otro))+'</span> '+esc(a.relacionLegible)+' <b>esta entidad</b>'
-             : '<b>Esta entidad</b> '+esc(a.relacionLegible)+' <span style="color:var(--tenue)">'+esc(etq(otro))+'</span>')+
-        '</div></div>';
+
+    const ORDEN = ["PERSONA_MENCION","IDENTIDAD","CUENTA","ALIAS","TELEFONO",
+                   "EMAIL","IP","DISPOSITIVO","EVIDENCIA","UBICACION","EVENTO"];
+    const conDatos = ORDEN.filter(t=>porTipo.has(t));
+    if(conDatos.length){
+      h += '<h2>Qué aporta este reporte</h2>'+
+        '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Clic en '+
+        'cualquiera para abrirlo en el grafo y ver en qué otros reportes aparece.</p></div>';
+      conDatos.forEach(t=>{
+        h += '<div style="margin:10px 0 4px;font-size:11px;color:var(--tenue);'+
+          'text-transform:uppercase;letter-spacing:.1em">'+
+          esc((D.tipos[t]||{}).legible||t)+'</div>';
+        porTipo.get(t).forEach(m=>{
+          const otros = (m.reportes||[]).filter(r=>rs.has(r) && r!==n.valor).length;
+          h += '<span class="chip boton" data-ir="nodo|'+m.id+'" style="max-width:100%">'+
+            esc(m.etiqueta)+(otros? ' <b style="color:var(--ambar)">·'+otros+'</b>':'')+
+            '</span>';
+        });
+      });
+      h += '<div class="prosa"><p style="font-size:11.5px;color:var(--tenue);'+
+        'margin-top:8px">El número en ámbar indica en cuántos otros reportes del '+
+        'caso aparece ese mismo dato.</p></div>';
+    }
+
+    const orgs = [...(ADY.get(id)||new Set())].map(v=>NODOS.get(RE(v)))
+      .filter(m=>m && m.tipo==="ORGANIZACION");
+    if(orgs.length){
+      h += '<h2>Origen</h2><div class="prosa"><p>'+
+        esc(orgs.map(m=>m.etiqueta).join(" · "))+'</p>'+
+        '<p style="font-size:11.5px;color:var(--tenue)">Las plataformas y '+
+        'prestadores no se dibujan en el grafo: todos los reportes de una misma '+
+        'plataforma la comparten, así que no distinguen nada.</p></div>';
+    }
+    h += '<h2>Datos del reporte</h2>'+tabla(n.atributos);
+
+  } else {
+    // Entidad: lo primero que importa es en qué reportes del caso aparece.
+    const enReportes = (n.reportes||[]).filter(r=>rs.has(r));
+    h += '<h2>Aparece en '+enReportes.length+' reporte(s) del caso</h2>';
+    enReportes.forEach(r=>{
+      const nr = NODOS.get("REPORTE::"+r.toLowerCase());
+      h += '<div class="tarjeta click" data-ir="nodo|'+(nr?nr.id:"")+'">'+
+        '<div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div></div>';
     });
+    if(enReportes.length > 1){
+      h += '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Este '+
+        'dato se repite en más de un reporte: es de los que sostienen las '+
+        'vinculaciones del caso.</p></div>';
+    }
+    h += '<h2>Datos</h2>'+tabla(n.atributos);
+
+    if(n.transcripciones&&n.transcripciones.length){
+      h += '<h2>Texto restringido</h2><div class="prosa"><p>Este hecho tiene '+
+        n.transcripciones.length+' transcripción(es) que no se incorporan al grafo. '+
+        'Se conservan aparte, por hash, en <span class="cita">salida/textos_restringidos.json</span>.</p></div>';
+    }
+
+    const otras = rel.filter(a=>!a.entreReportes);
+    if(otras.length){
+      const vistos = new Set();
+      h += '<h2>Cómo se conecta</h2>';
+      otras.forEach(a=>{
+        const otro = RE(a.a===id?a.b:a.a), inv = a.a!==id;
+        const m = NODOS.get(otro);
+        // Nunca mostrar entidades de otro caso: el operador trabaja sobre este.
+        if(!m || m.tipo==="ORGANIZACION" || !enElCaso(otro)) return;
+        const clave = otro+"|"+a.relacion;
+        if(vistos.has(clave)) return; vistos.add(clave);
+        const cuantas = (MIEMBROS.get(GRUPO.get(a.id))||[]).length;
+        h += '<div class="tarjeta click'+(a.relacion==="CONTRADICE"?" alarma":"")+
+          '" data-ir="arista|'+a.id+'">'+chipOrigen(a)+
+          (cuantas>1? '<span class="chip">en '+cuantas+' reportes</span>':'')+
+          '<div style="margin-top:4px;font-size:12.5px">'+
+          (inv ? '<span style="color:var(--tenue)">'+esc(m.etiqueta)+'</span> '+
+                 esc(a.relacionLegible)+' <b>esta entidad</b>'
+               : '<b>Esta entidad</b> '+esc(a.relacionLegible)+
+                 ' <span style="color:var(--tenue)">'+esc(m.etiqueta)+'</span>')+
+          '</div></div>';
+      });
+    }
   }
   ficha(h);
 }
@@ -1512,9 +1727,9 @@ function pintarArista(id){
     esc(a.relacionLegible)+'</span> '+esc(etq(a.b))+'</h3>'+
     '<div style="font-size:11.5px;color:var(--tenue)">'+esc(a.origenDesc)+'</div>'+
     '<div class="fila">'+
-    '<button onclick="irANodo(\''+a.a+'\')">'+esc(etq(a.a))+'</button>'+
-    '<button onclick="irANodo(\''+a.b+'\')">'+esc(etq(a.b))+'</button></div>';
-  if(a.entreReportes) h += '<div class="fila"><button onclick="irAPorQue(\''+a.id+'\')">Ver por qué se vinculan</button></div>';
+    '<button data-ir="nodo|'+a.a+'">'+esc(etq(a.a))+'</button>'+
+    '<button data-ir="nodo|'+a.b+'">'+esc(etq(a.b))+'</button></div>';
+  if(a.entreReportes) h += '<div class="fila"><button data-ir="porque|'+a.id+'">Ver por qué se vinculan</button></div>';
   if(a.explicacion) h += '<h2>Fundamento</h2>'+prosa(a.explicacion);
   h += '<h2>De dónde surge</h2>'+tabla([
     ["Evidencia de origen",a.fuente], ["Ubicación exacta en la fuente",a.locator],
@@ -1563,8 +1778,8 @@ function markdown(texto){
 function pintarInforme(){
   const t = (D.informe||{}).texto || "";
   if(!t){ ficha('<h1>Informe</h1><div class="vacio">No se generó el informe en esta corrida.</div>'); return; }
-  ficha('<div class="fila"><button onclick="descargarInforme()">Descargar .md</button>'+
-    '<button onclick="irAInicio()">Volver</button></div>'+markdown(t)+
+  ficha('<div class="fila"><button data-accion="descargar">Descargar .md</button>'+
+    '<button data-ir="inicio|">Volver</button></div>'+markdown(t)+
     '<h2>Versión redactada por IA</h2><div class="prosa"><p>Este informe se genera '+
     'con plantillas, sin depender de ningún modelo. Para una redacción más fluida, '+
     'cuando haya un modelo local disponible:</p></div>'+
@@ -1603,7 +1818,8 @@ window.addEventListener("pointermove",e=>{
   pintarVista();
 });
 window.addEventListener("pointerup",()=>{
-  if(arr && !arr.movido && estado.vista.tipo!=="inicio") ir({tipo:"inicio"});
+  // Un clic en el vacio no descarta el recorrido: antes reseteaba la vista y se
+  // perdia todo lo que el operador habia ido abriendo.
   arr = null; svg.classList.remove("arrastrandoLienzo");
 });
 

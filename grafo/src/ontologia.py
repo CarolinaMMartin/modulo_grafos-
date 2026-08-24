@@ -258,7 +258,7 @@ ETIQUETA_TIPO = {
 
 ETIQUETA_RELACION = {
     "REPORTADO_EN": u"figura en el reporte",
-    "CONTIENE_EVENTO": u"comprende el hecho",
+    "CONTIENE_EVENTO": u"registra el hecho",
     "EMITIDO_POR": u"fue generado por",
     "USA_CUENTA": u"opera con la cuenta",
     "ALIAS_DE": u"se presenta con el nombre",
@@ -266,7 +266,7 @@ ETIQUETA_RELACION = {
     "ASOCIADO_A_EMAIL": u"está asociada al correo",
     "OBSERVADO_DESDE_IP": u"fue observada desde la IP",
     "USA_DISPOSITIVO": u"se usó desde el dispositivo",
-    "PARTICIPA_EN": u"participa en el hecho",
+    "PARTICIPA_EN": u"interviene en",
     "ADJUNTA": u"adjunta el archivo",
     "UBICADO_EN": u"se ubica en",
     "PUESTO_A_DISPOSICION_DE": u"fue puesto a disposición de",
