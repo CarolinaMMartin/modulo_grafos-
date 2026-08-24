@@ -121,8 +121,60 @@ def _camino(g, n_rep, n_destino):
     return []
 
 
+def _reportes_por_nodo(g):
+    """Que reportes menciona cada entidad.
+
+    Es lo que permite recortar el grafo a un caso: una entidad pertenece al caso
+    si alguno de los reportes del caso la menciona.
+    """
+    from collections import defaultdict
+    mapa = defaultdict(set)
+    for u, v, k, d in g.aristas(vigentes=False):
+        sid = d.get("source_evidence_id") or ""
+        if not sid.startswith("ncmec:"):
+            continue
+        rid = sid.split(":", 1)[1]
+        mapa[u].add(rid)
+        mapa[v].add(rid)
+    for n, d in g.G.nodes(data=True):
+        if d.get("tipo") == "REPORTE":
+            mapa[n].add(d["valor"])
+    # Una identidad unificada no proviene de un reporte sino de una decision
+    # humana. Hereda los reportes de las menciones que agrupa, para que quede
+    # dentro del caso cuando se la colapsa.
+    for u, v, k, d in g.aristas(relacion="IDENTIFICADO_COMO", vigentes=False):
+        mapa[v] |= mapa.get(u, set())
+    return {n: sorted(v) for n, v in mapa.items()}
+
+
+def _casos(g, res, legajo_de):
+    """Un caso es un legajo: el reporte y todos aquellos con los que quedo
+    vinculado. Un reporte sin vinculaciones es un caso de uno solo.
+
+    El operador trabaja de a un caso. El visor nunca muestra dos a la vez.
+    """
+    casos, vistos = [], set()
+    for l in res.get("legajos", []):
+        reportes = sorted(l["reportes"])
+        casos.append(dict(
+            id=l["legajo"],
+            etiqueta=u"Legajo %s · %d reportes" % (l["legajo"], len(reportes)),
+            reportes=reportes,
+            vinculos=l["vinculos"],
+            confianza_max=l["confianza_max"]))
+        vistos.update(reportes)
+    sueltos = sorted(g.G.nodes[n]["valor"] for n in g.nodos_tipo("REPORTE")
+                     if g.G.nodes[n]["valor"] not in vistos)
+    for rid in sueltos:
+        casos.append(dict(id=u"R" + rid, etiqueta=u"Reporte %s · sin vinculaciones" % rid,
+                          reportes=[rid], vinculos=0, confianza_max=None))
+    casos.sort(key=lambda c: (-len(c["reportes"]), c["reportes"][0]))
+    return casos
+
+
 def _datos(g, res, dossier=None, texto_informe=None):
     pos = _layout(g)
+    por_nodo = _reportes_por_nodo(g)
 
     # legajo al que pertenece cada reporte, para la disposicion agrupada
     legajo_de = {}
@@ -148,6 +200,7 @@ def _datos(g, res, dossier=None, texto_informe=None):
             x=round(x, 1), y=round(y, 1),
             nivel=NIVEL_JERARQUICO.get(d.get("tipo"), 3),
             legajo=legajo_de.get(n),
+            reportes=por_nodo.get(n, []),
             color=ont.TIPOS_NODO.get(d.get("tipo"), {}).get("color", "#8a94a6"),
             atributos=atributos,
             transcripciones=d.get("transcripciones") or [],
@@ -208,6 +261,7 @@ def _datos(g, res, dossier=None, texto_informe=None):
                   reportes=res.get("reportes_ingeridos")),
         alertas=res.get("alertas", {}).get("alertas", []),
         legajos=res.get("legajos", []),
+        casos=_casos(g, res, legajo_de),
     )
     if dossier is not None:
         salida["informe"] = dict(
@@ -331,6 +385,13 @@ details[open] summary::before{content:"▾ "}
 .grupo button{border:0;border-radius:0;background:transparent;padding:7px 13px}
 .grupo button+button{border-left:1px solid var(--borde)}
 .solo{background:rgba(8,13,23,.92);backdrop-filter:blur(6px)}
+select.solo{border:1px solid var(--borde);border-radius:9px;color:#a5f3fc;
+  padding:7px 11px;font:inherit;font-size:12px;cursor:pointer;outline:none;
+  max-width:250px}
+select.solo:hover{border-color:var(--cyan-borde)}
+.etiquetaArista{font-size:9px;fill:#8fa1bb;font-family:var(--mono);
+  pointer-events:none;paint-order:stroke;stroke:#080d17;stroke-width:3.5;
+  stroke-linejoin:round;transition:opacity .3s}
 #migas{margin-left:auto;font-size:11px;color:var(--tenue);font-family:var(--mono);
   background:rgba(8,13,23,.92);border-radius:8px;padding:6px 11px;
   max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -451,10 +512,11 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
       <button id="atras" title="Volver (Alt + ←)">‹ Volver</button>
       <button id="adelante" title="Siguiente (Alt + →)">Siguiente ›</button>
     </div>
+    <select id="selCaso" class="solo" title="Caso en curso"></select>
     <div class="grupo" id="niveles">
       <button data-nivel="0">Vinculaciones</button>
       <button data-nivel="1">Por qué</button>
-      <button data-nivel="2">Todo el detalle</button>
+      <button data-nivel="2">Todo el caso</button>
     </div>
     <button class="solo" id="reorganizar">Reorganizar</button>
     <button class="solo primario" id="btnInforme">Informe</button>
@@ -501,16 +563,54 @@ const UNIF = new Map(Object.entries(D.identidades||{}));
 const HAY_UNIF = UNIF.size > 0;
 const RE = id => (estado.unificar && UNIF.get(id)) || id;
 const VINCULOS = D.aristas.filter(a=>a.entreReportes);
+const CASOS = D.casos || [];
+
+/* El visor trabaja sobre UN caso por vez. No es un explorador del archivo
+   general: mostrar a la vez las relaciones de todos los casos vuelve ilegible
+   lo único que le importa al operador, que es el caso que tiene en la mano. */
+function casoActual(){ return CASOS.find(c=>c.id===estado.caso) || CASOS[0] || null; }
+function reportesDelCaso(){
+  const c = casoActual();
+  return new Set(c ? c.reportes : []);
+}
+function enElCaso(id){
+  const n = NODOS.get(id); if(!n) return false;
+  const rs = reportesDelCaso();
+  if(n.tipo==="REPORTE") return rs.has(n.valor);
+  return (n.reportes||[]).some(r=>rs.has(r));
+}
+function vinculosDelCaso(){
+  const rs = reportesDelCaso();
+  return VINCULOS.filter(a=>rs.has((NODOS.get(a.a)||{}).valor) &&
+                            rs.has((NODOS.get(a.b)||{}).valor));
+}
+function esCompartido(id){
+  const n = NODOS.get(id); if(!n || n.tipo==="REPORTE") return false;
+  const rs = reportesDelCaso();
+  return (n.reportes||[]).filter(r=>rs.has(r)).length >= 2;
+}
 
 const estado = {tipos:new Set(Object.keys(D.tipos)),
                 origenes:new Set(["observada","derivada","inferida"]),
-                conf:0, nivel:0, disposicion:"fuerzas", rechazadas:false,
-                verPesos:true, texto:"", unificar:true,
-                vista:{tipo:"inicio"}};
+                conf:0, nivel:0, disposicion:"secuencia", rechazadas:false,
+                verPesos:true, verEtiquetas:true, texto:"", unificar:true,
+                caso:null, foco:null, vista:{tipo:"inicio"}};
 
 const num = v => (v==null? "—" : v.toFixed(2).replace(".",","));
 const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const etq = id => (NODOS.get(id)||{}).etiqueta || id;
+// Los estados y motivos vienen del sistema transaccional en formato tecnico.
+// En pantalla se leen como frases.
+const LEGIBLE = {
+  en_analisis:"en análisis", en_investigacion:"en investigación",
+  archivado:"archivado", archivado_latente:"archivado de forma latente",
+  judicializado:"judicializado", derivado:"derivado", pendiente:"pendiente",
+  sin_datos_de_usuario:"archivado por falta de datos de usuario",
+  no_atribuible_nat:"archivado por IP no atribuible bajo NAT",
+  sin_archivos:"archivado por ausencia de archivos",
+  sin_ubicacion:"archivado sin datos de ubicación",
+  material_sin_relevancia:"archivado por material sin relevancia"};
+const legible = v => v ? (LEGIBLE[v] || String(v).replace(/_/g," ")) : v;
 
 document.getElementById("meta").innerHTML =
   D.meta.reportes+" reportes · "+D.nodos.length+" entidades · "+
@@ -720,6 +820,60 @@ function dispPorQue(aristaId){
   });
   return destino;
 }
+/* Disposición en secuencia: se lee de izquierda a derecha como una frase.
+   [reporte en curso] -> [por dónde pasa] -> [dato compartido] -> [reporte vinculado]
+   Es la forma más directa de seguir la lógica de una vinculación sin tener que
+   interpretar una nube de nodos. */
+function dispSecuencia(){
+  const vis = visiblesAhora();
+  if(!vis.length) return new Map();
+  const ids = new Set(vis.map(n=>n.id));
+  const rs = reportesDelCaso();
+  const reportes = vis.filter(n=>n.tipo==="REPORTE");
+  const ancla = (estado.foco && ids.has(estado.foco)) ? estado.foco
+              : (reportes[0] ? reportes[0].id : vis[0].id);
+
+  // distancia al reporte en curso, recorriendo solo lo visible
+  const dist = new Map([[ancla,0]]);
+  let frente = [ancla];
+  while(frente.length){
+    const sig = [];
+    frente.forEach(x=>(ADY.get(x)||new Set()).forEach(y0=>{
+      const y = RE(y0);
+      if(ids.has(y) && !dist.has(y)){ dist.set(y, dist.get(x)+1); sig.push(y); }
+    }));
+    frente = sig;
+  }
+
+  const COL_COMPARTIDO = 4, COL_OTROS = 5;
+  const columnas = new Map();
+  vis.forEach(n=>{
+    let c;
+    if(n.id===ancla) c = 0;
+    else if(n.tipo==="REPORTE") c = COL_OTROS;
+    else if(esCompartido(n.id)) c = COL_COMPARTIDO;
+    else c = Math.min(3, Math.max(1, dist.get(n.id) || 1));
+    if(!columnas.has(c)) columnas.set(c,[]);
+    columnas.get(c).push(n);
+  });
+
+  const usadas = [...columnas.keys()].sort((a,b)=>a-b);
+  const destino = new Map(), orden = new Map();
+  const pasoX = (ANCHO-260)/Math.max(1, usadas.length-1);
+  usadas.forEach((c,i)=>{
+    let fila = columnas.get(c).slice();
+    fila = i>0 ? fila.sort((a,b)=>bari(a,orden)-bari(b,orden))
+               : fila.sort((a,b)=>String(a.etiqueta).localeCompare(String(b.etiqueta)));
+    const x = usadas.length>1 ? 130+pasoX*i : ANCHO/2;
+    const alto = ALTO-260, pasoY = alto/Math.max(1, fila.length);
+    fila.forEach((n,j)=>{
+      destino.set(n.id, {x, y: 170+pasoY*(j+0.5)});
+      orden.set(n.id, j);
+    });
+  });
+  return destino;
+}
+
 function aplicarDisposicion(disp, arg){
   estado.disposicion = disp;
   if(disp==="fuerzas"){
@@ -730,15 +884,20 @@ function aplicarDisposicion(disp, arg){
     return;
   }
   const destino = disp==="jerarquica" ? dispJerarquica()
-                : disp==="porque" ? dispPorQue(arg) : dispLegajos();
+                : disp==="porque" ? dispPorQue(arg)
+                : disp==="secuencia" ? dispSecuencia() : dispLegajos();
   if(!destino){ aplicarDisposicion("fuerzas"); return; }
   if(disp!=="legajos"){ GRUPOS.length = 0; pintarGrupos(); }
   animarA(destino, 700, ()=>{ destino.forEach((_,id)=>{ SIM.get(id).fijo = true; }); pintarGrupos(); });
 }
+const DISPOSICIONES = [
+  ["secuencia", "En secuencia"], ["fuerzas", "Orgánica"],
+  ["jerarquica", "Por tipo de dato"]];
 document.getElementById("reorganizar").onclick = ()=>{
-  const orden = ["fuerzas","jerarquica","legajos"];
-  const i = orden.indexOf(estado.disposicion);
-  aplicarDisposicion(orden[(i+1)%orden.length]);
+  const i = DISPOSICIONES.findIndex(d=>d[0]===estado.disposicion);
+  const sig = DISPOSICIONES[(i+1)%DISPOSICIONES.length];
+  aplicarDisposicion(sig[0]);
+  document.getElementById("reorganizar").textContent = "Vista: "+sig[1];
 };
 
 /* =============================================================== dibujo ==== */
@@ -761,12 +920,15 @@ D.aristas.forEach(a=>{
                  (a.estado==="rechazada"?" rechazada":""));
   gA.appendChild(p); gA.appendChild(z);
   elA.set(a.id,p); elZ.set(a.id,z);
-  if(a.entreReportes && a.confianza!=null){
-    const tx = document.createElementNS(SVGNS,"text");
-    tx.setAttribute("class","pesoArista"); tx.setAttribute("text-anchor","middle");
-    tx.textContent = num(a.confianza);
-    gP.appendChild(tx); elP.set(a.id,tx);
-  }
+  // Cada arista lleva escrito QUE la vincula. Sin la etiqueta, una linea entre
+  // dos nodos no dice nada: el operador tiene que poder leer la relacion.
+  const tx = document.createElementNS(SVGNS,"text");
+  tx.setAttribute("class", a.entreReportes ? "pesoArista" : "etiquetaArista");
+  tx.setAttribute("text-anchor","middle");
+  tx.textContent = a.entreReportes
+    ? a.relacionLegible+" · "+num(a.confianza)
+    : a.relacionLegible;
+  gP.appendChild(tx); elP.set(a.id,tx);
 });
 function radio(n){
   if(n.tipo==="REPORTE") return 13;
@@ -888,6 +1050,9 @@ function tramosDelPuente(a){
 function conjuntoVisible(){
   const v = estado.vista;
   const txt = estado.texto.trim().toLowerCase();
+  const delCaso = D.nodos.filter(n=>enElCaso(n.id));
+  const reportesCaso = delCaso.filter(n=>n.tipo==="REPORTE").map(n=>n.id);
+  const vincCaso = vinculosDelCaso();
   let base = new Set();
 
   if(v.tipo==="porque"){
@@ -895,29 +1060,27 @@ function conjuntoVisible(){
     const a = ARISTAS.get(v.id);
     if(a){ base = nodosDelPuente(a); base.add(RE(a.a)); base.add(RE(a.b)); }
   } else if(estado.nivel===0){
-    base = new Set(D.nodos.filter(n=>n.tipo==="REPORTE").map(n=>n.id));
-    if(v.tipo==="nodo" && (NODOS.get(v.id)||{}).tipo==="REPORTE"){
-      base = new Set([v.id]);
-      VINCULOS.forEach(a=>{ if(a.a===v.id) base.add(a.b); if(a.b===v.id) base.add(a.a); });
-    }
+    base = new Set(reportesCaso);
   } else if(estado.nivel===1){
-    // "Por qué": reportes + únicamente las cadenas que sostienen las vinculaciones.
-    base = new Set(D.nodos.filter(n=>n.tipo==="REPORTE").map(n=>n.id));
-    let relevantes = VINCULOS;
-    if(v.tipo==="nodo" && (NODOS.get(v.id)||{}).tipo==="REPORTE")
-      relevantes = VINCULOS.filter(a=>a.a===v.id||a.b===v.id);
+    // "Por qué": los reportes del caso y únicamente las cadenas que sostienen
+    // sus vinculaciones. Nada de lo que no explique algo.
+    base = new Set(reportesCaso);
+    let relevantes = vincCaso;
+    if(estado.foco) relevantes = vincCaso.filter(a=>a.a===estado.foco||a.b===estado.foco);
+    if(!relevantes.length) relevantes = vincCaso;
     relevantes.forEach(a=>nodosDelPuente(a).forEach(x=>base.add(x)));
     if(v.tipo==="nodo" && (NODOS.get(v.id)||{}).tipo!=="REPORTE"){
       base.add(v.id); (ADY.get(v.id)||new Set()).forEach(x=>base.add(RE(x)));
     }
   } else {
-    base = new Set(D.nodos.map(n=>n.id));
+    base = new Set(delCaso.map(n=>n.id));
   }
 
   const fin = new Set();
   base.forEach(id0=>{
     const id = RE(id0);
     const n = NODOS.get(id); if(!n) return;
+    if(!enElCaso(id)) return;                     // nunca se sale del caso
     const colapsada = estado.unificar && UNIF.has(id0) && id!==id0;
     if(!colapsada && estado.nivel>1 && v.tipo!=="porque" && !estado.tipos.has(n.tipo)) return;
     if(txt){
@@ -936,6 +1099,7 @@ function aplicar(reacomodar){
   const foco = v.tipo==="porque" ? ARISTAS.get(v.id) : null;
   const tramos = foco ? tramosDelPuente(foco) : null;
   let cuenta = 0;
+  const visiblesA = [];
   D.aristas.forEach(a=>{
     const p = elA.get(a.id); if(!p) return;
     const ea = RE(a.a), eb = RE(a.b);
@@ -950,9 +1114,17 @@ function aplicar(reacomodar){
     const tocaSel = v.tipo==="nodo" && (ea===RE(v.id)||eb===RE(v.id));
     p.classList.toggle("resaltada",!!(ok&&tocaSel));
     p.classList.toggle("sel", (v.tipo==="arista"||v.tipo==="porque") && a.id===v.id);
-    const tx = elP.get(a.id);
-    if(tx) tx.style.opacity = (ok && estado.verPesos) ? 1 : 0;
     if(ok) cuenta++;
+    visiblesA.push([a, ok]);
+  });
+  // Con muchas aristas las etiquetas se pisan y estorban: por encima de ese
+  // umbral se deja solo el peso de las vinculaciones entre reportes.
+  const pocasAristas = cuenta <= 90;
+  visiblesA.forEach(([a, ok])=>{
+    const tx = elP.get(a.id); if(!tx) return;
+    const mostrar = ok && estado.verEtiquetas &&
+                    (a.entreReportes ? estado.verPesos : pocasAristas);
+    tx.style.opacity = mostrar ? 1 : 0;
   });
   elN.forEach((el,id)=>el.classList.toggle("sel", v.tipo==="nodo" && RE(v.id)===id));
 
@@ -1006,6 +1178,23 @@ document.getElementById("verPesos").onchange = e=>{estado.verPesos=e.target.chec
 document.getElementById("verRechazadas").onchange = e=>{estado.rechazadas=e.target.checked;aplicar(false);};
 document.getElementById("unificar").onchange = e=>{estado.unificar=e.target.checked;aplicar();};
 document.getElementById("buscar").oninput = e=>{estado.texto=e.target.value;aplicar();};
+const sel = document.getElementById("selCaso");
+CASOS.forEach(c=>{
+  const o = document.createElement("option");
+  o.value = c.id; o.textContent = c.etiqueta;
+  sel.appendChild(o);
+});
+function cambiarCaso(id){
+  estado.caso = id;
+  const c = casoActual();
+  estado.foco = c ? ont_id(c.reportes[0]) : null;
+  sel.value = id;
+  HIST.pila = []; HIST.pos = -1;
+  ir({tipo:"inicio"});
+}
+function ont_id(valorReporte){ return "REPORTE::"+String(valorReporte).toLowerCase(); }
+sel.onchange = e=>cambiarCaso(e.target.value);
+
 document.querySelectorAll("#niveles button").forEach(b=>b.onclick=()=>{
   estado.nivel = +b.dataset.nivel;
   if(estado.vista.tipo==="porque"){
@@ -1085,30 +1274,82 @@ function ficha(html){
 }
 
 function pintarInicio(){
-  const p = (D.informe||{}).pesos||{};
-  ficha('<h1>Vinculaciones entre reportes</h1>'+
-    '<div class="prosa"><p>El grafo muestra los reportes y cómo se conectan '+
-    'entre sí. Sobre cada línea está el <b>peso</b> de la vinculación.</p>'+
-    '<p>Hacé clic en una línea para ver <b>por qué</b> esos dos reportes quedaron '+
-    'vinculados: qué dato comparten y por dónde pasa la conexión.</p>'+
-    '<p>Hacé clic en un reporte para verlo con sus vinculaciones.</p></div>'+
-    (p.cantidad ? '<h2>En esta corrida</h2>'+
-      '<div class="prosa"><p>Se propusieron <b>'+p.cantidad+'</b> vinculaciones, '+
-      'con un peso promedio de '+num(p.peso_promedio)+'. Por debajo de '+
-      num(p.umbral_para_proponer)+' el sistema no propone nada.</p></div>' : '')+
-    '<h2>Vinculaciones</h2>'+
-    VINCULOS.slice().sort((a,b)=>(b.confianza||0)-(a.confianza||0)).map(a=>
-      '<div class="tarjeta click" onclick="irAPorQue(\''+a.id+'\')">'+
-      chipPeso(a.confianza)+(a.relacion==="POSIBLE_DUPLICADO_DE"?
-        '<span class="chip am">posible duplicado</span>':'')+
-      '<div style="margin-top:4px;font-size:12.5px"><b>'+esc(etq(a.a))+'</b>'+
-      ' <span style="color:var(--tenue)">y</span> <b>'+esc(etq(a.b))+'</b></div>'+
+  const c = casoActual();
+  if(!c){ ficha('<div class="vacio">No hay casos para mostrar.</div>'); return; }
+  const vinc = vinculosDelCaso().slice().sort((a,b)=>(b.confianza||0)-(a.confianza||0));
+  const otros = CASOS.length-1;
+  const compartidos = D.nodos.filter(n=>enElCaso(n.id) && esCompartido(n.id));
+
+  let h = '<div class="sub" style="font-family:inherit;font-size:11px;'+
+    'text-transform:uppercase;letter-spacing:.14em;color:var(--cyan)">Caso en curso</div>'+
+    '<h1 style="margin:2px 0 6px">'+esc(c.etiqueta)+'</h1>'+
+    '<div class="prosa"><p>Se muestran únicamente las relaciones de este caso. '+
+    'El archivo general tiene '+D.meta.reportes+' reportes en '+CASOS.length+
+    ' casos'+(otros>0? '; los otros '+otros+' no se dibujan hasta que se los '+
+    'elija en el selector de arriba':'')+'.</p></div>';
+
+  h += '<h2>Reportes del caso</h2>';
+  c.reportes.forEach(rid=>{
+    const n = NODOS.get("REPORTE::"+rid.toLowerCase());
+    if(!n) return;
+    const at = Object.fromEntries(n.atributos);
+    h += '<div class="tarjeta click" onclick="irANodo(\''+n.id+'\')">'+
+      '<div style="font-size:12.5px"><b>Reporte '+esc(rid)+'</b>'+
+      (estado.foco===n.id? ' <span class="chip cy">en curso</span>':'')+'</div>'+
       '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">'+
-      ((a.puente||[]).filter(x=>x.sostiene).map(x=>esc(x.tipo)).join(", ")||"—")+
-      '</div></div>').join('')+
-    (D.alertas.length ? '<h2>Antecedentes a revisar</h2><div class="prosa"><p>'+
-      D.alertas.length+' reporte(s) archivado(s) quedaron vinculados a actuaciones '+
-      'que aportan el dato que les faltaba. Están en el panel de filtros.</p></div>':''));
+      esc([at["Plataforma"], legible(at["Estado en SIPAR"]),
+           legible(at["Motivo del archivo"])].filter(Boolean).join(" · "))+
+      '</div></div>';
+  });
+
+  if(vinc.length){
+    h += '<h2>Cómo se conectan entre sí</h2>'+
+      '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Clic en '+
+      'cualquiera para ver la cadena completa que une a los dos reportes.</p></div>';
+    vinc.forEach(a=>{
+      h += '<div class="tarjeta click" onclick="irAPorQue(\''+a.id+'\')">'+
+        chipPeso(a.confianza)+(a.relacion==="POSIBLE_DUPLICADO_DE"?
+          '<span class="chip am">posible duplicado</span>':'')+
+        '<div style="margin-top:4px;font-size:12.5px"><b>'+esc(etq(a.a))+'</b>'+
+        ' <span style="color:var(--cyan)">'+esc(a.relacionLegible)+'</span> <b>'+
+        esc(etq(a.b))+'</b></div>'+
+        '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">por '+
+        ((a.puente||[]).filter(x=>x.sostiene).map(x=>esc(x.tipo.toLowerCase()))
+          .join(", ")||"—")+'</div></div>';
+    });
+  } else {
+    h += '<h2>Vinculaciones</h2><div class="vacio">Este reporte no quedó '+
+      'vinculado con ningún otro.</div>';
+  }
+
+  if(compartidos.length){
+    h += '<h2>Datos que se repiten en el caso</h2>'+
+      '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Aparecen '+
+      'en más de un reporte. Son los que sostienen las vinculaciones.</p></div>';
+    compartidos.sort((a,b)=>(b.reportes||[]).length-(a.reportes||[]).length)
+      .forEach(n=>{
+      h += '<div class="tarjeta click" onclick="irANodo(\''+n.id+'\')">'+
+        '<span class="chip">'+esc(n.tipoLegible)+'</span>'+
+        '<div style="margin-top:3px;font-size:12.5px"><b>'+esc(n.etiqueta)+'</b></div>'+
+        '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">en los '+
+        'reportes '+esc((n.reportes||[]).filter(r=>reportesDelCaso().has(r)).join(", "))+
+        '</div></div>';
+    });
+  }
+
+  const alertasCaso = D.alertas.filter(a=>reportesDelCaso().has(a.reporte_archivado));
+  if(alertasCaso.length){
+    h += '<h2>Antecedentes a revisar en este caso</h2>';
+    alertasCaso.forEach(al=>{
+      h += '<div class="tarjeta click" onclick="irAPorQue(\''+al.arista_id+'\')">'+
+        '<span class="chip '+(al.prioridad==="alta"?"am":"cy")+'"><span class="pt">'+
+        '</span>'+esc(al.prioridad)+'</span>'+
+        '<div style="margin-top:4px;font-size:12.5px">Reporte <b>'+
+        esc(al.reporte_archivado)+'</b> archivado, lo reactiva el '+
+        esc(al.reporte_disparador)+'</div></div>';
+    });
+  }
+  ficha(h);
 }
 
 function pintarPorQue(id){
@@ -1302,7 +1543,8 @@ window.addEventListener("pointerup",()=>{
 });
 
 pintarPos();
-ir({tipo:"inicio"});
+document.getElementById("reorganizar").textContent = "Vista: En secuencia";
+if(CASOS.length) cambiarCaso(CASOS[0].id); else ir({tipo:"inicio"});
 bucle();
 </script></body></html>
 """

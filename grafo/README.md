@@ -29,22 +29,40 @@ python generar_sinteticos.py
 
 Abrir `salida/grafo.html` en el navegador.
 
-Arranca en **Vinculaciones**: solo los reportes y las líneas entre ellos, con el
-peso escrito sobre cada línea. Nada más.
+**El visor es del caso en curso, no del archivo general.** Un caso es un reporte
+y todos aquellos con los que quedó vinculado. Al abrir se posiciona en el
+primero y dibuja únicamente sus relaciones; los otros casos se eligen en el
+selector de la barra superior. Mostrar a la vez las relaciones de todo el
+archivo vuelve ilegible lo único que le importa al operador.
 
-- **Clic en una línea** → *Por qué se vinculan*. Muestra el dato compartido y la
-  cadena completa que va de un reporte al otro pasando por él, en línea recta:
-  `Reporte A → chat → cuenta → chat → Reporte B`. Lo que solo refuerza cuelga
-  debajo. Es la respuesta a "cómo llegaron ahí".
-- **Clic en un reporte** → sus vinculaciones, cada una con su peso.
+La vista por defecto es **En secuencia**: se lee de izquierda a derecha como una
+frase.
+
+```
+[reporte en curso] → [por dónde pasa] → [dato compartido] → [reporte vinculado]
+```
+
+Cada línea lleva escrito qué relación representa —*opera con la cuenta*, *fue
+observada desde la IP*, *coincide con · 0,99*—, de modo que no haga falta
+interpretar la forma del dibujo para entender qué está vinculado con qué.
+
+### Recorrido
+
+- **Vinculaciones** — solo los reportes del caso y las líneas entre ellos, con
+  su peso.
+- **Por qué** — agrega únicamente las cadenas que sostienen esas vinculaciones.
+  Nada que no explique algo.
+- **Todo el caso** — el detalle completo, siempre dentro del caso.
+
+**Clic en una línea entre dos reportes** abre *Por qué se vinculan*: el grafo se
+reordena en una sola cadena horizontal y la ficha escribe el recorrido paso a
+paso, con cada eslabón clickeable.
+
 - **‹ Volver / Siguiente ›** recorren el historial, como en un navegador.
   También con `Alt + ←` y `Alt + →`.
-- **Por qué** (en la barra) muestra, para todo el conjunto, solo las cadenas que
-  sostienen vinculaciones. **Todo el detalle** muestra el grafo completo.
-- **Reorganizar** rota entre disposición orgánica, jerárquica y por legajo.
+- **Reorganizar** rota entre *En secuencia*, *Orgánica* y *Por tipo de dato*.
 - Arrastrar una entidad la fija donde se la suelta; doble clic la libera.
-- El panel izquierdo (☰) trae la búsqueda, los antecedentes a revisar y los
-  filtros. Arranca plegado para no estorbar.
+- El panel izquierdo (☰) trae la búsqueda y los filtros. Arranca plegado.
 
 ## Informe
 

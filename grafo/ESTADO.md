@@ -23,6 +23,8 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Paneles plegables y redimensionables, tres niveles de detalle, tres disposiciones | **implementada** | `src/render_html.py` |
 | Historial de navegación con volver y siguiente | **implementada** | `src/render_html.py` |
 | Vista "por qué se vinculan": cadena completa entre dos reportes | **implementada** | `render_html._camino`, `dispPorQue` |
+| Visor acotado al caso en curso, con selector de caso | **implementada** | `render_html._casos`, `conjuntoVisible` |
+| Disposición lineal por defecto y etiqueta de relación sobre cada arista | **implementada** | `dispSecuencia`, `etiquetaArista` |
 | Informe embebido en el visor, descargable | **implementada** | `src/redaccion.py` |
 | Contra-evidencia por desplazamiento implausible | **implementada** | `resolucion.detectar_contradicciones` |
 | Alertas de reapertura tipadas por motivo de archivo | **implementada** | `src/alertas.py` |
@@ -114,7 +116,22 @@ Puntos donde el diseño se apartó del enfoque más directo, con el motivo.
 8. **Los descartes se informan.** Cada par evaluado y no vinculado aparece en el
    informe con su motivo. Un descarte silencioso se lee como "no había nada".
 
-## 5. Próximo paso sugerido
+## 5. Qué falta para que sea una secuencia de trabajo completa
+
+El visor ya es del caso, no del archivo. Lo que todavía no existe es el resto
+del circuito alrededor de esa unidad:
+
+- **Entrada por caso.** Hoy el caso se elige en un selector. En la aplicación
+  debería llegar desde el sistema que asigna trabajo, con el caso ya abierto.
+- **Estado de avance dentro del caso.** No hay noción de "qué me falta revisar":
+  la cola de validación es global, no por caso.
+- **Cierre del caso.** No hay una acción que registre que el operador terminó de
+  revisarlo y con qué conclusión.
+- **Vuelta al archivo general.** Cuando el operador valida o rechaza, eso debería
+  impactar en el archivo y eventualmente reabrir otros casos. Hoy el efecto
+  existe —el libro se re-aplica— pero no hay aviso de qué otros casos cambiaron.
+
+## 6. Próximo paso sugerido
 
 Antes de sumar capas: **validar la ontología y las reglas con los operadores**.
 Concretamente, sentarse con una muestra de reportes reales ya trabajados y
