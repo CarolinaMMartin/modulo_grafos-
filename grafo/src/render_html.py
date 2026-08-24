@@ -32,7 +32,47 @@ import networkx as nx
 
 import ontologia as ont
 
-ANCHO, ALTO = 1700, 1050
+ATRIBUTOS_LEGIBLES = {
+    "valor": u"Valor", "clasificacion": u"Clasificación NCMEC",
+    "prioridad": u"Prioridad", "plataforma": u"Plataforma", "pais": u"País",
+    "fecha_incidente": u"Fecha del hecho", "fecha_recepcion": u"Fecha de recepción",
+    "estado_sipar": u"Estado en SIPAR", "motivo_archivo": u"Motivo del archivo",
+    "fecha_estado": u"Fecha del estado", "operador": u"Operador asignado",
+    "esp": u"Plataforma", "esp_user_id": u"Identificador de usuario",
+    "area": u"Código de área", "subtipo": u"Subtipo", "servicio": u"Servicio",
+    "ciudad": u"Ciudad", "region": u"Región", "cp": u"Código postal",
+    "lat": u"Latitud", "lon": u"Longitud", "forma_original": u"Forma original",
+    "cgnat": u"Bajo CGNAT", "privada": u"Dirección privada",
+    "atribuible_sin_dato_extra": u"Atribuible sin datos adicionales",
+    "version": u"Versión IP", "cuenta_suspendida": u"Cuenta dada de baja",
+    "genero": u"Género", "edad_aprox": u"Edad aproximada",
+    "reporte": u"Reporte de origen", "nombre": u"Nombre del archivo",
+    "tipo_mime": u"Tipo de archivo", "enviado_a_le": u"Remitido a autoridad",
+    "prioridad_desc": u"Detalle de prioridad",
+}
+
+OCULTAR = {"tipo", "etiqueta", "identificador", "fusionable", "bio_hash",
+           "decision", "transcripciones", "_variantes"}
+
+# Escalones de la disposicion jerarquica: de la actuacion hacia el dato tecnico.
+# Frase corta que explica por que dos reportes quedaron vinculados. Es lo que
+# se escribe sobre el conector, como el "motivo vinculacion" del boceto.
+MOTIVO_CORTO = {
+    "CUENTA": u"misma cuenta",
+    "DISPOSITIVO": u"mismo dispositivo",
+    "TELEFONO": u"mismo teléfono",
+    "EMAIL": u"mismo correo",
+    "EVIDENCIA": u"mismo archivo",
+    "IP": u"misma IP",
+    "ALIAS": u"mismo nombre visible",
+    "UBICACION": u"misma zona",
+}
+
+# Lo que se muestra al abrir un reporte: los datos por los que se vincula.
+# Quedan afuera la mencion de persona y el chat, que son estructura interna del
+# reporte y no son aquello que el operador esta buscando.
+TIPOS_EN_TARJETA = ("IDENTIDAD", "CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
+                    "DISPOSITIVO", "EVIDENCIA", "UBICACION")
 
 ATRIBUTOS_LEGIBLES = {
     "valor": u"Valor", "clasificacion": u"Clasificación NCMEC",
@@ -57,6 +97,77 @@ OCULTAR = {"tipo", "etiqueta", "identificador", "fusionable", "bio_hash",
            "decision", "transcripciones", "_variantes"}
 
 # Escalones de la disposicion jerarquica: de la actuacion hacia el dato tecnico.
+# Frase corta que explica por que dos reportes quedaron vinculados. Es lo que
+# se escribe sobre el conector, como el "motivo vinculacion" del boceto.
+MOTIVO_CORTO = {
+    "CUENTA": u"misma cuenta",
+    "DISPOSITIVO": u"mismo dispositivo",
+    "TELEFONO": u"mismo teléfono",
+    "EMAIL": u"mismo correo",
+    "EVIDENCIA": u"mismo archivo",
+    "IP": u"misma IP",
+    "ALIAS": u"mismo nombre visible",
+    "UBICACION": u"misma zona",
+}
+
+# Lo que se muestra al abrir un reporte: los datos por los que se vincula.
+# Quedan afuera la mencion de persona y el chat, que son estructura interna del
+# reporte y no son aquello que el operador esta buscando.
+TIPOS_EN_TARJETA = ("IDENTIDAD", "CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
+                    "DISPOSITIVO", "EVIDENCIA", "UBICACION")
+
+NIVEL_JERARQUICO = {
+    "REPORTE": 0,
+    "EVENTO": 1, "PERSONA_MENCION": 1, "IDENTIDAD": 1,
+    "CUENTA": 2,
+    "ALIAS": 3, "EMAIL": 3, "TELEFONO": 3, "IP": 3, "DISPOSITIVO": 3,
+    "EVIDENCIA": 3, "SEGMENTO": 3,
+    "UBICACION": 4, "ORGANIZACION": 4, "DOCUMENTO": 4, "JURISDICCION": 4,
+}
+
+
+ATRIBUTOS_LEGIBLES = {
+    "valor": u"Valor", "clasificacion": u"Clasificación NCMEC",
+    "prioridad": u"Prioridad", "plataforma": u"Plataforma", "pais": u"País",
+    "fecha_incidente": u"Fecha del hecho", "fecha_recepcion": u"Fecha de recepción",
+    "estado_sipar": u"Estado en SIPAR", "motivo_archivo": u"Motivo del archivo",
+    "fecha_estado": u"Fecha del estado", "operador": u"Operador asignado",
+    "esp": u"Plataforma", "esp_user_id": u"Identificador de usuario",
+    "area": u"Código de área", "subtipo": u"Subtipo", "servicio": u"Servicio",
+    "ciudad": u"Ciudad", "region": u"Región", "cp": u"Código postal",
+    "lat": u"Latitud", "lon": u"Longitud", "forma_original": u"Forma original",
+    "cgnat": u"Bajo CGNAT", "privada": u"Dirección privada",
+    "atribuible_sin_dato_extra": u"Atribuible sin datos adicionales",
+    "version": u"Versión IP", "cuenta_suspendida": u"Cuenta dada de baja",
+    "genero": u"Género", "edad_aprox": u"Edad aproximada",
+    "reporte": u"Reporte de origen", "nombre": u"Nombre del archivo",
+    "tipo_mime": u"Tipo de archivo", "enviado_a_le": u"Remitido a autoridad",
+    "prioridad_desc": u"Detalle de prioridad",
+}
+
+OCULTAR = {"tipo", "etiqueta", "identificador", "fusionable", "bio_hash",
+           "decision", "transcripciones", "_variantes"}
+
+# Escalones de la disposicion jerarquica: de la actuacion hacia el dato tecnico.
+# Frase corta que explica por que dos reportes quedaron vinculados. Es lo que
+# se escribe sobre el conector, como el "motivo vinculacion" del boceto.
+MOTIVO_CORTO = {
+    "CUENTA": u"misma cuenta",
+    "DISPOSITIVO": u"mismo dispositivo",
+    "TELEFONO": u"mismo teléfono",
+    "EMAIL": u"mismo correo",
+    "EVIDENCIA": u"mismo archivo",
+    "IP": u"misma IP",
+    "ALIAS": u"mismo nombre visible",
+    "UBICACION": u"misma zona",
+}
+
+# Lo que se muestra al abrir un reporte: los datos por los que se vincula.
+# Quedan afuera la mencion de persona y el chat, que son estructura interna del
+# reporte y no son aquello que el operador esta buscando.
+TIPOS_EN_TARJETA = ("IDENTIDAD", "CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
+                    "DISPOSITIVO", "EVIDENCIA", "UBICACION")
+
 NIVEL_JERARQUICO = {
     "REPORTE": 0,
     "EVENTO": 1, "PERSONA_MENCION": 1, "IDENTIDAD": 1,
@@ -184,8 +295,11 @@ def _casos(g, res, legajo_de):
     return casos
 
 
+def _tipo_crudo(x):
+    return x.get("tipo")
+
+
 def _datos(g, res, dossier=None, texto_informe=None):
-    pos = _layout(g)
     por_nodo = _reportes_por_nodo(g)
 
     # legajo al que pertenece cada reporte, para la disposicion agrupada
@@ -196,7 +310,6 @@ def _datos(g, res, dossier=None, texto_informe=None):
 
     nodos = []
     for n, d in g.G.nodes(data=True):
-        x, y = pos.get(n, (ANCHO / 2, ALTO / 2))
         atributos = []
         for k, v in d.items():
             if k in OCULTAR or v is None or v == "" or isinstance(v, (dict, list)):
@@ -209,10 +322,9 @@ def _datos(g, res, dossier=None, texto_informe=None):
             id=n, tipo=d.get("tipo"),
             tipoLegible=ont.ETIQUETA_TIPO.get(d.get("tipo"), d.get("tipo")),
             etiqueta=d.get("etiqueta") or d.get("valor"), valor=d.get("valor"),
-            x=round(x, 1), y=round(y, 1),
-            nivel=NIVEL_JERARQUICO.get(d.get("tipo"), 3),
             legajo=legajo_de.get(n),
             reportes=por_nodo.get(n, []),
+            enTarjeta=(d.get("tipo") in TIPOS_EN_TARJETA),
             color=ont.TIPOS_NODO.get(d.get("tipo"), {}).get("color", "#8a94a6"),
             atributos=atributos,
             transcripciones=d.get("transcripciones") or [],
@@ -235,8 +347,13 @@ def _datos(g, res, dossier=None, texto_informe=None):
                 camino_a=_camino(g, u, n_dato),
                 camino_b=_camino(g, v, n_dato)))
         puente.sort(key=lambda z: (not z["sostiene"], -(z["peso"] or 0)))
+        motivo = u", ".join(
+            MOTIVO_CORTO.get(_tipo_crudo(x), u"dato compartido")
+            for x in (d.get("detalle_reglas") or [])
+            if not x.get("corrobora_solamente")) or u"dato compartido"
         aristas.append(dict(
             puente=puente,
+            motivo=motivo,
             id=d["arista_id"], a=u, b=v,
             relacion=d["relation_type"],
             relacionLegible=ont.ETIQUETA_RELACION.get(d["relation_type"],
@@ -304,43 +421,29 @@ PLANTILLA = r"""<!doctype html>
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--fondo);color:var(--texto);display:flex;
-  font:13.5px/1.65 "Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden}
+  font:13.5px/1.6 "Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:#1c2942;border-radius:5px}
 ::-webkit-scrollbar-track{background:transparent}
 
-.panel{background:var(--panel);border:1px solid var(--borde);border-radius:14px;
-  overflow-y:auto;overflow-x:hidden;position:relative;
-  transition:flex-basis .3s cubic-bezier(.4,0,.2,1)}
-#izq{flex:0 0 320px;margin:10px 0 10px 10px}
-#der{flex:0 0 430px;margin:10px 10px 10px 0}
-.contenido{padding:16px 18px 24px}
-/* deja lugar al boton de plegar, que vive dentro del panel */
-#izq .contenido{padding-right:44px}
-#der .contenido{padding-left:44px}
-/* Plegado: queda un riel angosto con su propio boton. Nunca desaparece del todo,
-   para que siempre se pueda volver a abrir desde el mismo lugar. */
-.panel.plegado{flex-basis:44px!important}
-.panel.plegado .contenido{display:none}
-.panel.plegado .rotulo{display:block}
-.rotulo{display:none;position:absolute;top:52px;left:50%;transform-origin:0 0;
-  transform:rotate(90deg) translateX(0);white-space:nowrap;font-size:10.5px;
-  letter-spacing:.16em;text-transform:uppercase;color:var(--tenue);
-  pointer-events:none}
-.plegar{position:absolute;top:10px;width:26px;height:26px;padding:0;z-index:3;
-  display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1}
-#izq .plegar{right:10px} #izq.plegado .plegar{right:9px;left:9px}
-#der .plegar{left:10px} #der.plegado .plegar{left:9px;right:9px}
+#centro{flex:1;min-width:280px;position:relative;margin:10px 0 10px 10px;
+  border:1px solid var(--borde);border-radius:14px;background:
+    radial-gradient(1200px 700px at 30% 15%,rgba(34,211,238,.04),transparent 60%),
+    var(--lienzo);overflow:hidden}
 .asa{flex:0 0 7px;cursor:col-resize;position:relative}
 .asa::after{content:"";position:absolute;top:50%;left:2px;width:3px;height:46px;
   margin-top:-23px;border-radius:3px;background:#1e2c46;transition:background .2s}
 .asa:hover::after{background:var(--cyan)}
-#centro{flex:1;min-width:280px;position:relative;margin:10px 0;
-  border:1px solid var(--borde);border-radius:14px;background:
-    radial-gradient(1200px 700px at 30% 20%,rgba(34,211,238,.045),transparent 60%),
-    var(--lienzo);overflow:hidden}
+#der{flex:0 0 440px;background:var(--panel);border:1px solid var(--borde);
+  border-radius:14px;margin:10px 10px 10px 0;overflow-y:auto;position:relative;
+  transition:flex-basis .3s cubic-bezier(.4,0,.2,1)}
+#der.plegado{flex-basis:44px}
+#der.plegado .contenido{display:none}
+.contenido{padding:16px 18px 26px 44px}
+.plegar{position:absolute;top:10px;left:10px;width:26px;height:26px;padding:0;
+  z-index:3;display:flex;align-items:center;justify-content:center;font-size:13px}
 
-h1{font-size:15px;margin:0 30px 0 0;letter-spacing:.2px;font-weight:600}
+h1{font-size:15px;margin:0 0 2px;font-weight:600}
 h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--cyan);
   margin:20px 0 8px;font-weight:600;opacity:.85}
 h3{font-size:14.5px;margin:8px 0 4px;font-weight:600;line-height:1.35}
@@ -356,104 +459,78 @@ p{margin:0 0 10px}
 .tarjeta.click:hover{border-color:var(--cyan-borde);transform:translateX(2px)}
 
 .chip{display:inline-flex;align-items:center;gap:5px;padding:2.5px 9px;border-radius:999px;
-  font-size:10.5px;font-family:var(--mono);letter-spacing:.03em;
-  border:1px solid var(--borde);background:#0d1626;color:var(--suave);
-  margin:0 5px 5px 0;white-space:nowrap}
+  font-size:10.5px;font-family:var(--mono);border:1px solid var(--borde);
+  background:#0d1626;color:var(--suave);margin:0 5px 5px 0;white-space:nowrap}
 .chip.cy{border-color:var(--cyan-borde);background:var(--cyan-tenue);color:#67e8f9}
 .chip.ok{border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.08);color:#6ee7b7}
 .chip.am{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:#fcd34d}
 .chip.al{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.08);color:#fca5a5}
 .chip .pt{width:6px;height:6px;border-radius:50%;background:currentColor}
-.chip.boton{cursor:pointer}
+.chip.boton{cursor:pointer;max-width:100%}
 .chip.boton:hover{border-color:var(--cyan-borde);color:#67e8f9}
 
-label{display:flex;align-items:center;gap:8px;padding:3.5px 0;cursor:pointer;
-  font-size:12.5px;color:var(--suave)}
-label:hover{color:var(--texto)}
-label .sw{width:9px;height:9px;border-radius:2.5px;flex:0 0 9px}
-input[type=checkbox]{accent-color:var(--cyan);width:13px;height:13px;cursor:pointer}
-input[type=text]{width:100%;padding:8px 11px;border:1px solid var(--borde);
-  border-radius:8px;font:inherit;font-size:12.5px;background:#0a1120;color:var(--texto);
-  outline:none;transition:border-color .18s}
-input[type=text]:focus{border-color:var(--cyan-borde)}
-input[type=range]{accent-color:var(--cyan);width:100%}
 button{font:inherit;font-size:12px;padding:7px 12px;border:1px solid var(--borde);
   background:#0d1626;color:var(--suave);border-radius:8px;cursor:pointer;
   transition:border-color .18s,color .18s,background .18s;white-space:nowrap}
 button:hover:not(:disabled){border-color:var(--cyan-borde);color:#67e8f9;background:var(--cyan-tenue)}
-button.activo{border-color:var(--cyan-borde);background:var(--cyan-tenue);color:#67e8f9}
-button.primario{border-color:var(--cyan-borde);background:rgba(34,211,238,.14);
-  color:#a5f3fc;font-weight:600}
+button.primario{border-color:var(--cyan-borde);background:rgba(34,211,238,.14);color:#a5f3fc;font-weight:600}
 button:disabled{opacity:.35;cursor:default}
+select{border:1px solid var(--borde);border-radius:9px;color:#a5f3fc;
+  background:rgba(8,13,23,.94);padding:7px 11px;font:inherit;font-size:12px;
+  cursor:pointer;outline:none;max-width:260px}
+select:hover{border-color:var(--cyan-borde)}
+input[type=text]{width:100%;padding:8px 11px;border:1px solid var(--borde);
+  border-radius:8px;font:inherit;font-size:12.5px;background:#0a1120;
+  color:var(--texto);outline:none}
+input[type=text]:focus{border-color:var(--cyan-borde)}
 .fila{display:flex;gap:8px;align-items:center;margin:9px 0;flex-wrap:wrap}
-details{margin:14px 0}
-details summary{cursor:pointer;font-size:10.5px;text-transform:uppercase;
-  letter-spacing:.14em;color:var(--cyan);opacity:.85;font-weight:600;
-  list-style:none;padding:4px 0}
-details summary::-webkit-details-marker{display:none}
-details summary::before{content:"▸ ";font-size:9px}
-details[open] summary::before{content:"▾ "}
 
 #barra{position:absolute;top:12px;left:14px;right:14px;display:flex;gap:8px;
   align-items:center;flex-wrap:wrap;z-index:5;pointer-events:none}
 #barra>*{pointer-events:auto}
-.grupo{display:flex;background:rgba(8,13,23,.92);border:1px solid var(--borde);
-  border-radius:9px;overflow:hidden;backdrop-filter:blur(6px)}
+.grupo{display:flex;background:rgba(8,13,23,.94);border:1px solid var(--borde);
+  border-radius:9px;overflow:hidden}
 .grupo button{border:0;border-radius:0;background:transparent;padding:7px 13px}
 .grupo button+button{border-left:1px solid var(--borde)}
-.solo{background:rgba(8,13,23,.92);backdrop-filter:blur(6px)}
-select.solo{border:1px solid var(--borde);border-radius:9px;color:#a5f3fc;
-  padding:7px 11px;font:inherit;font-size:12px;cursor:pointer;outline:none;
-  max-width:250px}
-select.solo:hover{border-color:var(--cyan-borde)}
-.etiquetaArista{font-size:9px;fill:#8fa1bb;font-family:var(--mono);
-  pointer-events:none;paint-order:stroke;stroke:#080d17;stroke-width:3.5;
-  stroke-linejoin:round;transition:opacity .3s}
-#migas{margin-left:auto;font-size:11px;color:var(--tenue);font-family:var(--mono);
-  background:rgba(8,13,23,.92);border-radius:8px;padding:6px 11px;
-  max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.solo{background:rgba(8,13,23,.94)}
+#ruta{margin-left:auto;font-size:11px;color:var(--tenue);font-family:var(--mono);
+  background:rgba(8,13,23,.94);border-radius:8px;padding:6px 11px;
+  max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-svg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
-svg.arrastrandoLienzo{cursor:grabbing}
-.arista{fill:none;stroke:#31435f;stroke-width:1.3;transition:opacity .3s,stroke-width .2s}
-.arista.derivada{stroke:#22d3ee;stroke-width:2;stroke-dasharray:8 5;opacity:.85}
-.arista.inferida{stroke:#a78bfa;stroke-width:1.8;stroke-dasharray:2 5;opacity:.8}
-.arista.contradice{stroke:var(--alarma);stroke-width:2.2;stroke-dasharray:11 3 2 3}
-.arista.rechazada{opacity:.18}
-.arista.resaltada{stroke-width:3.4}
-.arista.sel{stroke:#fff;stroke-width:3.6;opacity:1}
-/* Va ultima a proposito: una arista filtrada no se dibuja NUNCA, ni siquiera
-   estando seleccionada o rechazada. Con la misma especificidad gana la ultima
-   regla, y antes .sel le ganaba a .apagada: eso pintaba una linea blanca hacia
-   nodos que no estaban en pantalla. */
-.arista.apagada{opacity:0}
-.zonaClic{stroke:transparent;stroke-width:14;fill:none;cursor:pointer}
-.pesoArista{font-size:9.5px;fill:#67e8f9;font-family:var(--mono);pointer-events:none;
-  paint-order:stroke;stroke:#080d17;stroke-width:3.5;stroke-linejoin:round;
-  transition:opacity .3s}
+svg{width:100%;height:100%;display:block;cursor:grab}
+svg.arrastrando{cursor:grabbing}
 
-.nodo{cursor:grab;transition:opacity .3s}
-.nodo.moviendo{cursor:grabbing}
-.nodo .halo{fill:none;stroke:currentColor;stroke-width:1.2;opacity:0;transition:opacity .25s}
-.nodo:hover .halo,.nodo.sel .halo{opacity:.55}
-.nodo .cuerpo{stroke:#060a12;stroke-width:2;transition:stroke .2s}
-.nodo.sel .cuerpo{stroke:#fff;stroke-width:2.4}
-.nodo text{font-size:10.5px;fill:#aebbd0;pointer-events:none;font-family:var(--mono);
-  paint-order:stroke;stroke:#060a12;stroke-width:3;stroke-linejoin:round}
-.nodo.sel text{fill:#fff}
-.nodo.apagado{opacity:0;pointer-events:none}
-.nodo .pin{fill:none;stroke:var(--ambar);stroke-width:1.2;stroke-dasharray:2 2;
-  opacity:0;transition:opacity .2s}
-.nodo.fijado .pin{opacity:.8}
-.abrir{cursor:pointer}
-.abrir circle{fill:#0d1626;stroke:var(--ambar);stroke-width:1.4;
-  transition:fill .18s}
-.abrir:hover circle{fill:rgba(251,191,36,.22)}
-.abrir text{fill:var(--ambar);font-size:8.5px;font-family:var(--mono);
-  text-anchor:middle;pointer-events:none}
-.abrir.oculto{display:none}
-.etiquetaGrupo{font-size:11px;fill:#4d5f7d;font-family:var(--mono);
-  text-transform:uppercase;letter-spacing:.12em;pointer-events:none}
+/* --- cajas ------------------------------------------------------------- */
+.caja{cursor:pointer}
+.caja rect.cuerpo{fill:#0e1728;stroke:#2b3a55;stroke-width:1.4;rx:7;
+  transition:stroke .18s,fill .18s}
+.caja:hover rect.cuerpo{stroke:var(--cyan)}
+.caja.sel rect.cuerpo{stroke:#fff;stroke-width:2}
+.caja.raiz rect.cuerpo{fill:#10243a;stroke:var(--cyan);stroke-width:1.8}
+.caja .barra{rx:2}
+.caja .titulo{fill:#e6eefb;font-size:12.5px;font-family:var(--mono);
+  dominant-baseline:middle;pointer-events:none}
+.caja .sub{fill:#7d8ba3;font-size:10px;dominant-baseline:middle;pointer-events:none}
+.caja .marca{fill:var(--ambar);font-size:9.5px;font-family:var(--mono);
+  text-anchor:end;dominant-baseline:middle;pointer-events:none}
+
+.mas{cursor:pointer}
+.mas circle{fill:#0d1626;stroke:var(--ambar);stroke-width:1.4;transition:fill .18s}
+.mas:hover circle{fill:rgba(251,191,36,.25)}
+.mas path{stroke:var(--ambar);stroke-width:1.6;stroke-linecap:round}
+
+/* --- conectores -------------------------------------------------------- */
+.con{fill:none;stroke:#3d5070;stroke-width:1.6;transition:stroke .18s,stroke-width .18s}
+.con.vinculo{stroke:#22d3ee;stroke-width:2}
+.con.duplicado{stroke:var(--ambar);stroke-width:2;stroke-dasharray:9 4}
+.con.cruce{stroke-width:1.5;stroke-dasharray:5 4}
+.con.sel{stroke:#fff;stroke-width:3}
+.zona{stroke:transparent;stroke-width:16;fill:none;cursor:pointer}
+.rotulo{font-size:10px;font-family:var(--mono);fill:#8fa1bb;text-anchor:middle;
+  pointer-events:none;paint-order:stroke;stroke:#080d17;stroke-width:4;
+  stroke-linejoin:round}
+.rotulo.vinculo{fill:#67e8f9}
+.rotulo.peso{fill:#6ee7b7}
 
 table{width:100%;border-collapse:collapse;font-size:12px}
 td{padding:5px 2px;vertical-align:top;border-bottom:1px solid rgba(26,39,64,.7)}
@@ -465,75 +542,15 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
 .prosa h2{color:var(--cyan);font-size:11px;margin:18px 0 8px}
 .prosa h3{font-size:13.5px;margin:14px 0 6px;color:#e2e8f0}
 .prosa li{margin:0 0 5px}
-.cadena{font-family:var(--mono);font-size:11.5px;color:var(--suave);
-  line-height:2;word-break:break-word}
-.cadena b{color:#67e8f9;font-weight:600}
+.cadena{font-family:var(--mono);font-size:11.5px;color:var(--suave);line-height:2}
 .cadena .fl{color:var(--tenue);padding:0 3px}
 .cita{font-family:var(--mono);font-size:11px;color:var(--tenue);word-break:break-all;
   background:#0a1120;border:1px solid var(--borde);border-radius:8px;padding:9px 11px}
 .vacio{color:var(--tenue);font-size:12.5px;font-style:italic}
 #pie{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--tenue);
-  font-family:var(--mono);pointer-events:none;user-select:none;
-  background:rgba(6,10,18,.82);border-radius:8px;padding:6px 10px}
-#leyenda{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--tenue);
-  text-align:right;pointer-events:none;user-select:none;font-family:var(--mono);
-  line-height:1.9;background:rgba(6,10,18,.82);border-radius:8px;padding:6px 10px}
-#leyenda i{display:inline-block;width:26px;height:0;vertical-align:middle;
-  margin-right:7px;border-top-width:2px;border-top-style:solid}
-@media (max-width:1350px){#leyenda{display:none}}
+  font-family:var(--mono);pointer-events:none;background:rgba(6,10,18,.85);
+  border-radius:8px;padding:6px 10px}
 </style></head><body>
-
-<aside class="panel plegado" id="izq">
-  <button class="plegar" id="plegIzq" title="Mostrar filtros">☰</button>
-  <div class="rotulo">Filtros</div>
-  <div class="contenido">
-    <h1>Vinculaciones</h1>
-    <div class="sub" id="meta"></div>
-
-    <h2>Buscar</h2>
-    <input type="text" id="buscar" placeholder="cuenta, IP, alias, reporte...">
-
-    <h2>Antecedentes a revisar</h2>
-    <div id="alertas"></div>
-
-    <details id="detFiltros">
-      <summary>Filtros</summary>
-
-      <div style="font-size:11.5px;color:var(--tenue);margin:6px 0 4px">
-        Cómo se obtuvo cada relación</div>
-      <label><input type="checkbox" class="forigen" value="observada" checked>
-        <span class="sw" style="background:#4b6182"></span> Consta en la fuente</label>
-      <label><input type="checkbox" class="forigen" value="derivada" checked>
-        <span class="sw" style="background:#22d3ee"></span> Derivada por regla</label>
-      <label><input type="checkbox" class="forigen" value="inferida" checked>
-        <span class="sw" style="background:#a78bfa"></span> Hipótesis a validar</label>
-
-      <div style="font-size:11.5px;color:var(--tenue);margin:12px 0 2px">
-        Peso mínimo de la vinculación</div>
-      <div class="fila">
-        <input type="range" id="conf" min="0" max="100" value="0" style="flex:1">
-        <span class="sub" id="confv" style="min-width:32px;text-align:right">0,00</span>
-      </div>
-      <label><input type="checkbox" id="verPesos" checked> Mostrar el peso sobre la línea</label>
-      <label><input type="checkbox" id="verRechazadas"> Mostrar las rechazadas</label>
-      <label id="filaUnif"><input type="checkbox" id="unificar" checked>
-        Unificar las identidades validadas</label>
-
-      <div style="font-size:11.5px;color:var(--tenue);margin:12px 0 2px">
-        Tipos de entidad (al ver todo el detalle)</div>
-      <div id="tipos"></div>
-    </details>
-
-    <div class="tarjeta cyan">
-      <div style="font-size:12px;color:var(--suave)">
-        Todo lo que se muestra son <b style="color:var(--texto)">propuestas del
-        sistema</b>. Ninguna relación acredita autoría ni responsabilidad.
-      </div>
-    </div>
-  </div>
-</aside>
-
-<div class="asa" id="asaIzq"></div>
 
 <main id="centro">
   <div id="barra">
@@ -541,133 +558,49 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
       <button id="atras" title="Volver (Alt + ←)">‹ Volver</button>
       <button id="adelante" title="Siguiente (Alt + →)">Siguiente ›</button>
     </div>
-    <select id="selCaso" class="solo" title="Caso en curso"></select>
-    <div class="grupo">
-      <button id="abrirTodo" title="Abrir todo el caso de una vez">Abrir todo</button>
-      <button id="contraer" title="Volver a los reportes">Contraer</button>
-    </div>
-    <button class="solo" id="reorganizar">Reorganizar</button>
+    <select id="selCaso" title="Caso en curso"></select>
+    <button class="solo" id="contraer">Contraer</button>
+    <button class="solo" id="ajustar" title="Encuadrar">Encuadrar</button>
     <button class="solo primario" id="btnInforme">Informe</button>
-    <div id="migas"></div>
+    <div id="ruta"></div>
   </div>
-
-  <svg id="lienzo" viewBox="0 0 __ANCHO__ __ALTO__">
+  <svg id="lienzo">
+    <defs>
+      <marker id="flecha" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7"
+              markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L8,4 L0,8 z" fill="#3d5070"/>
+      </marker>
+      <marker id="flechaCyan" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7"
+              markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L8,4 L0,8 z" fill="#22d3ee"/>
+      </marker>
+    </defs>
     <g id="vista">
-      <g id="ggrupos"></g>
-      <g id="garistas"></g>
-      <g id="gpesos"></g>
-      <g id="gnodos"></g>
-      <g id="gbadges"></g>
+      <g id="gcon"></g><g id="grot"></g><g id="gcajas"></g>
     </g>
   </svg>
   <div id="pie"></div>
-  <div id="leyenda">
-    <div><i style="border-color:#4b6182"></i>consta en la fuente</div>
-    <div><i style="border-color:#22d3ee;border-top-style:dashed"></i>derivada por regla</div>
-    <div><i style="border-color:#a78bfa;border-top-style:dotted"></i>hipótesis a validar</div>
-    <div><i style="border-color:#f87171;border-top-style:dashed"></i>contradice</div>
-  </div>
 </main>
 
-<div class="asa" id="asaDer"></div>
+<div class="asa" id="asa"></div>
 
-<aside class="panel" id="der">
+<aside id="der">
   <button class="plegar" id="plegDer" title="Plegar la ficha">›</button>
-  <div class="rotulo">Ficha</div>
   <div class="contenido" id="cuerpo"></div>
 </aside>
 
 <script>
 const D = __DATOS__;
-const ANCHO = __ANCHO__, ALTO = __ALTO__;
 const NODOS = new Map(D.nodos.map(n=>[n.id,n]));
 const ARISTAS = new Map(D.aristas.map(a=>[a.id,a]));
-const ADY = new Map();
-D.aristas.forEach(a=>{
-  if(!ADY.has(a.a)) ADY.set(a.a,new Set());
-  if(!ADY.has(a.b)) ADY.set(a.b,new Set());
-  ADY.get(a.a).add(a.b); ADY.get(a.b).add(a.a);
-});
-const UNIF = new Map(Object.entries(D.identidades||{}));
-const HAY_UNIF = UNIF.size > 0;
-const RE = id => (estado.unificar && UNIF.get(id)) || id;
-const VINCULOS = D.aristas.filter(a=>a.entreReportes);
-
-/* Aristas paralelas: la misma relacion entre los mismos dos nodos, afirmada por
-   reportes distintos. Cada una es evidencia separada y por eso existen todas en
-   el grafo, pero dibujar tres lineas identicas solo ensucia. Se dibuja una y se
-   informa en cuantos reportes consta. */
-const GRUPO = new Map(), MIEMBROS = new Map();
-D.aristas.forEach(a=>{
-  const clave = [a.a, a.b].sort().join("|")+"|"+a.relacion;
-  GRUPO.set(a.id, clave);
-  if(!MIEMBROS.has(clave)) MIEMBROS.set(clave,[]);
-  MIEMBROS.get(clave).push(a.id);
-});
 const CASOS = D.casos || [];
+const VINCULOS = D.aristas.filter(a=>a.entreReportes);
+const UNIF = new Map(Object.entries(D.identidades||{}));
+const RE = id => UNIF.get(id) || id;
 
-/* El visor trabaja sobre UN caso por vez. No es un explorador del archivo
-   general: mostrar a la vez las relaciones de todos los casos vuelve ilegible
-   lo único que le importa al operador, que es el caso que tiene en la mano. */
-function casoActual(){ return CASOS.find(c=>c.id===estado.caso) || CASOS[0] || null; }
-function reportesDelCaso(){
-  const c = casoActual();
-  return new Set(c ? c.reportes : []);
-}
-function enElCaso(id){
-  const n = NODOS.get(id); if(!n) return false;
-  const rs = reportesDelCaso();
-  if(n.tipo==="REPORTE") return rs.has(n.valor);
-  return (n.reportes||[]).some(r=>rs.has(r));
-}
-function vinculosDelCaso(){
-  const rs = reportesDelCaso();
-  return VINCULOS.filter(a=>rs.has((NODOS.get(a.a)||{}).valor) &&
-                            rs.has((NODOS.get(a.b)||{}).valor));
-}
-/* Vecinos de una entidad que vale la pena abrir.
-   Se excluyen las organizaciones -la plataforma que reporta, el prestador de
-   internet-: todos los reportes de Grindr comparten Grindr, asi que no
-   distinguen nada. Se informan en la ficha. */
-function vecinosAbribles(id){
-  const out = new Set();
-  (ADY.get(id)||new Set()).forEach(v0=>{
-    const v = RE(v0);
-    const n = NODOS.get(v);
-    if(!n || v===RE(id)) return;
-    if(!enElCaso(v)) return;
-    if(!estado.tipos.has(n.tipo)) return;
-    out.add(v);
-  });
-  return out;
-}
-function abrir(id){ estado.expandidos.add(RE(id)); }
-function cerrar(id){
-  const r = RE(id);
-  estado.expandidos.delete(r);
-  // Cerrar una entidad tambien recoge lo que se habia abierto desde ella y ya
-  // no tiene por que seguir en pantalla.
-  const vis = conjuntoVisible();
-  [...estado.expandidos].forEach(x=>{ if(!vis.has(x)) estado.expandidos.delete(x); });
-}
-
-function esCompartido(id){
-  const n = NODOS.get(id); if(!n || n.tipo==="REPORTE") return false;
-  const rs = reportesDelCaso();
-  return (n.reportes||[]).filter(r=>rs.has(r)).length >= 2;
-}
-
-const estado = {tipos:new Set(Object.keys(D.tipos).filter(t=>!D.tipos[t].informativo)),
-                origenes:new Set(["observada","derivada","inferida"]),
-                conf:0, expandidos:new Set(), disposicion:"secuencia", rechazadas:false,
-                verPesos:true, verEtiquetas:true, texto:"", unificar:true,
-                caso:null, foco:null, vista:{tipo:"inicio"}};
-
-const num = v => (v==null? "—" : v.toFixed(2).replace(".",","));
 const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = v => (v==null? "—" : v.toFixed(2).replace(".",","));
 const etq = id => (NODOS.get(id)||{}).etiqueta || id;
-// Los estados y motivos vienen del sistema transaccional en formato tecnico.
-// En pantalla se leen como frases.
 const LEGIBLE = {
   en_analisis:"en análisis", en_investigacion:"en investigación",
   archivado:"archivado", archivado_latente:"archivado de forma latente",
@@ -678,761 +611,330 @@ const LEGIBLE = {
   sin_ubicacion:"archivado sin datos de ubicación",
   material_sin_relevancia:"archivado por material sin relevancia"};
 const legible = v => v ? (LEGIBLE[v] || String(v).replace(/_/g," ")) : v;
+const attr = n => Object.fromEntries((n.atributos||[]));
 
-document.getElementById("meta").innerHTML =
-  D.meta.reportes+" reportes · "+D.nodos.length+" entidades · "+
-  VINCULOS.length+" vinculaciones";
+const estado = {caso:null, raiz:null, abiertos:new Set(), sel:null};
 
-/* =========================================================== navegación ==== */
-/* Un historial simple: cada vista es {tipo, id}. Volver y Siguiente recorren
-   la pila, igual que en un navegador. Sin esto, entrar a una entidad y querer
-   regresar obliga a reconstruir el recorrido a mano. */
+/* =============================================================== caso ===== */
+function caso(){ return CASOS.find(c=>c.id===estado.caso) || CASOS[0]; }
+function reportesCaso(){ return new Set(caso() ? caso().reportes : []); }
+function nodoReporte(valor){ return NODOS.get("REPORTE::"+String(valor).toLowerCase()); }
+function vinculosDe(idReporte){
+  return VINCULOS.filter(a=>a.a===idReporte||a.b===idReporte)
+    .filter(a=>{ const rs=reportesCaso();
+      return rs.has((NODOS.get(a.a)||{}).valor) && rs.has((NODOS.get(a.b)||{}).valor); });
+}
+/* Datos por los que un reporte puede vincularse. Se dejan afuera la mención de
+   persona y el chat: son estructura interna del reporte, no aquello que el
+   operador está buscando. */
+function datosDe(valorReporte){
+  return D.nodos.filter(n => n.enTarjeta
+                          && (n.reportes||[]).includes(valorReporte)
+                          && RE(n.id) === n.id);
+}
+function otrosReportesDe(nodo){
+  const rs = reportesCaso();
+  return (nodo.reportes||[]).filter(r=>rs.has(r));
+}
+
+/* ========================================================== navegación ==== */
 const HIST = {pila:[], pos:-1};
-function ir(vista, reemplazar){
-  const actual = HIST.pila[HIST.pos];
-  if(actual && actual.tipo===vista.tipo && actual.id===vista.id) { mostrar(vista); return; }
-  if(reemplazar && HIST.pos>=0) HIST.pila[HIST.pos] = vista;
-  else { HIST.pila = HIST.pila.slice(0,HIST.pos+1); HIST.pila.push(vista); HIST.pos++; }
-  mostrar(vista);
+function ir(v){
+  const act = HIST.pila[HIST.pos];
+  if(!(act && act.tipo===v.tipo && act.id===v.id)){
+    HIST.pila = HIST.pila.slice(0,HIST.pos+1); HIST.pila.push(v); HIST.pos++;
+  }
+  mostrar(v);
 }
 function atras(){ if(HIST.pos>0){ HIST.pos--; mostrar(HIST.pila[HIST.pos]); } }
 function adelante(){ if(HIST.pos<HIST.pila.length-1){ HIST.pos++; mostrar(HIST.pila[HIST.pos]); } }
-function botonesHist(){
+function mostrar(v){
+  estado.sel = v;
+  if(v.tipo==="reporte"){ fichaReporte(v.id); }
+  else if(v.tipo==="entidad"){ fichaEntidad(v.id); }
+  else if(v.tipo==="vinculo"){ fichaVinculo(v.id); }
+  else if(v.tipo==="relacion"){ fichaRelacion(v.id); }
+  else if(v.tipo==="informe"){ fichaInforme(); }
+  else fichaCaso();
   document.getElementById("atras").disabled = HIST.pos<=0;
   document.getElementById("adelante").disabled = HIST.pos>=HIST.pila.length-1;
-  const v = HIST.pila[HIST.pos] || {tipo:"inicio"};
-  const nombre = v.tipo==="inicio" ? "Vista general"
-    : v.tipo==="informe" ? "Informe de vinculaciones"
-    : v.tipo==="porque" ? "Por qué se vinculan"
-    : v.tipo==="arista" ? "Relación"
-    : (NODOS.get(v.id)||{}).tipoLegible+" · "+etq(v.id);
-  document.getElementById("migas").textContent =
-    (HIST.pos>0 ? "◂ " : "") + nombre;
+  const nombre = v.tipo==="inicio" ? "Caso"
+    : v.tipo==="informe" ? "Informe"
+    : v.tipo==="vinculo" ? "Vinculación"
+    : v.tipo==="relacion" ? "Relación" : etq(v.id);
+  document.getElementById("ruta").textContent = (HIST.pos>0?"◂ ":"")+nombre;
+  dibujar();
 }
-function mostrar(v){
-  estado.vista = v;
-  if(v.tipo==="inicio") pintarInicio();
-  else if(v.tipo==="nodo"){
-    // Elegir una entidad -desde el lienzo o desde la ficha- la abre. Es el
-    // mismo gesto en los dos lados.
-    estado.foco = v.id;
-    if(v.id && enElCaso(v.id)) abrir(v.id);
-    pintarNodo(v.id);
-  }
-  else if(v.tipo==="arista") pintarArista(v.id);
-  else if(v.tipo==="porque") pintarPorQue(v.id);
-  else if(v.tipo==="informe") pintarInforme();
-  botonesHist();
-  aplicar();
-}
-document.getElementById("atras").onclick = atras;
-document.getElementById("adelante").onclick = adelante;
 window.addEventListener("keydown",e=>{
   if(e.altKey && e.key==="ArrowLeft"){ e.preventDefault(); atras(); }
   if(e.altKey && e.key==="ArrowRight"){ e.preventDefault(); adelante(); }
 });
-window.irANodo = id => ir({tipo:"nodo", id});
-window.irAArista = id => ir({tipo:"arista", id});
-window.irAPorQue = id => ir({tipo:"porque", id});
-window.irAInicio = () => ir({tipo:"inicio"});
+document.getElementById("atras").onclick = atras;
+document.getElementById("adelante").onclick = adelante;
 
-/* ============================================================ simulación ==== */
-const SIM = new Map();
-D.nodos.forEach(n=>SIM.set(n.id,{x:n.x,y:n.y,vx:0,vy:0,fijo:false}));
-const CX = ANCHO/2, CY = ALTO/2;
-let alpha = 0.9, corriendo = true, animando = false;
-
-function paso(){
-  const activos = D.nodos.filter(n=>!elN.get(n.id).classList.contains("apagado"));
-  const pocos = activos.length <= 16;
-  const dt = 0.85, gravedad = 0.0016;
-  const repulsion = pocos ? 26000 : 6200;
-  const resorte = pocos ? 0.010 : 0.013;
-  const largo = pocos ? 260 : 155;
-  for(let i=0;i<activos.length;i++){
-    const a = SIM.get(activos[i].id);
-    for(let j=i+1;j<activos.length;j++){
-      const b = SIM.get(activos[j].id);
-      let dx = b.x-a.x, dy = b.y-a.y, d2 = dx*dx+dy*dy;
-      if(d2 < 1){ dx = (Math.random()-0.5)*4; dy = (Math.random()-0.5)*4; d2 = dx*dx+dy*dy; }
-      if(d2 > 700*700) continue;
-      const f = repulsion/d2, d = Math.sqrt(d2);
-      const ux = dx/d*f, uy = dy/d*f;
-      a.vx -= ux; a.vy -= uy; b.vx += ux; b.vy += uy;
-    }
-  }
-  const vis = new Set(activos.map(n=>n.id));
-  D.aristas.forEach(e=>{
-    const ea = RE(e.a), eb = RE(e.b);
-    if(ea===eb || !vis.has(ea) || !vis.has(eb)) return;
-    const a = SIM.get(ea), b = SIM.get(eb);
-    const dx = b.x-a.x, dy = b.y-a.y;
-    const d = Math.sqrt(dx*dx+dy*dy)||1;
-    const f = (d-largo)*resorte;
-    const ux = dx/d*f, uy = dy/d*f;
-    a.vx += ux; a.vy += uy; b.vx -= ux; b.vy -= uy;
-  });
-  let mov = 0;
-  SIM.forEach(s=>{
-    s.vx += (CX-s.x)*gravedad; s.vy += (CY-s.y)*gravedad;
-    if(s.fijo){ s.vx = 0; s.vy = 0; return; }
-    s.vx *= 0.82; s.vy *= 0.82;
-    s.x += s.vx*dt*alpha; s.y += s.vy*dt*alpha;
-    s.x = Math.max(60,Math.min(ANCHO-60,s.x));
-    s.y = Math.max(70,Math.min(ALTO-50,s.y));
-    mov += Math.abs(s.vx)+Math.abs(s.vy);
-  });
-  alpha *= 0.992;
-  if(alpha < 0.02 || mov < 0.6) corriendo = false;
-}
-function recalentar(a){
-  if(estado.disposicion!=="fuerzas" || animando) return;
-  alpha = Math.max(alpha,a||0.55);
-  if(!corriendo){ corriendo = true; bucle(); }
-}
-function bucle(){ if(!corriendo||animando) return; paso(); pintarPos(); requestAnimationFrame(bucle); }
-
-function animarA(destino, ms, alTerminar){
-  corriendo = false; animando = true;
-  const inicio = new Map();
-  SIM.forEach((s,id)=>inicio.set(id,{x:s.x,y:s.y}));
-  const t0 = performance.now();
-  // Salvaguarda: en una pestana en segundo plano requestAnimationFrame no se
-  // dispara y la disposicion quedaria a mitad de camino. El temporizador la
-  // completa igual.
-  const red = setTimeout(()=>{
-    if(!animando) return;
-    destino.forEach((d,id)=>{ const s = SIM.get(id); s.x = d.x; s.y = d.y; s.vx = 0; s.vy = 0; });
-    animando = false; pintarPos(); if(alTerminar) alTerminar();
-  }, (ms||700)+260);
-  (function cuadro(t){
-    const p = Math.min(1,(t-t0)/(ms||700));
-    const e = p<0.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
-    destino.forEach((d,id)=>{
-      const s = SIM.get(id), i = inicio.get(id);
-      s.x = i.x+(d.x-i.x)*e; s.y = i.y+(d.y-i.y)*e; s.vx = 0; s.vy = 0;
-    });
-    pintarPos();
-    if(p<1) requestAnimationFrame(cuadro);
-    else { clearTimeout(red); animando = false; if(alTerminar) alTerminar(); }
-  })(performance.now());
-}
-
-/* ========================================================= disposiciones ==== */
-const GRUPOS = [];
-function visiblesAhora(){ return D.nodos.filter(n=>!elN.get(n.id).classList.contains("apagado")); }
-function dispJerarquica(){
-  const vis = visiblesAhora(), porNivel = new Map();
-  vis.forEach(n=>{ if(!porNivel.has(n.nivel)) porNivel.set(n.nivel,[]); porNivel.get(n.nivel).push(n); });
-  const niveles = [...porNivel.keys()].sort((a,b)=>a-b);
-  const altoUtil = ALTO-200, pasoY = niveles.length>1 ? altoUtil/(niveles.length-1) : 0;
-  const destino = new Map(), orden = new Map();
-  niveles.forEach((niv,i)=>{
-    let fila = porNivel.get(niv).slice();
-    fila = i>0 ? fila.sort((a,b)=>bari(a,orden)-bari(b,orden))
-               : fila.sort((a,b)=>String(a.etiqueta).localeCompare(String(b.etiqueta)));
-    const pasoX = (ANCHO-220)/Math.max(1,fila.length);
-    fila.forEach((n,j)=>{ destino.set(n.id,{x:110+pasoX*(j+0.5), y:120+pasoY*i}); orden.set(n.id,j); });
-  });
-  return destino;
-}
-function bari(n,orden){
-  const vec = [...(ADY.get(n.id)||[])].filter(v=>orden.has(v)).map(v=>orden.get(v));
-  return vec.length ? vec.reduce((a,b)=>a+b,0)/vec.length : 1e9;
-}
-function dispLegajos(){
-  const vis = visiblesAhora(), grupos = new Map();
-  vis.forEach(n=>{
-    let g = n.legajo;
-    if(!g){
-      const vecinos = [...(ADY.get(n.id)||[])].map(v=>(NODOS.get(v)||{}).legajo).filter(Boolean);
-      g = vecinos.length ? vecinos[0] : "Sin agrupar";
-    }
-    if(!grupos.has(g)) grupos.set(g,[]);
-    grupos.get(g).push(n);
-  });
-  const claves = [...grupos.keys()].sort();
-  const cols = Math.min(claves.length,3)||1, filas = Math.ceil(claves.length/cols);
-  const anchoCol = ANCHO/cols, altoFila = (ALTO-140)/filas;
-  const destino = new Map(); GRUPOS.length = 0;
-  claves.forEach((clave,i)=>{
-    const cx = anchoCol*((i%cols)+0.5), cy = 140+altoFila*(Math.floor(i/cols)+0.45);
-    const miembros = grupos.get(clave).slice()
-      .sort((a,b)=>(a.nivel-b.nivel)||String(a.etiqueta).localeCompare(String(b.etiqueta)));
-    GRUPOS.push({clave, x:cx, y:cy-Math.min(altoFila,anchoCol)*0.42-16});
-    const r = Math.min(anchoCol,altoFila)*0.36;
-    miembros.forEach((n,j)=>{
-      if(miembros.length===1){ destino.set(n.id,{x:cx,y:cy}); return; }
-      const ang = (j/miembros.length)*Math.PI*2 - Math.PI/2;
-      const rr = n.tipo==="REPORTE" ? r*0.45 : r;
-      destino.set(n.id,{x:cx+Math.cos(ang)*rr, y:cy+Math.sin(ang)*rr});
-    });
-  });
-  return destino;
-}
-/* Disposición del "por qué": el reporte A a la izquierda, el B a la derecha, y
-   una fila por cada dato compartido, con la cadena que va de un reporte al otro
-   pasando por ese dato. Es la forma más directa de leer cómo llegaron ahí. */
-function dispPorQue(aristaId){
-  const a = ARISTAS.get(aristaId);
-  if(!a || !a.puente || !a.puente.length) return null;
-  const destino = new Map();
-  const izq = 190, der = ANCHO-190;
-  const filas = a.puente.length;
-  // La cadena principal -la que sostiene el vinculo- queda horizontal, con los
-  // dos reportes a la misma altura. Lo que solo refuerza cuelga por debajo.
-  const yBase = 250, alto = ALTO-yBase-140;
-  const pasoY = filas>1 ? alto/(filas-1) : 0;
-  destino.set(RE(a.a), {x:izq, y:yBase});
-  destino.set(RE(a.b), {x:der, y:yBase});
-  // Un mismo nodo puede estar en varias cadenas (la cuenta suele estar en todas).
-  // Se lo ubica en la primera en la que aparece y no se lo vuelve a mover: si no,
-  // cada cadena lo arrastra a su fila y el dibujo se desarma.
-  a.puente.forEach((p,i)=>{
-    const y = yBase+pasoY*i;
-    const cadena = p.camino_a.concat(p.camino_b.slice(0,-1).reverse());
-    const total = cadena.length;
-    cadena.forEach((id,k)=>{
-      const e = RE(id);
-      if(e===RE(a.a) || e===RE(a.b) || destino.has(e)) return;
-      const t = total>1 ? k/(total-1) : 0.5;
-      destino.set(e, {x: izq+(der-izq)*t, y});
-    });
-  });
-  return destino;
-}
-/* Disposición en secuencia: se lee de izquierda a derecha como una frase.
-   [reporte en curso] -> [por dónde pasa] -> [dato compartido] -> [reporte vinculado]
-   Es la forma más directa de seguir la lógica de una vinculación sin tener que
-   interpretar una nube de nodos. */
-function dispSecuencia(){
-  const vis = visiblesAhora();
-  if(!vis.length) return new Map();
-
-  // Si lo unico visible son reportes, no hay secuencia que armar: son pares.
-  // Se los apila en una columna y las vinculaciones quedan como arcos, cada uno
-  // con su etiqueta a distinta altura. Es la forma legible de leer quien se
-  // conecta con quien cuando son unos pocos.
-  if(vis.every(n=>n.tipo==="REPORTE")){
-    const col = vis.slice().sort((a,b)=>String(a.etiqueta).localeCompare(String(b.etiqueta)));
-    const alto = ALTO-320, paso = alto/Math.max(1, col.length-1);
-    const d = new Map();
-    col.forEach((n,i)=>d.set(n.id, {
-      x: ANCHO*0.34,
-      y: col.length>1 ? 190+paso*i : ALTO/2}));
-    return d;
-  }
-
-  const ids = new Set(vis.map(n=>n.id));
-  const rs = reportesDelCaso();
-  const reportes = vis.filter(n=>n.tipo==="REPORTE");
-  const ancla = (estado.foco && ids.has(estado.foco)) ? estado.foco
-              : (reportes[0] ? reportes[0].id : vis[0].id);
-
-  // distancia al reporte en curso, recorriendo solo lo visible
-  const dist = new Map([[ancla,0]]);
-  let frente = [ancla];
-  while(frente.length){
-    const sig = [];
-    frente.forEach(x=>(ADY.get(x)||new Set()).forEach(y0=>{
-      const y = RE(y0);
-      if(ids.has(y) && !dist.has(y)){ dist.set(y, dist.get(x)+1); sig.push(y); }
-    }));
-    frente = sig;
-  }
-
-  const COL_COMPARTIDO = 4, COL_OTROS = 5;
-  const columnas = new Map();
-  vis.forEach(n=>{
-    let c;
-    if(n.id===ancla) c = 0;
-    else if(n.tipo==="REPORTE") c = COL_OTROS;
-    else if(esCompartido(n.id)) c = COL_COMPARTIDO;
-    else c = Math.min(3, Math.max(1, dist.get(n.id) || 1));
-    if(!columnas.has(c)) columnas.set(c,[]);
-    columnas.get(c).push(n);
-  });
-
-  const usadas = [...columnas.keys()].sort((a,b)=>a-b);
-  const destino = new Map(), orden = new Map();
-  const pasoX = (ANCHO-260)/Math.max(1, usadas.length-1);
-  usadas.forEach((c,i)=>{
-    let fila = columnas.get(c).slice();
-    fila = i>0 ? fila.sort((a,b)=>bari(a,orden)-bari(b,orden))
-               : fila.sort((a,b)=>String(a.etiqueta).localeCompare(String(b.etiqueta)));
-    const x = usadas.length>1 ? 130+pasoX*i : ANCHO/2;
-    const alto = ALTO-260, pasoY = alto/Math.max(1, fila.length);
-    fila.forEach((n,j)=>{
-      destino.set(n.id, {x, y: 170+pasoY*(j+0.5)});
-      orden.set(n.id, j);
-    });
-  });
-  return destino;
-}
-
-function aplicarDisposicion(disp, arg){
-  estado.disposicion = disp;
-  if(disp==="fuerzas"){
-    GRUPOS.length = 0; pintarGrupos();
-    SIM.forEach(s=>s.fijo=false);
-    elN.forEach(el=>el.classList.remove("fijado"));
-    corriendo = false; animando = false; alpha = 0.9; recalentar(0.9);
-    return;
-  }
-  const destino = disp==="jerarquica" ? dispJerarquica()
-                : disp==="porque" ? dispPorQue(arg)
-                : disp==="secuencia" ? dispSecuencia() : dispLegajos();
-  if(!destino){ aplicarDisposicion("fuerzas"); return; }
-  if(disp!=="legajos"){ GRUPOS.length = 0; pintarGrupos(); }
-  animarA(destino, 700, ()=>{ destino.forEach((_,id)=>{ SIM.get(id).fijo = true; }); pintarGrupos(); });
-}
-const DISPOSICIONES = [
-  ["secuencia", "En secuencia"], ["fuerzas", "Orgánica"],
-  ["jerarquica", "Por tipo de dato"]];
-document.getElementById("reorganizar").onclick = ()=>{
-  const i = DISPOSICIONES.findIndex(d=>d[0]===estado.disposicion);
-  const sig = DISPOSICIONES[(i+1)%DISPOSICIONES.length];
-  aplicarDisposicion(sig[0]);
-  document.getElementById("reorganizar").textContent = "Vista: "+sig[1];
-};
-
-/* =============================================================== dibujo ==== */
+/* ============================================================== lienzo ==== */
 const SVGNS = "http://www.w3.org/2000/svg";
-const gG = document.getElementById("ggrupos"), gA = document.getElementById("garistas");
-const gP = document.getElementById("gpesos"), gN = document.getElementById("gnodos");
-const gB = document.getElementById("gbadges");
-const elA = new Map(), elZ = new Map(), elN = new Map(), elP = new Map();
-const TETIQ = new Map(), CURV = new Map(), elB = new Map();
+const gCon = document.getElementById("gcon"), gRot = document.getElementById("grot"),
+      gCaj = document.getElementById("gcajas"), svg = document.getElementById("lienzo");
+const ANCHO_CAJA = 200, ALTO_CAJA = 52, SEP_X = 34;
+const Y_RAIZ = 90, Y_REL = 280, Y_ENT = 480;
+const PALETA = ["#34d399","#a78bfa","#f472b6","#fbbf24","#38bdf8","#fb7185",
+                "#4ade80","#c084fc"];
 
-D.aristas.forEach(a=>{
-  if(!NODOS.has(a.a)||!NODOS.has(a.b)) return;
-  const z = document.createElementNS(SVGNS,"path");
-  z.setAttribute("class","zonaClic");
-  z.onclick = e=>{ e.stopPropagation(); ir(a.entreReportes?{tipo:"porque",id:a.id}:{tipo:"arista",id:a.id}); };
-  const t = document.createElementNS(SVGNS,"title");
-  t.textContent = etq(a.a)+" "+a.relacionLegible+" "+etq(a.b)+
-                  (a.confianza!=null? "  ·  peso "+num(a.confianza) : "");
-  z.appendChild(t);
-  const p = document.createElementNS(SVGNS,"path");
-  p.setAttribute("class","arista "+a.origen+(a.relacion==="CONTRADICE"?" contradice":"")+
-                 (a.estado==="rechazada"?" rechazada":""));
-  gA.appendChild(p); gA.appendChild(z);
-  elA.set(a.id,p); elZ.set(a.id,z);
-  // Si todas las etiquetas cayeran en el punto medio, las aristas que se cruzan
-  // las apilarian una encima de otra. Se escalona la posicion a lo largo de
-  // cada linea.
-  TETIQ.set(a.id, 0.5 + (((elA.size + 1) % 3) - 1) * 0.16);
-  // Curvatura propia por arista: dos vinculaciones de igual largo dejarian de
-  // otro modo arcos superpuestos, con sus etiquetas una encima de la otra.
-  CURV.set(a.id, 0.07 + ((elA.size + 1) % 4) * 0.035);
-  // Cada arista lleva escrito QUE la vincula. Sin la etiqueta, una linea entre
-  // dos nodos no dice nada: el operador tiene que poder leer la relacion.
-  const tx = document.createElementNS(SVGNS,"text");
-  tx.setAttribute("class", a.entreReportes ? "pesoArista" : "etiquetaArista");
-  tx.setAttribute("text-anchor","middle");
-  tx.textContent = a.entreReportes
-    ? a.relacionLegible+" · "+num(a.confianza)
-    : a.relacionLegible;
-  gP.appendChild(tx); elP.set(a.id,tx);
-});
-function radio(n){
-  if(n.tipo==="REPORTE") return 13;
-  if(n.tipo==="IDENTIDAD") return 12;
-  if(n.tipo==="PERSONA_MENCION"||n.tipo==="EVENTO") return 10;
-  return 8;
-}
-D.nodos.forEach(n=>{
-  const g = document.createElementNS(SVGNS,"g");
-  g.setAttribute("class","nodo"); g.style.color = n.color;
-  const r = radio(n);
-  const halo = document.createElementNS(SVGNS,"circle");
-  halo.setAttribute("class","halo"); halo.setAttribute("r",r+6); g.appendChild(halo);
-  const caja = ["REPORTE","EVIDENCIA","ORGANIZACION","DOCUMENTO"].includes(n.tipo);
-  let f;
-  if(caja){
-    f = document.createElementNS(SVGNS,"rect");
-    f.setAttribute("x",-r); f.setAttribute("y",-r);
-    f.setAttribute("width",2*r); f.setAttribute("height",2*r); f.setAttribute("rx",3);
-  } else { f = document.createElementNS(SVGNS,"circle"); f.setAttribute("r",r); }
-  f.setAttribute("class","cuerpo"); f.setAttribute("fill",n.color); g.appendChild(f);
-  const pin = document.createElementNS(SVGNS,"circle");
-  pin.setAttribute("class","pin"); pin.setAttribute("r",r+4);
-  g.appendChild(pin);
-  const tx = document.createElementNS(SVGNS,"text");
-  tx.setAttribute("x",r+6); tx.setAttribute("y",4);
-  tx.textContent = (n.etiqueta||"").slice(0,28); g.appendChild(tx);
+let VP = {x:0,y:0,k:1};
+function pintarVP(){ document.getElementById("vista")
+  .setAttribute("transform","translate("+VP.x+","+VP.y+") scale("+VP.k+")"); }
+
+function caja(g, x, y, {titulo, sub, marca, color, clases, alClic}){
+  const el = document.createElementNS(SVGNS,"g");
+  el.setAttribute("class","caja "+(clases||""));
+  el.setAttribute("transform","translate("+x+","+y+")");
+  const r = document.createElementNS(SVGNS,"rect");
+  r.setAttribute("class","cuerpo"); r.setAttribute("width",ANCHO_CAJA);
+  r.setAttribute("height",ALTO_CAJA); r.setAttribute("rx",7);
+  el.appendChild(r);
+  if(color){
+    const b = document.createElementNS(SVGNS,"rect");
+    b.setAttribute("class","barra"); b.setAttribute("x",0); b.setAttribute("y",0);
+    b.setAttribute("width",4); b.setAttribute("height",ALTO_CAJA);
+    b.setAttribute("fill",color); el.appendChild(b);
+  }
+  const t = document.createElementNS(SVGNS,"text");
+  t.setAttribute("class","titulo"); t.setAttribute("x",13);
+  t.setAttribute("y", sub? ALTO_CAJA/2-8 : ALTO_CAJA/2);
+  t.textContent = String(titulo).slice(0,24); el.appendChild(t);
+  if(sub){
+    const s2 = document.createElementNS(SVGNS,"text");
+    s2.setAttribute("class","sub"); s2.setAttribute("x",13);
+    s2.setAttribute("y",ALTO_CAJA/2+10);
+    s2.textContent = String(sub).slice(0,32); el.appendChild(s2);
+  }
+  if(marca){
+    const m = document.createElementNS(SVGNS,"text");
+    m.setAttribute("class","marca"); m.setAttribute("x",ANCHO_CAJA-12);
+    m.setAttribute("y",13); m.textContent = marca; el.appendChild(m);
+  }
   const ti = document.createElementNS(SVGNS,"title");
-  ti.textContent = n.tipoLegible+": "+n.etiqueta; g.appendChild(ti);
-  gN.appendChild(g); elN.set(n.id,g);
-  arrastrable(g,n);
-
-  // Indicador de apertura: dice cuantas entidades cuelgan todavia de esta y
-  // permite abrirlas o volver a cerrarlas. Va en su propia capa para no
-  // interferir con el arrastre del nodo.
-  const b = document.createElementNS(SVGNS,"g");
-  b.setAttribute("class","abrir oculto");
-  const bc = document.createElementNS(SVGNS,"circle");
-  bc.setAttribute("r",7.5); b.appendChild(bc);
-  const bt = document.createElementNS(SVGNS,"text");
-  bt.setAttribute("y",3); b.appendChild(bt);
-  const btl = document.createElementNS(SVGNS,"title"); b.appendChild(btl);
-  b.addEventListener("click",e=>{
-    e.stopPropagation();
-    if(estado.expandidos.has(RE(n.id))) cerrar(n.id); else abrir(n.id);
-    aplicar();
-  });
-  gB.appendChild(b); elB.set(n.id,b);
-});
-function pintarGrupos(){
-  gG.textContent = "";
-  GRUPOS.forEach(gr=>{
+  ti.textContent = titulo + (sub? "  ·  "+sub : ""); el.appendChild(ti);
+  if(alClic) el.addEventListener("click", e=>{ e.stopPropagation(); alClic(); });
+  g.appendChild(el);
+  return el;
+}
+function botonMas(g, x, y, abierto, alClic, ayuda){
+  const el = document.createElementNS(SVGNS,"g");
+  el.setAttribute("class","mas");
+  el.setAttribute("transform","translate("+x+","+y+")");
+  const c = document.createElementNS(SVGNS,"circle");
+  c.setAttribute("r",9); el.appendChild(c);
+  const p = document.createElementNS(SVGNS,"path");
+  p.setAttribute("d", abierto ? "M-4.5,0 H4.5" : "M-4.5,0 H4.5 M0,-4.5 V4.5");
+  p.setAttribute("fill","none"); el.appendChild(p);
+  const ti = document.createElementNS(SVGNS,"title");
+  ti.textContent = ayuda; el.appendChild(ti);
+  el.addEventListener("click", e=>{ e.stopPropagation(); alClic(); });
+  g.appendChild(el);
+}
+/* Conector en ángulo recto: baja del origen, corre horizontal y entra al
+   destino por arriba. Es la forma en que se lee un árbol. */
+function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril}){
+  const x1 = desde.x, y1 = desde.y, x2 = hasta.x, y2 = hasta.y;
+  const ym = carril!=null ? carril : (y1 + (y2-y1)/2);
+  const d = "M"+x1+","+y1+" V"+ym+" H"+x2+" V"+y2;
+  const p = document.createElementNS(SVGNS,"path");
+  p.setAttribute("class","con "+(clase||""));
+  p.setAttribute("d",d);
+  if(color) p.setAttribute("stroke",color);
+  p.setAttribute("marker-end", clase==="vinculo" ? "url(#flechaCyan)" : "url(#flecha)");
+  gCon.appendChild(p);
+  if(alClic){
+    const z = document.createElementNS(SVGNS,"path");
+    z.setAttribute("class","zona"); z.setAttribute("d",d);
+    z.addEventListener("click", e=>{ e.stopPropagation(); alClic(); });
+    const ti = document.createElementNS(SVGNS,"title");
+    ti.textContent = rotulo||""; z.appendChild(ti);
+    gCon.appendChild(z);
+  }
+  if(rotulo){
     const t = document.createElementNS(SVGNS,"text");
-    t.setAttribute("class","etiquetaGrupo");
-    t.setAttribute("x",gr.x); t.setAttribute("y",gr.y);
-    t.setAttribute("text-anchor","middle");
-    t.textContent = gr.clave==="Sin agrupar" ? "sin vincular" : "legajo "+gr.clave;
-    gG.appendChild(t);
-  });
-}
-function pintarPos(){
-  D.aristas.forEach(a=>{
-    const p = elA.get(a.id); if(!p) return;
-    const s = SIM.get(RE(a.a)), t = SIM.get(RE(a.b));
-    if(!s||!t) return;
-    const dx = t.x-s.x, dy = t.y-s.y;
-    const k = CURV.get(a.id) || 0.08;
-    const cx = (s.x+t.x)/2 - dy*k, cy = (s.y+t.y)/2 + dx*k;
-    const d = "M"+s.x+","+s.y+" Q"+cx+","+cy+" "+t.x+","+t.y;
-    p.setAttribute("d",d); elZ.get(a.id).setAttribute("d",d);
-    const tx = elP.get(a.id);
-    if(tx){
-      // punto sobre la curva cuadratica en la posicion escalonada
-      const u = TETIQ.get(a.id) || 0.5, w = 1-u;
-      const px = w*w*s.x + 2*w*u*cx + u*u*t.x;
-      const py = w*w*s.y + 2*w*u*cy + u*u*t.y;
-      const largo = Math.sqrt(dx*dx+dy*dy) || 1;
-      tx.setAttribute("x", px - dy/largo*9);
-      tx.setAttribute("y", py + dx/largo*9 + 3);
+    t.setAttribute("class","rotulo "+(clase==="vinculo"?"vinculo":""));
+    t.setAttribute("x",(x1+x2)/2); t.setAttribute("y",ym-7);
+    t.textContent = rotulo; gRot.appendChild(t);
+    if(peso!=null){
+      const w = document.createElementNS(SVGNS,"text");
+      w.setAttribute("class","rotulo peso");
+      w.setAttribute("x",(x1+x2)/2); w.setAttribute("y",ym+13);
+      w.textContent = "peso "+num(peso); gRot.appendChild(w);
     }
-  });
-  SIM.forEach((s,id)=>{
-    const el = elN.get(id);
-    if(el) el.setAttribute("transform","translate("+s.x.toFixed(1)+","+s.y.toFixed(1)+")");
-    const b = elB.get(id);
-    if(b){
-      const n = NODOS.get(id), r = n ? radio(n) : 8;
-      b.setAttribute("transform","translate("+(s.x+r+3).toFixed(1)+","+
-                     (s.y-r-3).toFixed(1)+")");
-    }
-  });
+  }
+  return p;
 }
 
-/* ============================================================= arrastre ==== */
-function aGrafo(ev){
-  const r = svg.getBoundingClientRect();
-  const sx = (ev.clientX-r.left)/r.width*ANCHO, sy = (ev.clientY-r.top)/r.height*ALTO;
-  return {x:(sx-T.x)/T.k, y:(sy-T.y)/T.k};
-}
-function arrastrable(el,n){
-  let mov = false, movido = false;
-  el.addEventListener("pointerdown",ev=>{
-    ev.stopPropagation(); ev.preventDefault();
-    mov = true; movido = false;
-    el.setPointerCapture(ev.pointerId); el.classList.add("moviendo");
-    SIM.get(n.id).fijo = true; recalentar(0.75);
-  });
-  el.addEventListener("pointermove",ev=>{
-    if(!mov) return;
-    const p = aGrafo(ev), s = SIM.get(n.id);
-    if(Math.abs(p.x-s.x)>2||Math.abs(p.y-s.y)>2) movido = true;
-    s.x = p.x; s.y = p.y; s.vx = 0; s.vy = 0;
-    recalentar(0.6); pintarPos();
-  });
-  el.addEventListener("pointerup",ev=>{
-    if(!mov) return;
-    mov = false; el.classList.remove("moviendo"); el.releasePointerCapture(ev.pointerId);
-    if(movido){ el.classList.add("fijado"); recalentar(0.5); }
-    else {
-      if(estado.disposicion==="fuerzas") SIM.get(n.id).fijo = false;
-      abrir(n.id);                       // abrir en cascada: un clic, un paso
-      ir({tipo:"nodo", id:n.id});
-    }
-  });
-  el.addEventListener("dblclick",ev=>{
-    ev.stopPropagation(); SIM.get(n.id).fijo = false;
-    el.classList.remove("fijado"); recalentar(0.6);
-  });
-}
+function dibujar(){
+  gCon.textContent = ""; gRot.textContent = ""; gCaj.textContent = "";
+  const c = caso(); if(!c) return;
+  const raizVal = estado.raiz || c.reportes[0];
+  const nRaiz = nodoReporte(raizVal); if(!nRaiz) return;
 
-/* ============================================================== filtros ==== */
-function nodosDelPuente(a){
-  const s = new Set();
-  (a.puente||[]).forEach(p=>{
-    p.camino_a.forEach(x=>s.add(RE(x)));
-    p.camino_b.forEach(x=>s.add(RE(x)));
+  // --- fila 1: los reportes con los que se vincula el que está en análisis
+  const vinc = vinculosDe(nRaiz.id).sort((a,b)=>(b.confianza||0)-(a.confianza||0));
+  const relacionados = vinc.map(a=>{
+    const otro = a.a===nRaiz.id ? a.b : a.a;
+    return {arista:a, nodo:NODOS.get(otro)};
   });
-  return s;
-}
-/* Pares consecutivos de cada cadena. En la vista "por qué" solo se dibujan
-   estos tramos: mostrar todas las relaciones entre los nodos visibles llena la
-   pantalla de líneas que no explican nada. */
-function tramosDelPuente(a){
-  const s = new Set();
-  (a.puente||[]).forEach(p=>{
-    [p.camino_a, p.camino_b].forEach(cad=>{
-      for(let i=0;i<cad.length-1;i++){
-        const x = RE(cad[i]), y = RE(cad[i+1]);
-        if(x!==y){ s.add(x+"|"+y); s.add(y+"|"+x); }
-      }
+
+  // --- fila 2: los datos de los reportes abiertos
+  const abiertos = relacionados.filter(r=>estado.abiertos.has(r.nodo.id));
+  if(estado.abiertos.has(nRaiz.id)) abiertos.unshift({nodo:nRaiz, arista:null});
+  const entidades = [];
+  const yaEnt = new Set();
+  abiertos.forEach(r=>{
+    datosDe(r.nodo.valor).forEach(m=>{
+      if(yaEnt.has(m.id)) return;
+      yaEnt.add(m.id); entidades.push({nodo:m, padre:r.nodo});
     });
   });
-  return s;
-}
-function conjuntoVisible(){
-  const v = estado.vista;
-  const txt = estado.texto.trim().toLowerCase();
 
-  // La vista "por que" es una excepcion: muestra exactamente la cadena que
-  // explica una vinculacion, sin depender de lo que el operador haya abierto.
-  if(v.tipo==="porque"){
-    const a = ARISTAS.get(v.id);
-    const fin = new Set();
-    if(a){
-      nodosDelPuente(a).forEach(x=>fin.add(x));
-      fin.add(RE(a.a)); fin.add(RE(a.b));
-    }
-    return fin;
-  }
+  // --- posiciones
+  const anchoFila = arr => arr.length*ANCHO_CAJA + Math.max(0,arr.length-1)*SEP_X;
+  const anchoTotal = Math.max(anchoFila(relacionados), anchoFila(entidades), ANCHO_CAJA);
+  const x0 = 60;
+  const pos = new Map();
+  pos.set(nRaiz.id, {x: x0 + anchoTotal/2 - ANCHO_CAJA/2, y: Y_RAIZ});
+  const xRel = x0 + (anchoTotal - anchoFila(relacionados))/2;
+  relacionados.forEach((r,i)=>pos.set(r.nodo.id,
+    {x: xRel + i*(ANCHO_CAJA+SEP_X), y: Y_REL}));
+  const xEnt = x0 + (anchoTotal - anchoFila(entidades))/2;
+  entidades.forEach((e,i)=>pos.set(e.nodo.id,
+    {x: xEnt + i*(ANCHO_CAJA+SEP_X), y: Y_ENT}));
 
-  // Punto de partida: los reportes del caso. Nada mas.
-  const base = new Set(D.nodos.filter(n=>n.tipo==="REPORTE" && enElCaso(n.id))
-                              .map(n=>n.id));
-  // Y lo que colgó de cada cosa que el operador fue abriendo.
-  estado.expandidos.forEach(id=>{
-    if(!enElCaso(id)) return;
-    base.add(id);
-    vecinosAbribles(id).forEach(x=>base.add(x));
-  });
-  if(v.tipo==="nodo" && v.id && enElCaso(v.id)) base.add(RE(v.id));
-  if(v.tipo==="arista"){
-    const a = ARISTAS.get(v.id);
-    if(a){ base.add(RE(a.a)); base.add(RE(a.b)); }
-  }
+  const abajo = p => ({x:p.x+ANCHO_CAJA/2, y:p.y+ALTO_CAJA});
+  const arriba = p => ({x:p.x+ANCHO_CAJA/2, y:p.y});
 
-  if(!txt) return base;
-  const fin = new Set();
-  base.forEach(id=>{
-    const n = NODOS.get(id); if(!n) return;
-    const blob = (n.etiqueta+" "+n.tipoLegible+" "+
-                  n.atributos.map(x=>x[1]).join(" ")).toLowerCase();
-    if(blob.includes(txt) || (v.tipo==="nodo" && id===RE(v.id))) fin.add(id);
+  // --- conectores: reporte en análisis -> relacionados
+  relacionados.forEach(r=>{
+    const a = r.arista;
+    conector(abajo(pos.get(nRaiz.id)), arriba(pos.get(r.nodo.id)), {
+      clase: a.relacion==="POSIBLE_DUPLICADO_DE" ? "vinculo duplicado" : "vinculo",
+      rotulo: a.motivo, peso: a.confianza,
+      alClic: ()=>ir({tipo:"vinculo", id:a.id})});
   });
-  return fin;
-}
 
-function aplicar(reacomodar){
-  const v = estado.vista;
-  const vis = conjuntoVisible();
-  D.nodos.forEach(n=>elN.get(n.id).classList.toggle("apagado",!vis.has(n.id)));
+  // --- conectores: reporte abierto -> sus datos
+  entidades.forEach(e=>{
+    conector(abajo(pos.get(e.padre.id)), arriba(pos.get(e.nodo.id)), {
+      rotulo: null, alClic: ()=>ir({tipo:"entidad", id:e.nodo.id})});
+  });
 
-  const foco = v.tipo==="porque" ? ARISTAS.get(v.id) : null;
-  const tramos = foco ? tramosDelPuente(foco) : null;
-  let cuenta = 0;
-  const visiblesA = [];
-  D.aristas.forEach(a=>{
-    const p = elA.get(a.id); if(!p) return;
-    const ea = RE(a.a), eb = RE(a.b);
-    let ok = estado.origenes.has(a.origen) && vis.has(ea) && vis.has(eb) && ea!==eb;
-    if(ok && foco && !a.entreReportes && !tramos.has(ea+"|"+eb)) ok = false;
-    if(ok && foco && a.entreReportes && a.id!==foco.id) ok = false;
-    if(ok && a.confianza!=null) ok = a.confianza >= estado.conf;
-    if(ok && a.estado==="rechazada" && !estado.rechazadas) ok = false;
-    p.classList.toggle("apagada",!ok);
-    elZ.get(a.id).style.pointerEvents = ok ? "stroke" : "none";
-    const tocaSel = v.tipo==="nodo" && (ea===RE(v.id)||eb===RE(v.id));
-    p.classList.toggle("resaltada",!!(ok&&tocaSel));
-    p.classList.toggle("sel", (v.tipo==="arista"||v.tipo==="porque") && a.id===v.id);
-    if(ok) cuenta++;
-    visiblesA.push([a, ok]);
+  // --- cruces: el mismo dato en otros reportes de la fila
+  let carril = Y_ENT + ALTO_CAJA + 40;
+  entidades.forEach((e,i)=>{
+    const color = PALETA[i % PALETA.length];
+    otrosReportesDe(e.nodo).forEach(rv=>{
+      const nr = nodoReporte(rv);
+      if(!nr || nr.id===e.padre.id || !pos.has(nr.id)) return;
+      conector(abajo(pos.get(e.nodo.id)), abajo(pos.get(nr.id)),
+        {clase:"cruce", color, carril, alClic: ()=>ir({tipo:"entidad", id:e.nodo.id})});
+      carril += 13;
+    });
   });
-  // Con muchas aristas las etiquetas se pisan y estorban: por encima de ese
-  // umbral se deja solo el peso de las vinculaciones entre reportes.
-  // De cada grupo de aristas paralelas se dibuja solo la primera visible.
-  const representante = new Map();
-  visiblesA.forEach(([a, ok])=>{
-    if(!ok) return;
-    const clave = GRUPO.get(a.id);
-    if(!representante.has(clave)) representante.set(clave, a.id);
-  });
-  let dibujadas = 0;
-  visiblesA.forEach(([a, ok], i)=>{
-    const clave = GRUPO.get(a.id);
-    const soyRepre = representante.get(clave) === a.id;
-    if(ok && !soyRepre){
-      elA.get(a.id).classList.add("apagada");
-      elZ.get(a.id).style.pointerEvents = "none";
-      visiblesA[i][1] = false;
-    } else if(ok) dibujadas++;
-  });
-  cuenta = dibujadas;
 
-  const pocasAristas = cuenta <= 90;
-  const yaEtiquetado = new Set();
-  visiblesA.forEach(([a, ok])=>{
-    const tx = elP.get(a.id); if(!tx) return;
-    let mostrar = ok && estado.verEtiquetas &&
-                  (a.entreReportes ? estado.verPesos : pocasAristas);
-    if(mostrar){
-      // Una arista muy corta no tiene lugar para su etiqueta.
-      const s1 = SIM.get(RE(a.a)), s2 = SIM.get(RE(a.b));
-      if(s1 && s2 && Math.hypot(s2.x-s1.x, s2.y-s1.y) < 80) mostrar = false;
-    }
-    if(mostrar && !a.entreReportes){
-      // Dos aristas paralelas con la misma relacion se dibujan encima: alcanza
-      // con rotular una sola vez.
-      const clave = [RE(a.a), RE(a.b)].sort().join("|")+"|"+a.relacionLegible;
-      if(yaEtiquetado.has(clave)) mostrar = false; else yaEtiquetado.add(clave);
-    }
-    if(mostrar && !a.entreReportes){
-      const n = (MIEMBROS.get(GRUPO.get(a.id))||[]).length;
-      tx.textContent = a.relacionLegible + (n>1 ? "  ·  en "+n+" reportes" : "");
-    }
-    tx.style.opacity = mostrar ? 1 : 0;
+  // --- cajas
+  const at = attr(nRaiz);
+  caja(gCaj, pos.get(nRaiz.id).x, pos.get(nRaiz.id).y, {
+    titulo:"Reporte "+nRaiz.valor,
+    sub: at["Plataforma"] ? at["Plataforma"]+" · en análisis" : "en análisis",
+    clases:"raiz"+(estado.sel && estado.sel.id===nRaiz.id?" sel":""),
+    alClic:()=>ir({tipo:"reporte", id:nRaiz.id})});
+  const dRaiz = datosDe(nRaiz.valor).length;
+  if(dRaiz) botonMas(gCaj, pos.get(nRaiz.id).x+ANCHO_CAJA-16,
+    pos.get(nRaiz.id).y+ALTO_CAJA-14, estado.abiertos.has(nRaiz.id),
+    ()=>{ alternar(nRaiz.id); },
+    (estado.abiertos.has(nRaiz.id)?"Cerrar":"Abrir")+" los "+dRaiz+" datos de este reporte");
+
+  relacionados.forEach(r=>{
+    const p = pos.get(r.nodo.id), a2 = attr(r.nodo);
+    const est = a2["Motivo del archivo"] ? legible(a2["Motivo del archivo"])
+                                         : legible(a2["Estado en SIPAR"]);
+    caja(gCaj, p.x, p.y, {
+      titulo:"Reporte "+r.nodo.valor, sub:est,
+      clases: (estado.sel && estado.sel.id===r.nodo.id?"sel":""),
+      alClic:()=>ir({tipo:"reporte", id:r.nodo.id})});
+    const n = datosDe(r.nodo.valor).length;
+    if(n) botonMas(gCaj, p.x+ANCHO_CAJA-16, p.y+ALTO_CAJA-14,
+      estado.abiertos.has(r.nodo.id), ()=>alternar(r.nodo.id),
+      (estado.abiertos.has(r.nodo.id)?"Cerrar":"Abrir")+" los "+n+" datos de este reporte");
   });
-  elN.forEach((el,id)=>el.classList.toggle("sel", v.tipo==="nodo" && RE(v.id)===id));
+
+  entidades.forEach((e,i)=>{
+    const p = pos.get(e.nodo.id);
+    const enN = otrosReportesDe(e.nodo).length;
+    caja(gCaj, p.x, p.y, {
+      titulo:e.nodo.etiqueta, sub:e.nodo.tipoLegible,
+      marca: enN>1 ? "en "+enN+" reportes" : null,
+      color: PALETA[i % PALETA.length],
+      clases: (estado.sel && estado.sel.id===e.nodo.id?"sel":""),
+      alClic:()=>ir({tipo:"entidad", id:e.nodo.id})});
+  });
 
   document.getElementById("pie").textContent =
-    vis.size+(vis.size===1?" entidad · ":" entidades · ")+
-    cuenta+(cuenta===1?" relación":" relaciones");
-  document.getElementById("contraer").disabled = estado.expandidos.size===0;
+    relacionados.length+" reporte(s) vinculado(s) · "+entidades.length+" dato(s) a la vista";
+  document.getElementById("contraer").disabled = estado.abiertos.size===0;
+  if(!VP.encuadrado){ encuadrar(); VP.encuadrado = true; }
+}
+function alternar(id){
+  if(estado.abiertos.has(id)) estado.abiertos.delete(id); else estado.abiertos.add(id);
+  dibujar();
+}
+function encuadrar(){
+  const b = document.getElementById("vista").getBBox();
+  const r = svg.getBoundingClientRect();
+  if(!b.width || !r.width) return;
+  const k = Math.min((r.width-60)/b.width, (r.height-120)/b.height, 1.3);
+  VP.k = k;
+  VP.x = (r.width - b.width*k)/2 - b.x*k;
+  VP.y = 70 - b.y*k;
+  pintarVP();
+}
+document.getElementById("ajustar").onclick = ()=>{ encuadrar(); };
+document.getElementById("contraer").onclick = ()=>{ estado.abiertos.clear(); dibujar(); };
 
-  // Indicadores de apertura sobre cada entidad visible.
-  D.nodos.forEach(n=>{
-    const b = elB.get(n.id); if(!b) return;
-    if(!vis.has(n.id) || v.tipo==="porque"){ b.classList.add("oculto"); return; }
-    const abierto = estado.expandidos.has(RE(n.id));
-    const ocultos = [...vecinosAbribles(n.id)].filter(x=>!vis.has(x)).length;
-    if(!abierto && ocultos===0){ b.classList.add("oculto"); return; }
-    b.classList.remove("oculto");
-    b.querySelector("text").textContent = ocultos>0 ? "+"+ocultos : "−";
-    b.querySelector("title").textContent = ocultos>0
-      ? "Abrir "+ocultos+" entidad(es) vinculada(s) a "+n.etiqueta
-      : "Cerrar lo que se abrió desde "+n.etiqueta;
-  });
+svg.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const r = svg.getBoundingClientRect();
+  const sx = e.clientX-r.left, sy = e.clientY-r.top;
+  const f = e.deltaY<0 ? 1.12 : 1/1.12, k2 = Math.max(0.2,Math.min(3,VP.k*f));
+  VP.x = sx-(sx-VP.x)*(k2/VP.k); VP.y = sy-(sy-VP.y)*(k2/VP.k); VP.k = k2; pintarVP();
+},{passive:false});
+let arr = null;
+svg.addEventListener("pointerdown",e=>{
+  arr = {x:e.clientX,y:e.clientY,vx:VP.x,vy:VP.y}; svg.classList.add("arrastrando"); });
+window.addEventListener("pointermove",e=>{
+  if(!arr) return; VP.x = arr.vx+(e.clientX-arr.x); VP.y = arr.vy+(e.clientY-arr.y); pintarVP(); });
+window.addEventListener("pointerup",()=>{ arr = null; svg.classList.remove("arrastrando"); });
 
-  if(reacomodar!==false){
-    if(v.tipo==="porque") aplicarDisposicion("porque", v.id);
-    else if(estado.disposicion==="fuerzas") recalentar(0.6);
-    else aplicarDisposicion(estado.disposicion);
+/* =============================================================== ficha ==== */
+document.getElementById("cuerpo").addEventListener("click", e=>{
+  const nav = e.target.closest("[data-ir]");
+  if(nav){ const [tipo,id] = nav.dataset.ir.split("|"); ir(id?{tipo,id}:{tipo}); return; }
+  const acc = e.target.closest("[data-accion]");
+  if(!acc) return;
+  if(acc.dataset.accion==="descargar") descargarInforme();
+  if(acc.dataset.accion==="raiz"){
+    estado.raiz = acc.dataset.valor; estado.abiertos.clear();
+    VP.encuadrado = false; ir({tipo:"inicio"});
   }
-}
-
-/* ======================================================== panel izquierdo ==== */
-const cont = document.getElementById("tipos");
-Object.entries(D.tipos).forEach(([t,m])=>{
-  const usados = D.nodos.filter(n=>n.tipo===t).length;
-  if(!usados) return;
-  const l = document.createElement("label");
-  l.innerHTML = '<input type="checkbox" class="ftipo" value="'+t+'"'+
-    (m.informativo ? '' : ' checked')+'>'+
-    '<span class="sw" style="background:'+m.color+'"></span>'+esc(m.legible)+
-    ' <span style="color:var(--tenue);font-family:var(--mono);font-size:11px">'+usados+'</span>';
-  l.title = m.desc; cont.appendChild(l);
+  if(acc.dataset.accion==="abrir"){ estado.abiertos.add(acc.dataset.valor); dibujar(); }
 });
-const ca = document.getElementById("alertas");
-if(!D.alertas.length) ca.innerHTML = '<div class="vacio">Ningún antecedente archivado quedó reactivado.</div>';
-D.alertas.forEach(al=>{
-  const d = document.createElement("div");
-  d.className = "tarjeta click";
-  d.innerHTML = '<span class="chip '+(al.prioridad==="alta"?"am":"cy")+'"><span class="pt"></span>'+
-    esc(al.prioridad)+'</span>'+
-    '<div style="margin-top:4px;font-size:12.5px">Reporte <b>'+esc(al.reporte_archivado)+'</b> archivado</div>'+
-    '<div style="color:var(--tenue);font-size:12px;margin-top:4px">Lo reactiva el '+
-    esc(al.reporte_disparador)+' · peso '+num(al.confianza_vinculo)+'</div>';
-  d.onclick = ()=>ir({tipo:"porque", id:al.arista_id});
-  ca.appendChild(d);
-});
-if(!HAY_UNIF) document.getElementById("filaUnif").style.display = "none";
-
-document.querySelectorAll(".ftipo").forEach(c=>c.onchange=()=>{
-  c.checked?estado.tipos.add(c.value):estado.tipos.delete(c.value); aplicar();});
-document.querySelectorAll(".forigen").forEach(c=>c.onchange=()=>{
-  c.checked?estado.origenes.add(c.value):estado.origenes.delete(c.value); aplicar(false);});
-document.getElementById("conf").oninput = e=>{
-  estado.conf = e.target.value/100;
-  document.getElementById("confv").textContent = num(estado.conf); aplicar(false);};
-document.getElementById("verPesos").onchange = e=>{estado.verPesos=e.target.checked;aplicar(false);};
-document.getElementById("verRechazadas").onchange = e=>{estado.rechazadas=e.target.checked;aplicar(false);};
-document.getElementById("unificar").onchange = e=>{estado.unificar=e.target.checked;aplicar();};
-document.getElementById("buscar").oninput = e=>{estado.texto=e.target.value;aplicar();};
-const sel = document.getElementById("selCaso");
-CASOS.forEach(c=>{
-  const o = document.createElement("option");
-  o.value = c.id; o.textContent = c.etiqueta;
-  sel.appendChild(o);
-});
-function cambiarCaso(id){
-  estado.caso = id;
-  estado.expandidos.clear();
-  const c = casoActual();
-  estado.foco = c ? ont_id(c.reportes[0]) : null;
-  sel.value = id;
-  HIST.pila = []; HIST.pos = -1;
-  ir({tipo:"inicio"});
+function ficha(html){
+  document.getElementById("cuerpo").innerHTML = html;
+  document.getElementById("der").classList.remove("plegado");
+  document.getElementById("der").scrollTop = 0;
 }
-function ont_id(valorReporte){ return "REPORTE::"+String(valorReporte).toLowerCase(); }
-sel.onchange = e=>cambiarCaso(e.target.value);
-
-document.getElementById("abrirTodo").onclick = ()=>{
-  D.nodos.forEach(n=>{ if(enElCaso(n.id)) estado.expandidos.add(n.id); });
-  aplicar();
-};
-document.getElementById("contraer").onclick = ()=>{
-  estado.expandidos.clear();
-  ir({tipo:"inicio"});
-};
-
-/* ================================================ plegado y redimensionado ==== */
-function plegable(idPanel,idBoton,abierto,cerrado){
-  const panel = document.getElementById(idPanel), b = document.getElementById(idBoton);
-  const pintar = ()=>{
-    const p = panel.classList.contains("plegado");
-    b.textContent = p ? cerrado : abierto;
-    b.title = (p?"Mostrar":"Plegar")+" el panel";
-  };
-  b.onclick = ()=>{ panel.classList.toggle("plegado"); panel.style.flexBasis=""; pintar(); };
-  pintar();
-}
-plegable("izq","plegIzq","‹","☰");
-plegable("der","plegDer","›","‹");
-function redimensionable(idAsa,idPanel,lado){
-  const asa = document.getElementById(idAsa), panel = document.getElementById(idPanel);
-  let act = null;
-  asa.addEventListener("pointerdown",e=>{
-    act = {x:e.clientX, w:panel.getBoundingClientRect().width};
-    asa.setPointerCapture(e.pointerId);
-    panel.style.transition = "none"; document.body.style.userSelect = "none";
-  });
-  asa.addEventListener("pointermove",e=>{
-    if(!act) return;
-    const delta = lado==="izq" ? (e.clientX-act.x) : (act.x-e.clientX);
-    panel.classList.remove("plegado");
-    panel.style.flexBasis = Math.max(240,Math.min(720,act.w+delta))+"px";
-  });
-  asa.addEventListener("pointerup",e=>{
-    act = null; asa.releasePointerCapture(e.pointerId);
-    panel.style.transition = ""; document.body.style.userSelect = "";
-  });
-}
-redimensionable("asaIzq","izq","izq");
-redimensionable("asaDer","der","der");
-
-/* ============================================================ ficha ======== */
 function tabla(pares){
-  const filas = pares.filter(x=>x[1]!==""&&x[1]!=null);
-  if(!filas.length) return "";
-  return "<table>"+filas.map(([k,v])=>
-    "<tr><td>"+esc(k)+"</td><td class='mono'>"+esc(v)+"</td></tr>").join("")+"</table>";
+  const f = pares.filter(x=>x[1]!==""&&x[1]!=null);
+  if(!f.length) return "";
+  return "<table>"+f.map(([k,v])=>"<tr><td>"+esc(k)+"</td><td class='mono'>"+
+    esc(v)+"</td></tr>").join("")+"</table>";
 }
 function prosa(t){
   return '<div class="prosa">'+String(t||"").split(/\n\s*\n/)
@@ -1443,347 +945,227 @@ function chipPeso(c){
   const cl = c>=0.9?"ok":c>=0.7?"cy":"am", t = c>=0.9?"alto":c>=0.7?"medio":"bajo";
   return '<span class="chip '+cl+'"><span class="pt"></span>peso '+num(c)+' · '+t+'</span>';
 }
-function chipOrigen(a){
-  return '<span class="chip '+({observada:"",derivada:"cy",inferida:"am"})[a.origen]+'">'+
-    esc(a.origenLegible)+'</span>';
-}
-function cadenaHTML(ids, destacado){
+function cadena(ids, destacado){
   return '<div class="cadena">'+ids.map(id=>{
-    const n = NODOS.get(id)||{};
-    const txt = esc(n.etiqueta||id);
-    return id===destacado ? "<b>"+txt+"</b>" :
-      '<span class="chip boton" data-ir="nodo|'+id+'">'+txt+'</span>';
+    const t = esc(etq(id));
+    return id===destacado ? "<b style='color:#67e8f9'>"+t+"</b>"
+      : '<span class="chip boton" data-ir="entidad|'+id+'">'+t+'</span>';
   }).join('<span class="fl">→</span>')+'</div>';
 }
-// Navegacion delegada: la ficha se arma como texto y los botones se declaran
-// con data-ir="tipo|id". Evita escapar comillas dentro del HTML generado, que
-// es donde se colaban los errores.
-document.getElementById("cuerpo").addEventListener("click", e=>{
-  const nav = e.target.closest("[data-ir]");
-  if(nav){
-    const [tipo, id] = nav.dataset.ir.split("|");
-    ir(id ? {tipo, id} : {tipo});
-    return;
-  }
-  const acc = e.target.closest("[data-accion]");
-  if(acc && acc.dataset.accion === "descargar") descargarInforme();
-});
 
-function ficha(html){
-  document.getElementById("cuerpo").innerHTML = html;
-  document.getElementById("der").classList.remove("plegado");
-  document.getElementById("plegDer").textContent = "›";
-  document.getElementById("der").scrollTop = 0;
-}
-
-function pintarInicio(){
-  const c = casoActual();
-  if(!c){ ficha('<div class="vacio">No hay casos para mostrar.</div>'); return; }
-  const vinc = vinculosDelCaso().slice().sort((a,b)=>(b.confianza||0)-(a.confianza||0));
-  const otros = CASOS.length-1;
-  const compartidos = D.nodos.filter(n=>enElCaso(n.id) && esCompartido(n.id));
-
-  let h = '<div class="sub" style="font-family:inherit;font-size:11px;'+
-    'text-transform:uppercase;letter-spacing:.14em;color:var(--cyan)">Caso en curso</div>'+
-    '<h1 style="margin:2px 0 6px">'+esc(c.etiqueta)+'</h1>'+
-    '<div class="prosa"><p>Se muestran únicamente las relaciones de este caso. '+
-    'El archivo general tiene '+D.meta.reportes+' reportes en '+CASOS.length+
-    ' casos'+(otros>0? '; los otros '+otros+' no se dibujan hasta que se los '+
-    'elija en el selector de arriba':'')+'.</p></div>';
-
-  h += '<h2>Reportes del caso</h2>';
-  c.reportes.forEach(rid=>{
-    const n = NODOS.get("REPORTE::"+rid.toLowerCase());
-    if(!n) return;
-    const at = Object.fromEntries(n.atributos);
-    h += '<div class="tarjeta click" data-ir="nodo|'+n.id+'">'+
-      '<div style="font-size:12.5px"><b>Reporte '+esc(rid)+'</b>'+
-      (estado.foco===n.id? ' <span class="chip cy">en curso</span>':'')+'</div>'+
-      '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">'+
-      // El motivo ya dice "archivado por...": repetir el estado sobra.
-      esc([at["Plataforma"],
-           at["Motivo del archivo"] ? legible(at["Motivo del archivo"])
-                                    : legible(at["Estado en SIPAR"])]
-          .filter(Boolean).join(" · "))+'</div></div>';
-  });
-
+function fichaCaso(){
+  const c = caso(); if(!c){ ficha('<div class="vacio">Sin casos.</div>'); return; }
+  const raizVal = estado.raiz || c.reportes[0];
+  const nRaiz = nodoReporte(raizVal);
+  const vinc = vinculosDe(nRaiz.id).sort((a,b)=>(b.confianza||0)-(a.confianza||0));
+  let h = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;'+
+    'color:var(--cyan)">Reporte en análisis</div><h1>Reporte '+esc(raizVal)+'</h1>'+
+    '<div class="prosa"><p>'+
+    (vinc.length
+      ? 'Tiene <b>'+vinc.length+'</b> vinculación(es) con otros reportes del archivo. '+
+        'Es lo que habilita evaluar una reapertura.'
+      : 'No quedó vinculado con ningún otro reporte.')+
+    '</p></div>';
   if(vinc.length){
-    h += '<h2>Cómo se conectan entre sí</h2>'+
-      '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Clic en '+
-      'cualquiera para ver la cadena completa que une a los dos reportes.</p></div>';
+    h += '<h2>Se vincula con</h2>';
     vinc.forEach(a=>{
-      h += '<div class="tarjeta click" data-ir="porque|'+a.id+'">'+
-        chipPeso(a.confianza)+(a.relacion==="POSIBLE_DUPLICADO_DE"?
-          '<span class="chip am">posible duplicado</span>':'')+
-        '<div style="margin-top:4px;font-size:12.5px"><b>'+esc(etq(a.a))+'</b>'+
-        ' <span style="color:var(--cyan)">'+esc(a.relacionLegible)+'</span> <b>'+
-        esc(etq(a.b))+'</b></div>'+
-        '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">por '+
-        ((a.puente||[]).filter(x=>x.sostiene).map(x=>esc(x.tipo.toLowerCase()))
-          .join(", ")||"—")+'</div></div>';
-    });
-  } else {
-    h += '<h2>Vinculaciones</h2><div class="vacio">Este reporte no quedó '+
-      'vinculado con ningún otro.</div>';
-  }
-
-  if(compartidos.length){
-    h += '<h2>Datos que se repiten en el caso</h2>'+
-      '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Aparecen '+
-      'en más de un reporte. Son los que sostienen las vinculaciones.</p></div>';
-    compartidos.sort((a,b)=>(b.reportes||[]).length-(a.reportes||[]).length)
-      .forEach(n=>{
-      h += '<div class="tarjeta click" data-ir="nodo|'+n.id+'">'+
-        '<span class="chip">'+esc(n.tipoLegible)+'</span>'+
-        '<div style="margin-top:3px;font-size:12.5px"><b>'+esc(n.etiqueta)+'</b></div>'+
-        '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">en los '+
-        'reportes '+esc((n.reportes||[]).filter(r=>reportesDelCaso().has(r)).join(", "))+
+      const otro = a.a===nRaiz.id?a.b:a.a, m = NODOS.get(otro), at = attr(m);
+      h += '<div class="tarjeta click" data-ir="vinculo|'+a.id+'">'+
+        chipPeso(a.confianza)+
+        (a.relacion==="POSIBLE_DUPLICADO_DE"?'<span class="chip am">posible duplicado</span>':'')+
+        '<div style="margin-top:4px;font-size:12.5px"><b>Reporte '+esc(m.valor)+'</b></div>'+
+        '<div style="color:var(--cyan);font-size:12px;margin-top:2px">'+esc(a.motivo)+'</div>'+
+        '<div style="color:var(--tenue);font-size:11.5px;margin-top:2px">'+
+        esc(legible(at["Motivo del archivo"]) || legible(at["Estado en SIPAR"]) || "")+
         '</div></div>';
     });
   }
+  h += '<h2>Otros reportes del caso</h2>';
+  c.reportes.forEach(r=>{
+    if(r===raizVal) return;
+    h += '<span class="chip boton" data-accion="raiz" data-valor="'+r+'">analizar '+esc(r)+'</span>';
+  });
+  ficha(h);
+}
 
-  const alertasCaso = D.alertas.filter(a=>reportesDelCaso().has(a.reporte_archivado));
-  if(alertasCaso.length){
-    h += '<h2>Antecedentes a revisar en este caso</h2>';
-    alertasCaso.forEach(al=>{
-      h += '<div class="tarjeta click" data-ir="porque|'+al.arista_id+'">'+
-        '<span class="chip '+(al.prioridad==="alta"?"am":"cy")+'"><span class="pt">'+
-        '</span>'+esc(al.prioridad)+'</span>'+
-        '<div style="margin-top:4px;font-size:12.5px">Reporte <b>'+
-        esc(al.reporte_archivado)+'</b> archivado, lo reactiva el '+
-        esc(al.reporte_disparador)+'</div></div>';
+function fichaReporte(id){
+  const n = NODOS.get(id); if(!n){ fichaCaso(); return; }
+  const at = attr(n);
+  const vinc = vinculosDe(id).sort((a,b)=>(b.confianza||0)-(a.confianza||0));
+  const datos = datosDe(n.valor);
+  const esRaiz = (estado.raiz || caso().reportes[0]) === n.valor;
+  let h = '<span class="chip cy">Reporte</span>'+
+    (esRaiz?'<span class="chip">en análisis</span>':'')+
+    '<h3>Reporte '+esc(n.valor)+'</h3>';
+
+  h += '<h2>Resumen</h2>'+prosa(
+    'Reporte de '+(at["Plataforma"]||"plataforma no informada")+
+    ', clasificado como '+(at["Clasificación NCMEC"]||"sin clasificar")+
+    '. El hecho es del '+String(at["Fecha del hecho"]||"—").slice(0,10)+
+    ' y se recibió el '+String(at["Fecha de recepción"]||"—").slice(0,10)+'.'+
+    ' Actualmente '+(legible(at["Motivo del archivo"]) || legible(at["Estado en SIPAR"]) || "sin estado")+'.');
+
+  if(vinc.length){
+    h += '<h2>Se vincula con ('+vinc.length+')</h2>';
+    vinc.forEach(a=>{
+      const otro = a.a===id?a.b:a.a;
+      h += '<div class="tarjeta click" data-ir="vinculo|'+a.id+'">'+chipPeso(a.confianza)+
+        '<div style="margin-top:4px;font-size:12.5px"><b>Reporte '+esc(NODOS.get(otro).valor)+'</b></div>'+
+        '<div style="color:var(--cyan);font-size:12px">'+esc(a.motivo)+'</div></div>';
+    });
+  } else {
+    h += '<h2>Vinculaciones</h2><div class="vacio">Ninguna.</div>';
+  }
+
+  if(datos.length){
+    h += '<h2>Entidades ('+datos.length+')</h2>'+
+      '<div class="fila"><button data-accion="abrir" data-valor="'+id+'">Mostrarlas en el gráfico</button></div>';
+    const porTipo = new Map();
+    datos.forEach(m=>{ if(!porTipo.has(m.tipoLegible)) porTipo.set(m.tipoLegible,[]);
+                       porTipo.get(m.tipoLegible).push(m); });
+    porTipo.forEach((lista,t)=>{
+      h += '<div style="margin:10px 0 4px;font-size:11px;color:var(--tenue);'+
+        'text-transform:uppercase;letter-spacing:.1em">'+esc(t)+'</div>';
+      lista.forEach(m=>{
+        const o = otrosReportesDe(m).length;
+        h += '<span class="chip boton" data-ir="entidad|'+m.id+'">'+esc(m.etiqueta)+
+          (o>1? ' <b style="color:var(--ambar)">·'+o+'</b>':'')+'</span>';
+      });
+    });
+    h += '<div class="prosa"><p style="font-size:11.5px;color:var(--tenue);margin-top:8px">'+
+      'El número en ámbar indica en cuántos reportes del caso aparece ese dato.</p></div>';
+  }
+  if(!esRaiz){
+    h += '<div class="fila"><button data-accion="raiz" data-valor="'+n.valor+'">'+
+      'Analizar este reporte</button></div>';
+  }
+  h += '<h2>Datos del reporte</h2>'+tabla(n.atributos);
+  ficha(h);
+}
+
+function fichaEntidad(id){
+  const n = NODOS.get(id); if(!n){ fichaCaso(); return; }
+  const enR = otrosReportesDe(n);
+  let h = '<span class="chip cy">'+esc(n.tipoLegible)+'</span><h3>'+esc(n.etiqueta)+'</h3>';
+  h += '<h2>Aparece en '+enR.length+' reporte(s) del caso</h2>';
+  enR.forEach(r=>{
+    const nr = nodoReporte(r);
+    h += '<div class="tarjeta click" data-ir="reporte|'+(nr?nr.id:"")+'">'+
+      '<div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div></div>';
+  });
+  if(enR.length>1) h += '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">'+
+    'Este dato se repite: es de los que sostienen las vinculaciones del caso.</p></div>';
+  h += '<h2>Datos</h2>'+tabla(n.atributos);
+  const rel = D.aristas.filter(a=>!a.entreReportes && (RE(a.a)===id||RE(a.b)===id));
+  const vistos = new Set();
+  const lista = [];
+  rel.forEach(a=>{
+    const otro = RE(a.a)===id?RE(a.b):RE(a.a), m = NODOS.get(otro);
+    if(!m || m.tipo==="ORGANIZACION") return;
+    const k = otro+"|"+a.relacion; if(vistos.has(k)) return; vistos.add(k);
+    lista.push([a,m,RE(a.a)!==id]);
+  });
+  if(lista.length){
+    h += '<h2>Cómo se conecta</h2>';
+    lista.forEach(([a,m,inv])=>{
+      h += '<div class="tarjeta click'+(a.relacion==="CONTRADICE"?" alarma":"")+
+        '" data-ir="relacion|'+a.id+'"><span class="chip">'+esc(a.origenLegible)+'</span>'+
+        '<div style="margin-top:4px;font-size:12.5px">'+
+        (inv? esc(m.etiqueta)+' '+esc(a.relacionLegible)+' <b>esta entidad</b>'
+            : '<b>Esta entidad</b> '+esc(a.relacionLegible)+' '+esc(m.etiqueta))+
+        '</div></div>';
     });
   }
   ficha(h);
 }
 
-function pintarPorQue(id){
-  const a = ARISTAS.get(id);
-  if(!a){ pintarInicio(); return; }
+function fichaVinculo(id){
+  const a = ARISTAS.get(id); if(!a){ fichaCaso(); return; }
   const sost = (a.puente||[]).filter(x=>x.sostiene);
   const corr = (a.puente||[]).filter(x=>!x.sostiene);
-  let h = '<h1>Por qué se vinculan</h1>'+
-    '<div style="font-size:13px;margin-bottom:8px"><b>'+esc(etq(a.a))+'</b>'+
-    ' <span style="color:var(--tenue)">y</span> <b>'+esc(etq(a.b))+'</b></div>'+
-    chipPeso(a.confianza)+chipOrigen(a)+
+  let h = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;'+
+    'color:var(--cyan)">Por qué se vinculan</div>'+
+    '<h3>Reporte '+esc(NODOS.get(a.a).valor)+' y Reporte '+esc(NODOS.get(a.b).valor)+'</h3>'+
+    chipPeso(a.confianza)+'<span class="chip">'+esc(a.origenLegible)+'</span>'+
     '<span class="chip'+(a.estado==="validada"?" ok":a.estado==="rechazada"?" al":"")+'">'+
     esc(a.estadoLegible)+'</span>';
-
   if(sost.length){
     h += '<h2>Lo que sostiene la vinculación</h2>';
     sost.forEach(p=>{
       h += '<div class="tarjeta cyan">'+chipPeso(p.peso)+
         '<div style="font-size:12.5px;margin:2px 0 8px"><b>'+esc(p.tipo)+'</b> '+
-        '<span class="chip boton" data-ir="nodo|'+p.nodo+'">'+esc(p.valor)+'</span></div>'+
-        '<div style="font-size:11px;color:var(--tenue);margin-bottom:2px">Cómo llega desde '+
-        esc(etq(a.a))+'</div>'+cadenaHTML(p.camino_a, p.nodo)+
-        '<div style="font-size:11px;color:var(--tenue);margin:6px 0 2px">Cómo llega desde '+
-        esc(etq(a.b))+'</div>'+cadenaHTML(p.camino_b, p.nodo)+'</div>';
+        '<span class="chip boton" data-ir="entidad|'+p.nodo+'">'+esc(p.valor)+'</span></div>'+
+        '<div style="font-size:11px;color:var(--tenue)">Desde el reporte '+
+        esc(NODOS.get(a.a).valor)+'</div>'+cadena(p.camino_a,p.nodo)+
+        '<div style="font-size:11px;color:var(--tenue);margin-top:6px">Desde el reporte '+
+        esc(NODOS.get(a.b).valor)+'</div>'+cadena(p.camino_b,p.nodo)+'</div>';
     });
   }
   if(corr.length){
-    h += '<h2>Lo que solo refuerza</h2>'+
-      '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Estos elementos '+
-      'coinciden, pero no alcanzan por sí solos para vincular dos reportes.</p></div>';
+    h += '<h2>Lo que solo refuerza</h2><div class="prosa"><p style="font-size:12px;'+
+      'color:var(--tenue)">Coinciden, pero no alcanzan por sí solos para vincular.</p></div>';
     corr.forEach(p=>{
-      h += '<div class="tarjeta">'+chipPeso(p.peso)+
-        '<div style="font-size:12.5px;margin-top:2px"><b>'+esc(p.tipo)+'</b> '+
-        '<span class="chip boton" data-ir="nodo|'+p.nodo+'">'+esc(p.valor)+'</span></div>'+
-        '</div>';
+      h += '<div class="tarjeta">'+chipPeso(p.peso)+'<div style="font-size:12.5px">'+
+        '<b>'+esc(p.tipo)+'</b> <span class="chip boton" data-ir="entidad|'+p.nodo+'">'+
+        esc(p.valor)+'</span></div></div>';
     });
   }
   if(a.explicacion) h += '<h2>Fundamento</h2>'+prosa(a.explicacion);
-  h += '<h2>De dónde surge</h2>'+tabla([
-    ["Método",a.metodo], ["Evidencia de origen",a.fuente],
-    ["Revisada por",a.validado_por||"sin revisar"],
+  h += '<h2>De dónde surge</h2>'+tabla([["Método",a.metodo],
+    ["Evidencia de origen",a.fuente],["Revisada por",a.validado_por||"sin revisar"],
     ["Identificador",a.id]]);
-  h += '<div class="fila"><button data-ir="arista|'+a.id+'">Ver la relación en detalle</button></div>';
+  h += '<h2>Registrar una decisión</h2><div class="cita">python validar.py '+
+    esc(a.id)+' validada --usuario SU_USUARIO</div>';
   ficha(h);
 }
 
-function pintarNodo(id){
-  if(!id || !NODOS.has(id)){ pintarInicio(); return; }
-  const n = NODOS.get(id);
-  const rs = reportesDelCaso();
-  const rel = D.aristas.filter(a=>a.a===id||a.b===id);
-  const conRep = rel.filter(a=>a.entreReportes);
-  let h = '<span class="chip cy">'+esc(n.tipoLegible)+'</span><h3>'+esc(n.etiqueta||"")+'</h3>';
-
-  if(n.tipo==="REPORTE"){
-    if(conRep.length){
-      h += '<h2>Se vincula con ('+conRep.length+')</h2>';
-      conRep.sort((a,b)=>(b.confianza||0)-(a.confianza||0)).forEach(a=>{
-        const otro = a.a===id?a.b:a.a;
-        h += '<div class="tarjeta click" data-ir="porque|'+a.id+'">'+chipPeso(a.confianza)+
-          '<div style="margin-top:4px;font-size:12.5px"><b>'+esc(etq(otro))+'</b></div>'+
-          '<div style="color:var(--tenue);font-size:11.5px;margin-top:3px">por '+
-          ((a.puente||[]).filter(x=>x.sostiene).map(x=>esc(x.tipo.toLowerCase()))
-            .join(", ")||"—")+' · clic para ver por qué</div></div>';
-      });
-    }
-
-    // Los datos del reporte, agrupados por tipo. Cada entidad ya sabe en que
-    // reportes aparece, asi que no hace falta recorrer el grafo: alcanza con
-    // preguntar quien menciona a este.
-    const porTipo = new Map();
-    D.nodos.forEach(m=>{
-      if(m.tipo==="REPORTE" || m.id===id) return;
-      if((D.tipos[m.tipo]||{}).informativo) return;
-      if(!(m.reportes||[]).includes(n.valor)) return;
-      if(!porTipo.has(m.tipo)) porTipo.set(m.tipo,[]);
-      porTipo.get(m.tipo).push(m);
-    });
-
-    const ORDEN = ["PERSONA_MENCION","IDENTIDAD","CUENTA","ALIAS","TELEFONO",
-                   "EMAIL","IP","DISPOSITIVO","EVIDENCIA","UBICACION","EVENTO"];
-    const conDatos = ORDEN.filter(t=>porTipo.has(t));
-    if(conDatos.length){
-      h += '<h2>Qué aporta este reporte</h2>'+
-        '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Clic en '+
-        'cualquiera para abrirlo en el grafo y ver en qué otros reportes aparece.</p></div>';
-      conDatos.forEach(t=>{
-        h += '<div style="margin:10px 0 4px;font-size:11px;color:var(--tenue);'+
-          'text-transform:uppercase;letter-spacing:.1em">'+
-          esc((D.tipos[t]||{}).legible||t)+'</div>';
-        porTipo.get(t).forEach(m=>{
-          const otros = (m.reportes||[]).filter(r=>rs.has(r) && r!==n.valor).length;
-          h += '<span class="chip boton" data-ir="nodo|'+m.id+'" style="max-width:100%">'+
-            esc(m.etiqueta)+(otros? ' <b style="color:var(--ambar)">·'+otros+'</b>':'')+
-            '</span>';
-        });
-      });
-      h += '<div class="prosa"><p style="font-size:11.5px;color:var(--tenue);'+
-        'margin-top:8px">El número en ámbar indica en cuántos otros reportes del '+
-        'caso aparece ese mismo dato.</p></div>';
-    }
-
-    const orgs = [...(ADY.get(id)||new Set())].map(v=>NODOS.get(RE(v)))
-      .filter(m=>m && m.tipo==="ORGANIZACION");
-    if(orgs.length){
-      h += '<h2>Origen</h2><div class="prosa"><p>'+
-        esc(orgs.map(m=>m.etiqueta).join(" · "))+'</p>'+
-        '<p style="font-size:11.5px;color:var(--tenue)">Las plataformas y '+
-        'prestadores no se dibujan en el grafo: todos los reportes de una misma '+
-        'plataforma la comparten, así que no distinguen nada.</p></div>';
-    }
-    h += '<h2>Datos del reporte</h2>'+tabla(n.atributos);
-
-  } else {
-    // Entidad: lo primero que importa es en qué reportes del caso aparece.
-    const enReportes = (n.reportes||[]).filter(r=>rs.has(r));
-    h += '<h2>Aparece en '+enReportes.length+' reporte(s) del caso</h2>';
-    enReportes.forEach(r=>{
-      const nr = NODOS.get("REPORTE::"+r.toLowerCase());
-      h += '<div class="tarjeta click" data-ir="nodo|'+(nr?nr.id:"")+'">'+
-        '<div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div></div>';
-    });
-    if(enReportes.length > 1){
-      h += '<div class="prosa"><p style="font-size:12px;color:var(--tenue)">Este '+
-        'dato se repite en más de un reporte: es de los que sostienen las '+
-        'vinculaciones del caso.</p></div>';
-    }
-    h += '<h2>Datos</h2>'+tabla(n.atributos);
-
-    if(n.transcripciones&&n.transcripciones.length){
-      h += '<h2>Texto restringido</h2><div class="prosa"><p>Este hecho tiene '+
-        n.transcripciones.length+' transcripción(es) que no se incorporan al grafo. '+
-        'Se conservan aparte, por hash, en <span class="cita">salida/textos_restringidos.json</span>.</p></div>';
-    }
-
-    const otras = rel.filter(a=>!a.entreReportes);
-    if(otras.length){
-      const vistos = new Set();
-      h += '<h2>Cómo se conecta</h2>';
-      otras.forEach(a=>{
-        const otro = RE(a.a===id?a.b:a.a), inv = a.a!==id;
-        const m = NODOS.get(otro);
-        // Nunca mostrar entidades de otro caso: el operador trabaja sobre este.
-        if(!m || m.tipo==="ORGANIZACION" || !enElCaso(otro)) return;
-        const clave = otro+"|"+a.relacion;
-        if(vistos.has(clave)) return; vistos.add(clave);
-        const cuantas = (MIEMBROS.get(GRUPO.get(a.id))||[]).length;
-        h += '<div class="tarjeta click'+(a.relacion==="CONTRADICE"?" alarma":"")+
-          '" data-ir="arista|'+a.id+'">'+chipOrigen(a)+
-          (cuantas>1? '<span class="chip">en '+cuantas+' reportes</span>':'')+
-          '<div style="margin-top:4px;font-size:12.5px">'+
-          (inv ? '<span style="color:var(--tenue)">'+esc(m.etiqueta)+'</span> '+
-                 esc(a.relacionLegible)+' <b>esta entidad</b>'
-               : '<b>Esta entidad</b> '+esc(a.relacionLegible)+
-                 ' <span style="color:var(--tenue)">'+esc(m.etiqueta)+'</span>')+
-          '</div></div>';
-      });
-    }
-  }
-  ficha(h);
-}
-
-function pintarArista(id){
-  const a = ARISTAS.get(id);
-  if(!a){ pintarInicio(); return; }
-  let h = chipOrigen(a)+chipPeso(a.confianza)+
-    '<span class="chip'+(a.estado==="validada"?" ok":a.estado==="rechazada"?" al":"")+'">'+
-    esc(a.estadoLegible)+'</span>'+
+function fichaRelacion(id){
+  const a = ARISTAS.get(id); if(!a){ fichaCaso(); return; }
+  let h = '<span class="chip">'+esc(a.origenLegible)+'</span>'+chipPeso(a.confianza)+
     '<h3>'+esc(etq(a.a))+' <span style="color:var(--cyan);font-weight:400">'+
     esc(a.relacionLegible)+'</span> '+esc(etq(a.b))+'</h3>'+
-    '<div style="font-size:11.5px;color:var(--tenue)">'+esc(a.origenDesc)+'</div>'+
-    '<div class="fila">'+
-    '<button data-ir="nodo|'+a.a+'">'+esc(etq(a.a))+'</button>'+
-    '<button data-ir="nodo|'+a.b+'">'+esc(etq(a.b))+'</button></div>';
-  if(a.entreReportes) h += '<div class="fila"><button data-ir="porque|'+a.id+'">Ver por qué se vinculan</button></div>';
+    '<div style="font-size:11.5px;color:var(--tenue)">'+esc(a.origenDesc)+'</div>';
   if(a.explicacion) h += '<h2>Fundamento</h2>'+prosa(a.explicacion);
   h += '<h2>De dónde surge</h2>'+tabla([
-    ["Evidencia de origen",a.fuente], ["Ubicación exacta en la fuente",a.locator],
-    ["Método",a.metodo], ["Fecha del hecho observado",a.observado||"no informada"],
-    ["Revisada por",a.validado_por||"sin revisar"],
-    ["Fecha de la revisión",a.validado_en||""], ["Vigente",a.vigente?"sí":"no"],
-    ["Rol",a.rol||""], ["Puerto de origen",a.puerto||""], ["Identificador",a.id]]);
-  if(a.origen!=="observada"){
-    h += '<h2>Registrar una decisión</h2>'+
-      '<div class="cita">python validar.py '+esc(a.id)+' validada --usuario SU_USUARIO</div>';
-  }
+    ["Evidencia de origen",a.fuente],["Ubicación exacta en la fuente",a.locator],
+    ["Método",a.metodo],["Fecha del hecho observado",a.observado||"no informada"],
+    ["Revisada por",a.validado_por||"sin revisar"],["Puerto de origen",a.puerto||""],
+    ["Identificador",a.id]]);
   ficha(h);
 }
 
-/* =============================================================== informe ==== */
-function markdown(texto){
-  const L = texto.split("\n"); let out = [], enTabla = false, enLista = false;
-  const inline = s => esc(s)
-    .replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
-    .replace(/`(.+?)`/g,'<code style="font-family:var(--mono);font-size:11.5px">$1</code>')
-    .replace(/\*(.+?)\*/g,"<i>$1</i>");
-  const cerrar = ()=>{ if(enTabla){out.push("</table>");enTabla=false;} if(enLista){out.push("</ul>");enLista=false;} };
+function markdown(t){
+  const L = t.split("\n"); let out=[], enT=false, enL=false;
+  const il = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
+    .replace(/`(.+?)`/g,'<code style="font-family:var(--mono);font-size:11.5px">$1</code>');
+  const cerrar = ()=>{ if(enT){out.push("</table>");enT=false;} if(enL){out.push("</ul>");enL=false;} };
   L.forEach(l=>{
     if(/^\s*\|/.test(l)){
       if(/^\s*\|[\s:|-]+\|\s*$/.test(l)) return;
-      const c = l.trim().replace(/^\||\|$/g,"").split("|").map(x=>inline(x.trim()));
-      if(enLista){out.push("</ul>");enLista=false;}
-      if(!enTabla){ out.push("<table>"); enTabla = true; }
+      const c = l.trim().replace(/^\||\|$/g,"").split("|").map(x=>il(x.trim()));
+      if(enL){out.push("</ul>");enL=false;}
+      if(!enT){out.push("<table>");enT=true;}
       out.push("<tr>"+c.map(x=>"<td>"+x+"</td>").join("")+"</tr>"); return;
     }
     if(/^\s*[-*]\s/.test(l)){
-      if(enTabla){out.push("</table>");enTabla=false;}
-      if(!enLista){ out.push("<ul style='margin:6px 0 10px;padding-left:18px'>"); enLista = true; }
-      out.push("<li>"+inline(l.replace(/^\s*[-*]\s/,""))+"</li>"); return;
+      if(enT){out.push("</table>");enT=false;}
+      if(!enL){out.push("<ul style='margin:6px 0 10px;padding-left:18px'>");enL=true;}
+      out.push("<li>"+il(l.replace(/^\s*[-*]\s/,""))+"</li>"); return;
     }
     cerrar();
-    if(/^###\s/.test(l)) out.push("<h3>"+inline(l.slice(4))+"</h3>");
-    else if(/^##\s/.test(l)) out.push("<h2>"+inline(l.slice(3))+"</h2>");
-    else if(/^#\s/.test(l)) out.push("<h1>"+inline(l.slice(2))+"</h1>");
-    else if(/^>\s?/.test(l)) out.push('<p style="color:var(--tenue)">'+inline(l.replace(/^>\s?/,""))+"</p>");
-    else if(l.trim()) out.push("<p>"+inline(l)+"</p>");
+    if(/^###\s/.test(l)) out.push("<h3>"+il(l.slice(4))+"</h3>");
+    else if(/^##\s/.test(l)) out.push("<h2>"+il(l.slice(3))+"</h2>");
+    else if(/^#\s/.test(l)) out.push("<h1>"+il(l.slice(2))+"</h1>");
+    else if(l.trim()) out.push("<p>"+il(l)+"</p>");
   });
   cerrar();
   return '<div class="prosa">'+out.join("")+"</div>";
 }
-function pintarInforme(){
-  const t = (D.informe||{}).texto || "";
-  if(!t){ ficha('<h1>Informe</h1><div class="vacio">No se generó el informe en esta corrida.</div>'); return; }
+function fichaInforme(){
+  const t = (D.informe||{}).texto||"";
   ficha('<div class="fila"><button data-accion="descargar">Descargar .md</button>'+
-    '<button data-ir="inicio|">Volver</button></div>'+markdown(t)+
-    '<h2>Versión redactada por IA</h2><div class="prosa"><p>Este informe se genera '+
-    'con plantillas, sin depender de ningún modelo. Para una redacción más fluida, '+
-    'cuando haya un modelo local disponible:</p></div>'+
-    '<div class="cita">python informe_ia.py</div>');
+    '<button data-ir="inicio|">Volver</button></div>'+
+    (t? markdown(t) : '<div class="vacio">Sin informe.</div>'));
 }
 function descargarInforme(){
   const b = new Blob([(D.informe||{}).texto||""],{type:"text/markdown;charset=utf-8"});
@@ -1791,52 +1173,53 @@ function descargarInforme(){
   a.href = u; a.download = "informe_vinculaciones.md"; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1000);
 }
-window.descargarInforme = descargarInforme;
 document.getElementById("btnInforme").onclick = ()=>ir({tipo:"informe"});
 
-/* ============================================================ pan y zoom ==== */
-const svg = document.getElementById("lienzo"), vista = document.getElementById("vista");
-let T = {x:0,y:0,k:1}, arr = null;
-function pintarVista(){ vista.setAttribute("transform","translate("+T.x+","+T.y+") scale("+T.k+")"); }
-svg.addEventListener("wheel",e=>{
-  e.preventDefault();
-  const r = svg.getBoundingClientRect();
-  const sx = (e.clientX-r.left)/r.width*ANCHO, sy = (e.clientY-r.top)/r.height*ALTO;
-  const f = e.deltaY<0 ? 1.14 : 1/1.14, k2 = Math.max(0.25,Math.min(6,T.k*f));
-  T.x = sx-(sx-T.x)*(k2/T.k); T.y = sy-(sy-T.y)*(k2/T.k); T.k = k2; pintarVista();
-},{passive:false});
-svg.addEventListener("pointerdown",e=>{
-  arr = {x:e.clientX,y:e.clientY,tx:T.x,ty:T.y,movido:false};
-  svg.classList.add("arrastrandoLienzo");
-});
-window.addEventListener("pointermove",e=>{
-  if(!arr) return;
-  const r = svg.getBoundingClientRect();
-  T.x = arr.tx+(e.clientX-arr.x)/r.width*ANCHO;
-  T.y = arr.ty+(e.clientY-arr.y)/r.height*ALTO;
-  if(Math.abs(e.clientX-arr.x)>3||Math.abs(e.clientY-arr.y)>3) arr.movido = true;
-  pintarVista();
-});
-window.addEventListener("pointerup",()=>{
-  // Un clic en el vacio no descarta el recorrido: antes reseteaba la vista y se
-  // perdia todo lo que el operador habia ido abriendo.
-  arr = null; svg.classList.remove("arrastrandoLienzo");
-});
+/* ============================================================ panel ======= */
+document.getElementById("plegDer").onclick = ()=>{
+  const p = document.getElementById("der");
+  p.classList.toggle("plegado");
+  document.getElementById("plegDer").textContent = p.classList.contains("plegado")?"‹":"›";
+};
+(function(){
+  const asa = document.getElementById("asa"), panel = document.getElementById("der");
+  let act = null;
+  asa.addEventListener("pointerdown",e=>{
+    act = {x:e.clientX, w:panel.getBoundingClientRect().width};
+    asa.setPointerCapture(e.pointerId); panel.style.transition="none";
+    document.body.style.userSelect="none"; });
+  asa.addEventListener("pointermove",e=>{
+    if(!act) return; panel.classList.remove("plegado");
+    panel.style.flexBasis = Math.max(280,Math.min(760,act.w+(act.x-e.clientX)))+"px"; });
+  asa.addEventListener("pointerup",e=>{
+    act=null; asa.releasePointerCapture(e.pointerId);
+    panel.style.transition=""; document.body.style.userSelect=""; });
+})();
 
-pintarPos();
-document.getElementById("reorganizar").textContent = "Vista: En secuencia";
-if(CASOS.length) cambiarCaso(CASOS[0].id); else ir({tipo:"inicio"});
-bucle();
+/* ============================================================ arranque ==== */
+const sel = document.getElementById("selCaso");
+CASOS.forEach(c=>{
+  const o = document.createElement("option");
+  o.value = c.id; o.textContent = c.etiqueta; sel.appendChild(o);
+});
+function cambiarCaso(id){
+  estado.caso = id; estado.raiz = null; estado.abiertos.clear();
+  VP.encuadrado = false;
+  HIST.pila = []; HIST.pos = -1;
+  sel.value = id;
+  ir({tipo:"inicio"});
+}
+sel.onchange = e=>cambiarCaso(e.target.value);
+window.addEventListener("resize", ()=>{ VP.encuadrado = false; dibujar(); });
+if(CASOS.length) cambiarCaso(CASOS[0].id); else ficha('<div class="vacio">Sin casos.</div>');
 </script></body></html>
 """
 
 
 def render(g, res, ruta, dossier=None, texto_informe=None):
     datos = _datos(g, res, dossier, texto_informe)
-    html = (PLANTILLA
-            .replace("__DATOS__", json.dumps(datos, ensure_ascii=False, default=str))
-            .replace("__ANCHO__", str(ANCHO))
-            .replace("__ALTO__", str(ALTO)))
+    html = PLANTILLA.replace("__DATOS__",
+                             json.dumps(datos, ensure_ascii=False, default=str))
     with open(ruta, "w", encoding="utf-8") as fh:
         fh.write(html)
     return ruta

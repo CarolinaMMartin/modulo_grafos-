@@ -24,8 +24,8 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Historial de navegación con volver y siguiente | **implementada** | `src/render_html.py` |
 | Vista "por qué se vinculan": cadena completa entre dos reportes | **implementada** | `render_html._camino`, `dispPorQue` |
 | Visor acotado al caso en curso, con selector de caso | **implementada** | `render_html._casos`, `conjuntoVisible` |
-| Disposición lineal por defecto y etiqueta de relación sobre cada arista | **implementada** | `dispSecuencia`, `etiquetaArista` |
-| Apertura en cascada: un clic, un paso, con indicador de cuánto falta | **implementada** | `abrir`, `vecinosAbribles`, capa de indicadores |
+| Lienzo en árbol: reporte en análisis, reportes vinculados y datos, con conectores en ángulo recto rotulados | **implementada** | `render_html`, función `dibujar` |
+| Apertura por reporte, con líneas de color hacia los otros reportes que comparten el dato | **implementada** | `render_html`, función `dibujar` |
 | Colapso visual de aristas paralelas, informando en cuántos reportes constan | **implementada** | `GRUPO` / `MIEMBROS` en `aplicar` |
 | Informe embebido en el visor, descargable | **implementada** | `src/redaccion.py` |
 | Contra-evidencia por desplazamiento implausible | **implementada** | `resolucion.detectar_contradicciones` |
@@ -48,7 +48,7 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Sin control de acceso | Cualquiera que corra el script ve todo | Permisos por rol, caso, jurisdicción y sensibilidad |
 | El informe del visor se redacta con plantillas | Texto correcto pero rígido | Un modelo local vía `informe_ia.py`, cuando esté disponible |
 | La unificación de identidades se aprueba por CLI | No hay botón en la interfaz | Un control en el visor, cuando exista la aplicación con sesión de usuario |
-| Visor propio en SVG | Suficiente para revisar la lógica, no para producción | Cytoscape.js, como indica la arquitectura preliminar |
+| Visor propio en SVG, con disposición en árbol calculada a mano | Alcanza y se lee bien para un caso; no contempla casos con decenas de reportes vinculados | Un algoritmo de dibujo por capas con ruteo de aristas, o una librería especializada |
 | Ventanas temporales de IP por prestador, estimadas | El supuesto viaja en la explicación de cada arista, pero no está verificado | Confirmar tiempos de lease con cada prestador |
 
 ## 3. Qué está ausente

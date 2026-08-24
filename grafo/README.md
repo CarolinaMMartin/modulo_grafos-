@@ -29,66 +29,71 @@ python generar_sinteticos.py
 
 Abrir `salida/grafo.html` en el navegador.
 
-**El visor es del caso en curso, no del archivo general.** Un caso es un reporte
-y todos aquellos con los que quedó vinculado. Al abrir se posiciona en el
-primero y dibuja únicamente sus relaciones; los otros casos se eligen en el
-selector de la barra superior. Mostrar a la vez las relaciones de todo el
-archivo vuelve ilegible lo único que le importa al operador.
+**La pregunta que responde es una sola: este reporte, ¿tiene vinculaciones que
+justifiquen reabrirlo?** Todo lo demás está subordinado a eso.
 
-La vista por defecto es **En secuencia**: se lee de izquierda a derecha como una
-frase.
+El lienzo es un árbol de arriba hacia abajo, no una nube de nodos:
 
 ```
-[reporte en curso] → [por dónde pasa] → [dato compartido] → [reporte vinculado]
+                    +---------------------+
+                    | Reporte en análisis |
+                    +----------+----------+
+        misma cuenta,          |          mismo
+        mismo dispositivo      |          dispositivo
+    +--------------+-----------+-----------+--------------+
+    v              v                       v
++--------+   +--------+              +--------+
+| Rep. 1 | + | Rep. 2 | +            | Rep. 3 | -
++--------+   +--------+              +---+----+
+                                         |
+              +----------+--------------+----------+
+              v          v              v          v
+          +-------+ +--------+   +-----------+ +----------+
+          |lechero| |IP 5556.|   |cuenta@esp | |Monte Gr. |
+          +-------+ +--------+   +-----------+ +----------+
 ```
 
-Cada línea lleva escrito qué relación representa —*opera con la cuenta*, *fue
-observada desde la IP*, *coincide con · 0,99*—, de modo que no haga falta
-interpretar la forma del dibujo para entender qué está vinculado con qué.
+- Arriba, el **reporte en análisis**.
+- Debajo, los reportes con los que se vincula. Sobre cada conector está escrito
+  **por qué**: *misma cuenta, mismo dispositivo · peso 0,99*.
+- El botón **+** de cada reporte abre sus datos en la fila siguiente. **−** los
+  cierra.
+- Cuando uno de esos datos aparece además en otro de los reportes, una línea de
+  color vuelve hacia arriba y lo conecta. Es lo que muestra, de un vistazo, qué
+  dato sostiene qué vinculación.
+- La caja de un dato compartido lleva escrito *en N reportes*.
 
-### El grafo se abre en cascada
+### El panel derecho
 
-No hay niveles de detalle. Se empieza con los reportes del caso y se va abriendo
-de a un paso, con coherencia:
+Acompaña siempre a lo que se toca en el lienzo:
 
-1. **Al abrir** se ven solo los reportes del caso y las líneas entre ellos, con
-   su peso. Cada reporte lleva un indicador ámbar `+N`: cuántas entidades cuelgan
-   de él sin mostrar.
-2. **Clic en un reporte** → aparecen sus datos: cuentas, teléfonos, IP,
-   dispositivos, nombres visibles, ubicaciones. La ficha los lista agrupados por
-   tipo, y junto a cada uno indica en cuántos *otros* reportes del caso aparece
-   ese mismo dato.
-3. **Clic en una de esas entidades** —por ejemplo el nombre visible `lechero`—
-   → el grafo se reacomoda tomándola como punto de partida, y la ficha dice en
-   qué reportes del caso aparece.
-4. Y así sucesivamente. El indicador `−` cierra lo que se abrió desde ahí.
+| Al hacer clic en... | El panel muestra |
+|---|---|
+| El fondo, o al abrir | Resumen del caso: cuántas vinculaciones tiene el reporte en análisis y con quién |
+| Un **conector** entre reportes | Por qué se vinculan: qué dato lo sostiene, la cadena completa desde cada reporte, el fundamento redactado y de dónde surge |
+| Un **reporte** | Resumen del reporte, con quién se vincula y por qué, y sus entidades agrupadas por tipo |
+| Un **dato** | En qué reportes del caso aparece y cómo se conecta |
 
-`Abrir todo` despliega el caso completo de una vez. `Contraer` vuelve al punto
-de partida.
+Desde la ficha de cualquier reporte, **Analizar este reporte** lo lleva a la
+cima del árbol y reconstruye la vista alrededor de él.
 
-Un clic en el vacío del lienzo **no** descarta el recorrido.
+### Otras acciones
+
+- **Volver / Siguiente** recorren el historial. También `Alt + izquierda` y
+  `Alt + derecha`.
+- **Encuadrar** ajusta el zoom al contenido. Rueda para acercar, arrastrar para
+  desplazar.
+- **Contraer** cierra todo lo abierto.
+- El selector de arriba cambia de caso. El visor nunca muestra dos a la vez.
 
 ### Lo que no se dibuja
 
 - **Las plataformas y los prestadores.** Todos los reportes de Grindr comparten
-  Grindr: no distingue nada. Se informan en la ficha del reporte, bajo *Origen*.
-  Se pueden mostrar desde los filtros, si hiciera falta.
-- **Entidades de otros casos.** El visor nunca sale del caso en curso.
-- **Aristas paralelas.** Cuando tres reportes afirman la misma relación entre
-  las mismas dos entidades, se dibuja una sola línea y la etiqueta aclara *en 3
-  reportes*. Las tres siguen existiendo en el grafo, cada una con su fuente:
-  son evidencia separada.
-
-### Otras acciones
-
-- **Clic en una línea entre dos reportes** abre *Por qué se vinculan*: el grafo
-  se reordena en una sola cadena horizontal y la ficha escribe el recorrido paso
-  a paso.
-- **‹ Volver / Siguiente ›** recorren el historial, como en un navegador.
-  También con `Alt + ←` y `Alt + →`.
-- **Reorganizar** rota entre *En secuencia*, *Orgánica* y *Por tipo de dato*.
-- Arrastrar una entidad la fija donde se la suelta; doble clic la libera.
-- El panel izquierdo (☰) trae la búsqueda y los filtros. Arranca plegado.
+  Grindr: no distingue nada. Se informan en la ficha del reporte.
+- **La mención de persona y el chat.** Son estructura interna del reporte, no
+  aquello por lo que un reporte se vincula con otro. Aparecen en la cadena
+  completa cuando se abre una vinculación.
+- **Entidades de otros casos.**
 
 ## Informe
 

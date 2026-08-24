@@ -254,43 +254,26 @@ informa.
 
 ## 8. Visualización
 
-### Fruchterman-Reingold (`spring_layout`)
+### Disposición en árbol
 
-Modelo físico donde los nodos se repelen como cargas eléctricas y las aristas
-los atraen como resortes. El sistema se relaja hasta un equilibrio.
+El lienzo **no** usa un grafo de fuerzas. Un layout físico acomoda los nodos
+donde el equilibrio los deja: produce dibujos distintos en cada corrida y sin
+jerarquía visible. Para lo que el operador necesita -ver si un reporte tiene
+vinculaciones y por qué- sirve un árbol de arriba hacia abajo, calculado de
+forma determinista:
 
-Se calcula en Python con semilla fija —así el resultado es reproducible— y sirve
-como **posición inicial**. La simulación del navegador la refina.
+- fila 0: el reporte en análisis, centrado;
+- fila 1: los reportes con los que se vincula, distribuidos;
+- fila 2: los datos de los reportes que el operador abrió.
 
-### Simulación de fuerzas propia, en JavaScript
+Los conectores son **ortogonales**: bajan del origen, corren horizontal y entran
+al destino por arriba. Es la convención de los diagramas de flujo y se lee sin
+esfuerzo. Cada conector lleva escrito el motivo de la vinculación y su peso.
 
-Implementada a mano, sin librerías: repulsión inversa al cuadrado de la
-distancia, resortes de Hooke sobre las aristas, gravedad hacia el centro y
-amortiguación de velocidad, con un factor `alpha` que decae hasta detener la
-simulación.
-
-Permite arrastrar una entidad y que el resto se reacomode en tiempo real. La
-entidad queda fijada donde se la suelta; doble clic la libera.
-
-### Disposición en secuencia
-
-Es la vista **por defecto**, y la que responde al criterio de que la lógica se
-pueda seguir de forma lineal. Ordena en columnas de izquierda a derecha:
-
-```
-[reporte en curso] → [por dónde pasa] → [dato compartido] → [reporte vinculado]
-```
-
-La columna de cada entidad surge de su distancia al reporte en curso, salvo los
-datos compartidos —los que aparecen en más de un reporte del caso—, que se
-agrupan en su propia columna antes de los reportes vinculados.
-
-### Heurística del baricentro
-
-Para ordenar los nodos dentro de cada columna se calcula el promedio de las
-posiciones de sus vecinos ya ubicados, y se ordena por ese valor. Es la
-heurística clásica del método de Sugiyama para dibujar grafos por capas: reduce
-los cruces de líneas sin resolver el problema exacto, que es NP-difícil.
+Cuando un dato aparece además en otro de los reportes de la fila, se traza una
+línea de color desde el dato hasta ese reporte, por un carril horizontal propio
+para que no se superpongan. Es lo que hace visible, de un vistazo, qué dato
+sostiene qué vinculación.
 
 ### Etiquetas de vínculo
 
@@ -366,7 +349,7 @@ integrada, y conviene no presentarlas como disponibles.
 | **PyTorch Geometric / DGL** | Entrenamiento de redes neuronales sobre grafos. | Falta lo que la hoja de ruta exige antes: ontología estable, identidades resueltas, criterios de evaluación y un conjunto de vínculos validados por especialistas. El baseline determinista contra el cual comparar ya existe; el modelo no. |
 | **pgvector** | Búsqueda semántica por embeddings. | Requiere la capa de extracción de texto e imagen, que no está. |
 | **PostgreSQL** | Registro oficial de casos, estados y validaciones. | Hoy el estado institucional se simula con un archivo lateral. Es la primera pieza a integrar cuando el módulo salga del banco de pruebas. |
-| **Cytoscape.js** | Visualización de grafos para producción. | El visor propio alcanza para revisar la lógica. Cytoscape corresponde cuando exista la aplicación. |
+| **Cytoscape.js** | Visualización de grafos para producción, con dibujo por capas y ruteo de aristas. | El árbol calculado a mano alcanza para un caso. Corresponde revisarlo si aparecen casos con decenas de reportes vinculados. |
 | **FFmpeg, Whisper, Qwen** | Procesamiento multimodal de audio y video. | Es la línea del analizador de video, todavía sin integrar con el grafo. |
 | **Docker** | Despliegue reproducible. | El módulo no tiene servicios que orquestar. Corresponde cuando haya API. |
 
