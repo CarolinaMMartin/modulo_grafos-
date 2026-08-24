@@ -29,6 +29,7 @@ python grafo/pruebas.py
 |---|---|
 | [`grafo/`](grafo/) | El módulo. Su [README](grafo/README.md) explica cómo se usa y su [ESTADO.md](grafo/ESTADO.md) dice honestamente qué está implementado y qué no. |
 | [`reportes_sinteticos/`](reportes_sinteticos/) | Dataset de trabajo: diez reportes con la estructura del JSON de NCMEC, cada uno construido para ejercitar una rama distinta de la lógica. |
+| [`TRASPASO.md`](TRASPASO.md) | **Empezar por acá.** Todo lo trabajado: decisiones y su fundamento, errores corregidos, preguntas abiertas y qué falta. |
 | [`TECNOLOGIAS.md`](TECNOLOGIAS.md) | Todo lo que corre acá: tecnologías, algoritmos y qué papel cumple cada uno. |
 | [`CLAUDE.md`](CLAUDE.md) | Contexto funcional e institucional del proyecto. |
 | `redactar_reporte.py` | Quita el texto libre y los datos de contacto de un reporte real, conservando los identificadores técnicos. |
