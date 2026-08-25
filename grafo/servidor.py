@@ -66,17 +66,25 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write("  %s\n" % (formato % args))
 
     # -- respuestas --------------------------------------------------------
-    def _responder(self, codigo, cuerpo, tipo="application/json; charset=utf-8"):
+    def _responder(self, codigo, cuerpo, tipo="application/json; charset=utf-8",
+                   solo_encabezados=False):
         datos = cuerpo if isinstance(cuerpo, bytes) else cuerpo.encode("utf-8")
-        self.send_response(codigo)
-        self.send_header("Content-Type", tipo)
-        self.send_header("Content-Length", str(len(datos)))
-        # El visor no pide nada afuera y nadie deberia poder embeberlo.
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(datos)
+        try:
+            self.send_response(codigo)
+            self.send_header("Content-Type", tipo)
+            self.send_header("Content-Length", str(len(datos)))
+            # El visor no pide nada afuera y nadie deberia poder embeberlo.
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            if not solo_encabezados:
+                self.wfile.write(datos)
+        except (ConnectionError, BrokenPipeError):
+            # El navegador corto la descarga -recargo, cerro la pestana-. Es
+            # normal y no es un error del sistema: quien mira esta consola es un
+            # operador, y un stack trace ahi parece que algo se rompio.
+            self.log_message("el navegador corto la conexion")
 
     def _json(self, codigo, obj):
         self._responder(codigo, json.dumps(obj, ensure_ascii=False))
@@ -84,20 +92,31 @@ class Handler(BaseHTTPRequestHandler):
     def _error(self, codigo, mensaje):
         self._json(codigo, dict(ok=False, error=mensaje))
 
-    # -- GET ---------------------------------------------------------------
+    # -- GET / HEAD --------------------------------------------------------
     def do_GET(self):
+        self._servir(solo_encabezados=False)
+
+    def do_HEAD(self):
+        # Los que comprueban si el servidor esta vivo mandan HEAD antes que GET.
+        # Sin esto contestaba 501 y parecia caido estando levantado.
+        self._servir(solo_encabezados=True)
+
+    def _servir(self, solo_encabezados):
         ruta = self.path.split("?")[0]
         if ruta in ("/", "/index.html", "/grafo.html"):
             archivo = os.path.join(SALIDA, "grafo.html")
             if not os.path.exists(archivo):
                 reconstruir()
             with open(archivo, "rb") as fh:
-                self._responder(200, fh.read(), "text/html; charset=utf-8")
+                self._responder(200, fh.read(), "text/html; charset=utf-8",
+                                solo_encabezados=solo_encabezados)
             return
         if ruta == "/api/estado":
-            self._json(200, dict(ok=True, app=True))
+            self._responder(200, json.dumps(dict(ok=True, app=True)),
+                            solo_encabezados=solo_encabezados)
             return
-        self._error(404, "no existe")
+        self._responder(404, json.dumps(dict(ok=False, error="no existe")),
+                        solo_encabezados=solo_encabezados)
 
     # -- POST --------------------------------------------------------------
     def do_POST(self):
