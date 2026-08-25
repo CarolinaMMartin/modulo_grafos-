@@ -1,0 +1,12 @@
+# Dependencias del modulo de grafos.
+#
+# Una sola, y a proposito: todo lo demas -el servidor, el visor, el informe, el
+# libro de validaciones- usa la biblioteca estandar de Python. Agregar una
+# dependencia pesada o infraestructura distribuida antes de justificarla con
+# requisitos medidos esta expresamente desaconsejado (CLAUDE.md 20.9).
+#
+#   pip install -r requisitos.txt
+#
+# Python 3.8 o superior.
+
+networkx>=2.6

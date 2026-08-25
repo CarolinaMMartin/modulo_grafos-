@@ -55,6 +55,7 @@ Cuantico/
   TECNOLOGIAS.md             inventario de tecnologías y algoritmos
   TRASPASO.md                este documento
   CLAUDE.md                  contexto del proyecto (preexistente)
+  requisitos.txt             la única dependencia: networkx
   redactar_reporte.py        quita texto libre y contactos de un reporte real
   reportes_sinteticos/       dataset de trabajo: 10 reportes + estado + README
   _privado/                  originales sin redactar (fuera del repositorio)
@@ -117,8 +118,11 @@ la cantidad de aristas y reagrupa los legajos. Las pruebas no dependen de ellos
 ## 3. Cómo correrlo
 
 ```bash
-pip install networkx
+pip install -r requisitos.txt
 ```
+
+Python 3.8 o superior. Una sola dependencia, `networkx`: todo lo demás —el
+servidor, el visor, el informe, los libros— usa la biblioteca estándar.
 
 ```bash
 python grafo/servidor.py

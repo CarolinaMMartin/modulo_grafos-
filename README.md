@@ -4,18 +4,31 @@ Grafo de conocimiento sobre reportes de NCMEC: detecta vinculaciones entre
 reportes, explica de dónde sale cada una y avisa cuándo un caso archivado
 recibió el dato que le faltaba.
 
-Corre entero en local, sin servicios de red. Única dependencia: `networkx`.
+Corre entero en local, sin servicios de red. Python 3.8 o superior y una sola
+dependencia: `networkx`.
 
 ```bash
-pip install networkx
-python grafo/construir.py
+pip install -r requisitos.txt
+python grafo/servidor.py
 ```
 
-Después, abrir `grafo/salida/grafo.html` en el navegador.
+Eso abre el visor en el navegador. **Es la forma de usarlo**: los botones que
+registran decisiones —vincular dos reportes, revertir una vinculación— solo
+funcionan acá, porque son los que escriben en el libro. El servidor escucha
+únicamente en esta computadora.
 
 El visor trabaja **sobre un caso por vez**. No es un explorador del archivo
 general: abre en el primer caso y solo muestra sus relaciones. Los demás se
 eligen en el selector de la barra superior.
+
+Para generar las salidas sin levantar nada:
+
+```bash
+python grafo/construir.py
+```
+
+Eso deja `grafo/salida/grafo.html`, que se abre con doble clic pero sirve solo
+para mirar: un archivo suelto no puede guardar nada.
 
 ```bash
 python grafo/pruebas.py
@@ -77,3 +90,32 @@ falta —procesamiento multimodal, búsqueda semántica, GNN, integración con S
 y KIWI, control de acceso— está enumerado en
 [`grafo/ESTADO.md`](grafo/ESTADO.md), junto con lo que está simplificado a
 propósito y por qué.
+
+## Para incorporarlo
+
+Quien vaya a integrarlo conviene que lea, en este orden,
+[`TRASPASO.md`](TRASPASO.md) —el razonamiento completo— y
+[`grafo/ESTADO.md`](grafo/ESTADO.md) —qué está implementado, qué simplificado y
+qué ausente—. Tres cosas que no se ven en el código:
+
+**Lo que hay que preservar al integrarlo.** `grafo/estado/` es lo único que no
+se recalcula: guarda las decisiones humanas —validaciones, unificaciones de
+identidad y vinculaciones manuales— en libros append-only encadenados por hash.
+El grafo es una proyección reconstruible y `grafo/salida/` se regenera entero en
+cada corrida; `grafo/estado/` no. Perderlo es perder el trabajo del operador.
+
+**Lo que hace falta reemplazar.** `grafo/servidor.py` es un servidor de piloto:
+escucha solo en `127.0.0.1`, no autentica a nadie y no aplica permisos. El campo
+*«quién lo dispone»* es atribución, no identidad verificada. En la Bóveda eso lo
+reemplaza la sesión institucional, y el estado lateral debería mudarse a la base
+transaccional.
+
+**Un apartamiento del documento rector.** El módulo declara un cuarto origen de
+relación, `afirmada`, que [`CLAUDE.md`](CLAUDE.md) §10.1 no contempla: es para
+las vinculaciones que dispone una persona. Está fundado en `TRASPASO.md` §4.13 y
+pendiente de validar con los especialistas (§9.5). No presentarlo como ontología
+aprobada.
+
+Las salidas estructuradas —`grafo.json` con la procedencia de cada arista,
+`analisis.json` con el resultado de cada módulo, `grafo.graphml` para Gephi o
+Cytoscape— están descriptas en [`grafo/README.md`](grafo/README.md).
