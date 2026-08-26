@@ -2,7 +2,7 @@
 
 ## 1. Propósito de este documento
 
-Este archivo reúne el contexto funcional, institucional y técnico trabajado hasta el momento para que Claude Code pueda incorporarse al proyecto sin reconstruirlo desde cero.
+Este archivo reúne el contexto funcional, institucional y técnico trabajado hasta el momento para que pueda incorporarse al proyecto sin reconstruirlo desde cero.
 
 No debe interpretarse como una especificación técnica cerrada. El proyecto todavía se encuentra en una etapa de relevamiento, diseño y validación. Existen capacidades que forman parte de la visión de producto o de una narrativa comercial, pero cuya implementación real todavía debe comprobarse. En todo momento debe distinguirse entre:
 
