@@ -19,7 +19,7 @@ dispositivo no resuelve un archivo por falta de datos de ubicacion, y un vinculo
 por telefono no resuelve un archivo por ausencia de archivos.
 
 El archivo describe insuficiencia actual de evidencia, no falsedad del hecho
-(CLAUDE.md 3 y 14.14). El archivado nunca se trata como caso negativo.
+(contexto.md 3 y 14.14). El archivado nunca se trata como caso negativo.
 """
 
 from collections import defaultdict

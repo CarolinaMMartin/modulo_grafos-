@@ -8,7 +8,7 @@ vinculo. Nada de lo que produce este extractor es una inferencia.
 
 El texto libre sensible (transcripciones de chat, bios de perfil) NO se guarda
 en el grafo. Queda en un almacen aparte, referenciado por hash, para respetar
-minimizacion y exportacion controlada (CLAUDE.md 14.9 y 14.10).
+minimizacion y exportacion controlada (contexto.md 14.9 y 14.10).
 """
 
 import json
@@ -197,7 +197,7 @@ class ExtractorNCMEC(object):
 
     def _persona(self, p, base, rol, n_rep, sid, report_id, idx):
         # El nodo de mencion es local al reporte: no se fusionan personas
-        # entre reportes por cuenta propia (CLAUDE.md 11.2).
+        # entre reportes por cuenta propia (contexto.md 11.2).
         mencion_id = "%s/%s" % (report_id, p.get("id") or "%s%d" % (rol, idx))
         n_per = self.g.nodo(
             "PERSONA_MENCION", mencion_id,

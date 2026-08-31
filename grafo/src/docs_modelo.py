@@ -17,7 +17,7 @@ def generar(ruta, resumen=None):
     a("# Modelo de datos del grafo — Bóveda CIJ\n")
     a("Versión de ontología: **`%s`**\n" % ont.ONTOLOGIA_VERSION)
     a("Ontología preliminar. Debe validarse con los equipos jurídicos e "
-      "institucionales antes de considerarse estable (CLAUDE.md 10.2).\n")
+      "institucionales antes de considerarse estable (contexto.md 10.2).\n")
 
     a("## 1. Clases de relación\n")
     a("Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.\n")

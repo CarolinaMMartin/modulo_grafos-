@@ -5,7 +5,7 @@
 
 Versión de ontología: **`0.3.0`**
 
-Ontología preliminar. Debe validarse con los equipos jurídicos e institucionales antes de considerarse estable (CLAUDE.md 10.2).
+Ontología preliminar. Debe validarse con los equipos jurídicos e institucionales antes de considerarse estable (contexto.md 10.2).
 
 ## 1. Clases de relación
 

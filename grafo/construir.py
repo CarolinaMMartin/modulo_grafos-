@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Orquestador del corte vertical de grafos (CLAUDE.md 21).
+Orquestador del corte vertical de grafos (contexto.md 21).
 
   1. ingesta de reportes con preservacion y hash de la fuente
   2. extraccion de entidades y relaciones OBSERVADAS con locator

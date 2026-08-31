@@ -431,7 +431,7 @@ def proponer_identidades(g):
     """POSIBLE_MISMA_IDENTIDAD entre menciones de persona de reportes distintos.
 
     No se fusionan nodos. Se propone la hipotesis con su explicacion para que
-    una persona la confirme o la rechace (CLAUDE.md 11.2).
+    una persona la confirme o la rechace (contexto.md 11.2).
     """
     propuestas = []
     por_cuenta = defaultdict(set)

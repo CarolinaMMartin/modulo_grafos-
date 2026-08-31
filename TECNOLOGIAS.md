@@ -94,7 +94,7 @@ reemplazo local, siempre que el nuevo esquema también sea determinista. Lo que
 **no** puede cambiarse sin costo es esa propiedad: un identificador aleatorio o
 asignado por un servicio rompería la re-aplicación de las decisiones humanas.
 
-Está anotado también en las preguntas abiertas de `CLAUDE.md` §19.
+Está anotado también en las preguntas abiertas de `contexto.md` §19.
 
 ### Modelo de procedencia
 

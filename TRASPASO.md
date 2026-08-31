@@ -33,7 +33,7 @@ La carpeta tenía tres cosas:
 - `Prometea Cuántica- CIJ.pdf` — hoja de ruta del proyecto: relevamiento del
   proceso actual del CIJ y las tres etapas propuestas.
 - `reporte anonimizado.txt` — un reporte real de NCMEC en JSON.
-- `CLAUDE.md` — contexto integral del proyecto, escrito antes de esta sesión.
+- `contexto.md` — contexto integral del proyecto, escrito antes de esta sesión.
   **Es el documento rector.** Define la ontología preliminar, la separación
   observada/derivada/inferida, los principios no negociables y las preguntas
   que no deben resolverse por suposición.
@@ -41,7 +41,7 @@ La carpeta tenía tres cosas:
 El pedido inicial fue: *"analizá el contenido de la carpeta, quiero avanzar con
 los grafos"*.
 
-Lo que se construyó es el **corte vertical** que `CLAUDE.md` §21 recomienda como
+Lo que se construyó es el **corte vertical** que `contexto.md` §21 recomienda como
 primer objetivo: ingreso de reportes, extracción con procedencia, vínculo con un
 caso archivado, hipótesis separada, visualización, validación humana e informe.
 
@@ -55,7 +55,7 @@ Cuantico/
   TECNOLOGIAS.md             qué tecnología se usa y por qué esa
   DOCUMENTACION_TECNICA.md   pesos, umbrales y parámetros — generado, no editar
   TRASPASO.md                este documento
-  CLAUDE.md                  contexto del proyecto (preexistente)
+  contexto.md                  contexto del proyecto (preexistente)
   requisitos.txt             la única dependencia: networkx
   redactar_reporte.py        quita texto libre y contactos de un reporte real
   reportes_sinteticos/       dataset de trabajo: 10 reportes + estado + README
@@ -338,7 +338,7 @@ El caso es real y frecuente: dos reportes se archivaron por insuficiencia y el
 operador, con el expediente delante, concluye que tienen que ver. Eso el sistema
 no lo puede deducir; lo que sí tiene que hacer es conservarlo.
 
-Esa vinculación **no es ninguna de las tres categorías** de `CLAUDE.md` §10.1: no
+Esa vinculación **no es ninguna de las tres categorías** de `contexto.md` §10.1: no
 consta en la fuente, no sale de una regla, y no es una hipótesis del sistema
 esperando validación —ya es la decisión—. Meterla en cualquiera de las tres sería
 mezclar justamente lo que el proyecto pide no mezclar.
@@ -689,7 +689,7 @@ Surgieron de la conversación y conviene respetarlos.
 - **Procesamiento multimodal** (imagen, audio, video, OCR, transcripción).
 - **Embeddings y búsqueda semántica.**
 - **GNN.** Existe el baseline determinista (Adamic-Adar) contra el cual
-  compararla; el modelo no. `CLAUDE.md` §11.5 enumera lo que hace falta antes.
+  compararla; el modelo no. `contexto.md` §11.5 enumera lo que hace falta antes.
 
 ---
 
@@ -724,7 +724,7 @@ validación institucional si se retoma la Etapa 2.
 
 ### 9.5 El cuarto origen
 
-`afirmada` no está en `CLAUDE.md` §10.1, que enumera tres. Se agregó porque una
+`afirmada` no está en `contexto.md` §10.1, que enumera tres. Se agregó porque una
 vinculación que dispone una persona no entra en ninguna de las tres sin
 desdibujarlas (§4.13). Hay que validar con los especialistas si la categoría es
 correcta, cómo se llama, y qué efecto tiene sobre una actuación: en particular,
@@ -839,7 +839,7 @@ repositorio.
 - `.gitignore` excluye `_privado/`, `reporte anonimizado.txt`, `*.pdf` y
   `grafo/salida/`. **No revertir.**
 - El evidencia sensible no debe enviarse a servicios externos sin autorización
-  institucional expresa (`CLAUDE.md` §14.1).
+  institucional expresa (`contexto.md` §14.1).
 
 ---
 
@@ -859,7 +859,7 @@ El working copy es la carpeta entera del proyecto, no una subcarpeta.
 | `155a10c` | Apertura en cascada; se dejan de dibujar plataformas y aristas paralelas |
 | `040316d` | El lienzo pasa a ser un árbol |
 
-### Advertencia sobre `CLAUDE.md`
+### Advertencia sobre `contexto.md`
 
 Está versionado. Es útil para cualquiera que trabaje el código, pero contiene
 observaciones francas sobre el estado real de Prometea Cuántica —la biometría

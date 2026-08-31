@@ -6,7 +6,7 @@ Decisiones de diseno:
 
 1. MultiDiGraph. Dos nodos pueden estar relacionados por varias vias distintas
    (una comunicacion, un lugar, un archivo, una coincidencia temporal), cada
-   una con su propia fuente y fuerza (CLAUDE.md 10.4).
+   una con su propia fuente y fuerza (contexto.md 10.4).
 
 2. Toda arista lleva el bloque de procedencia completo. Si falta la fuente o
    el locator, la arista no se crea: se registra un incumplimiento. Es
@@ -18,7 +18,7 @@ Decisiones de diseno:
    registradas antes siguen aplicando.
 
 4. El grafo es una proyeccion analitica reconstruible, no el registro oficial
-   (CLAUDE.md 12.2). Nada de lo que vive aca es la fuente de verdad.
+   (contexto.md 12.2). Nada de lo que vive aca es la fuente de verdad.
 """
 
 import hashlib

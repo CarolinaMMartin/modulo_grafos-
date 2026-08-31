@@ -62,7 +62,7 @@ Dos consecuencias que conviene tener presentes:
 - Una **observada** no lleva peso porque no hay nada que ponderar: consta textualmente en un campo de la fuente. Nace validada, pero puede impugnarse.
 - Una **afirmada** tampoco lleva peso, y por el motivo contrario: no hay cálculo alguno detrás. La dispuso una persona. Ponerle un número sería inventar una precisión que nadie calculó.
 
-> La clase `afirmada` **no está en el documento rector** (`CLAUDE.md` §10.1, que enumera tres). Se agregó porque una vinculación que dispone una persona no entra en ninguna de las tres sin desdibujarlas. Está fundada en `TRASPASO.md` §4.13 y **pendiente de validar con los especialistas**. No presentarla como ontología aprobada.
+> La clase `afirmada` **no está en el documento rector** (`contexto.md` §10.1, que enumera tres). Se agregó porque una vinculación que dispone una persona no entra en ninguna de las tres sin desdibujarlas. Está fundada en `TRASPASO.md` §4.13 y **pendiente de validar con los especialistas**. No presentarla como ontología aprobada.
 
 ### Estados de validación
 

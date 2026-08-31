@@ -1,7 +1,7 @@
 # Módulo de grafos — Bóveda CIJ
 
 Corte vertical funcional del grafo de conocimiento, ejecutable de punta a punta
-sin infraestructura. Implementa el primer objetivo recomendado en `CLAUDE.md`
+sin infraestructura. Implementa el primer objetivo recomendado en `contexto.md`
 §21: ingreso de reportes → extracción con procedencia → vínculo con un caso
 archivado → hipótesis separada → visualización → validación humana → informe.
 

@@ -2,7 +2,7 @@
 """
 Ontologia controlada del grafo - Boveda CIJ.
 
-Fuente: CLAUDE.md secciones 10.1 a 10.4 y 11.1.
+Fuente: contexto.md secciones 10.1 a 10.4 y 11.1.
 Este modulo no infiere culpabilidad ni fusiona identidades: solo define el
 vocabulario, los origenes epistemologicos y los pesos de reglas deterministas.
 
@@ -14,12 +14,12 @@ producida, para que el grafo sea reconstruible y comparable entre corridas.
 ONTOLOGIA_VERSION = "0.3.0"
 
 # ---------------------------------------------------------------------------
-# 1. SEPARACION EPISTEMOLOGICA (CLAUDE.md 10.1) - nunca se mezclan
+# 1. SEPARACION EPISTEMOLOGICA (contexto.md 10.1) - nunca se mezclan
 # ---------------------------------------------------------------------------
 OBSERVADA = "observada"   # surge directamente de un campo de la fuente
 DERIVADA = "derivada"     # regla determinista reproducible sobre datos observados
 INFERIDA = "inferida"     # similitud / modelo / LLM / GNN -> hipotesis
-# Cuarta categoria, que no produce el sistema sino una persona. CLAUDE.md 10.1
+# Cuarta categoria, que no produce el sistema sino una persona. contexto.md 10.1
 # enumera tres porque describe lo que el sistema deriva de la evidencia; una
 # vinculacion que un operador establece por su propio criterio no es ninguna de
 # esas tres, y meterla dentro de cualquiera de ellas seria mezclar lo que el
@@ -50,11 +50,11 @@ ESTADO_INICIAL = {
 }
 
 # ---------------------------------------------------------------------------
-# 2. TIPOS DE NODO (CLAUDE.md 10.2)
+# 2. TIPOS DE NODO (contexto.md 10.2)
 # ---------------------------------------------------------------------------
 # Los colores son de identificacion, no de valoracion. Ningun tipo de
 # entidad se pinta de rojo: el rojo queda reservado para la contra-evidencia
-# (CLAUDE.md 13: el color no debe leerse como equivalente de culpabilidad).
+# (contexto.md 13: el color no debe leerse como equivalente de culpabilidad).
 # identificador : el valor es un dato objetivo apto para sostener un vinculo
 #                 entre reportes (regla 3.5 del relevamiento).
 # fusionable    : dos menciones del mismo valor son el mismo objeto (una IP es
@@ -98,7 +98,7 @@ TIPOS_NODO = {
 }
 
 # ---------------------------------------------------------------------------
-# 3. VOCABULARIO DE RELACIONES (CLAUDE.md 10.3)
+# 3. VOCABULARIO DE RELACIONES (contexto.md 10.3)
 # ---------------------------------------------------------------------------
 # Se evitan aristas genericas cuando existe una relacion especifica.
 RELACIONES = {
@@ -149,7 +149,7 @@ RELACIONES = {
 }
 
 # ---------------------------------------------------------------------------
-# 4. REGLAS DETERMINISTAS DE VINCULACION (CLAUDE.md 11.1)
+# 4. REGLAS DETERMINISTAS DE VINCULACION (contexto.md 11.1)
 # ---------------------------------------------------------------------------
 # peso_base           : confianza maxima que aporta la coincidencia.
 # corrobora_solamente : True -> nunca sostiene sola un vinculo; solo refuerza

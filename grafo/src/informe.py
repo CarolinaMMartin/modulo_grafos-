@@ -2,7 +2,7 @@
 """
 Informe en Markdown de una corrida del grafo.
 
-Criterio rector (CLAUDE.md 22): cada hallazgo debe poder responder que conecta,
+Criterio rector (contexto.md 22): cada hallazgo debe poder responder que conecta,
 de donde surge, cuando ocurrio, que metodo lo produjo, con que confianza, quien
 lo reviso y que evidencia permite comprobarlo. El informe no repite contenido
 sensible: enlaza al locator dentro de la fuente.

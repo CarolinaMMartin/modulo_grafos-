@@ -45,7 +45,7 @@ python grafo/pruebas.py
 | [`TRASPASO.md`](TRASPASO.md) | **Empezar por acá.** Todo lo trabajado: decisiones y su fundamento, errores corregidos, preguntas abiertas y qué falta. |
 | [`DOCUMENTACION_TECNICA.md`](DOCUMENTACION_TECNICA.md) | **Referencia técnica completa**: cada peso, umbral y parámetro, con un ejemplo de cálculo. Se genera solo en cada corrida leyendo los valores del código, así que no puede desactualizarse. |
 | [`TECNOLOGIAS.md`](TECNOLOGIAS.md) | Qué tecnología se usa para cada cosa y por qué esa y no otra. |
-| [`CLAUDE.md`](CLAUDE.md) | Contexto funcional e institucional del proyecto. |
+| [`contexto.md`](contexto.md) | Contexto funcional e institucional del proyecto. |
 | `redactar_reporte.py` | Quita el texto libre y los datos de contacto de un reporte real, conservando los identificadores técnicos. |
 
 ## Qué hace el sistema
@@ -112,7 +112,7 @@ reemplaza la sesión institucional, y el estado lateral debería mudarse a la ba
 transaccional.
 
 **Un apartamiento del documento rector.** El módulo declara un cuarto origen de
-relación, `afirmada`, que [`CLAUDE.md`](CLAUDE.md) §10.1 no contempla: es para
+relación, `afirmada`, que [`contexto.md`](contexto.md) §10.1 no contempla: es para
 las vinculaciones que dispone una persona. Está fundado en `TRASPASO.md` §4.13 y
 pendiente de validar con los especialistas (§9.5). No presentarlo como ontología
 aprobada.

@@ -1,6 +1,6 @@
 # Estado del módulo de grafos
 
-Clasificación de cada capacidad, según pide `CLAUDE.md` §20.7.
+Clasificación de cada capacidad, según pide `contexto.md` §20.7.
 
 
 ## 1. Qué existe hoy
@@ -65,7 +65,7 @@ Clasificación de cada capacidad, según pide `CLAUDE.md` §20.7.
 
 ### Apartamiento del documento rector
 
-`CLAUDE.md` §10.1 enumera **tres** clases de relación. El módulo declara una
+`contexto.md` §10.1 enumera **tres** clases de relación. El módulo declara una
 cuarta, `afirmada`, para las vinculaciones que dispone una persona: no constan
 en la fuente, no salen de una regla y no son hipótesis del sistema a la espera
 de validación. Está documentado en `TRASPASO.md` §4.13 y **pendiente de validar

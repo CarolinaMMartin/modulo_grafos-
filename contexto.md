@@ -821,7 +821,7 @@ Antes de modificar el proyecto:
 
 Documentación recomendada dentro del repositorio:
 
-- `CLAUDE.md`: este contexto e instrucciones;
+- `contexto.md`: este contexto e instrucciones;
 - `PRODUCTO.md`: alcance funcional y roles;
 - `ARQUITECTURA.md`: componentes, límites y flujos;
 - `MODELO_DATOS.md`: esquema transaccional y ontología del grafo;

@@ -172,7 +172,7 @@ def _ontologia(a):
              u"número sería inventar una precisión que nadie calculó.")
     a.append(u"")
     a.append(u"> La clase `afirmada` **no está en el documento rector** "
-             u"(`CLAUDE.md` §10.1, que enumera tres). Se agregó porque una "
+             u"(`contexto.md` §10.1, que enumera tres). Se agregó porque una "
              u"vinculación que dispone una persona no entra en ninguna de las "
              u"tres sin desdibujarlas. Está fundada en `TRASPASO.md` §4.13 y "
              u"**pendiente de validar con los especialistas**. No presentarla "
