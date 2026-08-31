@@ -20,7 +20,9 @@ SRC = os.path.join(BASE, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
+import alertas as mod_alertas          # noqa: E402
 import construir                        # noqa: E402
+import docs_tecnicos                    # noqa: E402
 import dossier as mod_dossier          # noqa: E402
 import normalizacion as nz              # noqa: E402
 import redaccion                        # noqa: E402
@@ -386,6 +388,64 @@ def main():
               render_html.PLANTILLA.count("botonVincular(") == 4)
         check("la tarjeta de descartada trae el boton adentro",
               "botonVincular(x.a, x.b)" in render_html.PLANTILLA)
+
+        # ------------------------------------------------------------------
+        print(chr(10)+"== Los pesos hacen lo que la documentacion dice ==")
+        corr = [r for r, m in ont.REGLAS.items() if m["corrobora_solamente"]]
+        sost = [r for r, m in ont.REGLAS.items() if not m["corrobora_solamente"]]
+        check("hay reglas que sostienen y reglas que solo refuerzan",
+              corr and sost)
+        # Aunque dispararan TODAS las corroborantes a la vez, no alcanzan el
+        # umbral. Es la garantia numerica de que una relacion no puede nacer de
+        # pura semejanza contextual.
+        prod = 1.0
+        for r in corr:
+            prod *= (1.0 - ont.REGLAS[r]["peso_base"])
+        check("todas las corroborantes juntas no llegan al umbral de propuesta",
+              (1.0 - prod) < ont.UMBRAL_PROPONER,
+              "%.4f vs %.2f" % (1.0 - prod, ont.UMBRAL_PROPONER))
+        # Y ademas la combinacion ni siquiera acumula si ninguna sostiene.
+        solo_corr = [dict(corrobora_solamente=True,
+                          peso_efectivo=ont.REGLAS[r]["peso_base"]) for r in corr]
+        conf, sostenido = resolucion.combinar(solo_corr)
+        check("sin una regla que sostenga, la combinacion no acumula",
+              conf == 0.0 and not sostenido, str((conf, sostenido)))
+        check("ninguna regla que sostiene llega a la confianza maxima",
+              all(ont.REGLAS[r]["peso_base"] < ont.CONFIANZA_MAXIMA for r in sost))
+        check("el umbral de agrupamiento no es menor que el de propuesta",
+              ont.UMBRAL_CLUSTER >= ont.UMBRAL_PROPONER)
+        check("la rareza no depende del tamano del corpus",
+              resolucion.discriminancia(4, 10)
+              == resolucion.discriminancia(4, 100000) == 1.0)
+        check("un identificador muy repetido conserva algo de peso, nunca cero",
+              0.15 <= resolucion.discriminancia(100000) < 1.0)
+        check("toda regla apunta a un tipo de nodo que existe",
+              all(m["tipo_nodo"] in ont.TIPOS_NODO for m in ont.REGLAS.values()))
+
+        print(chr(10)+"== La documentacion tecnica no puede mentir ==")
+        doc = os.path.join(tmp, "DOC.md")
+        docs_tecnicos.generar(doc, g, res)
+        with open(doc, "r", encoding="utf-8") as fh:
+            texto_doc = fh.read()
+        check("el documento se genera",
+              len(texto_doc) > 5000, "%d caracteres" % len(texto_doc))
+        faltan = [r for r in ont.REGLAS
+                  if ("`%s`" % r) not in texto_doc
+                  or ont.numero(ont.REGLAS[r]["peso_base"]) not in texto_doc]
+        check("documenta las %d reglas con su peso vigente" % len(ont.REGLAS),
+              not faltan, str(faltan))
+        umbrales = [ont.UMBRAL_PROPONER, ont.UMBRAL_CLUSTER, ont.UMBRAL_ALTA,
+                    ont.CONFIANZA_MAXIMA, ont.FACTOR_NAT_CON_PUERTO,
+                    ont.FACTOR_NAT_SIN_PUERTO]
+        check("documenta los umbrales y factores vigentes",
+              all(ont.numero(u) in texto_doc for u in umbrales))
+        check("documenta cada motivo de archivo y qué lo reactiva",
+              all(m in texto_doc for m in mod_alertas.DISPARADORES
+                  if m != "_default"))
+        check("advierte que los pesos no estan calibrados",
+              "no están calibrados" in texto_doc)
+        check("advierte que las ventanas de IP son estimadas",
+              "estimados y no están verificados" in texto_doc)
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

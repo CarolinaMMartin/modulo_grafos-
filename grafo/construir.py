@@ -34,6 +34,7 @@ if SRC not in sys.path:
 import alertas as mod_alertas          # noqa: E402
 import analisis                        # noqa: E402
 import docs_modelo                     # noqa: E402
+import docs_tecnicos                   # noqa: E402
 import dossier as mod_dossier          # noqa: E402
 import redaccion                       # noqa: E402
 import extractor_ncmec                 # noqa: E402
@@ -160,6 +161,8 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
             fh.write(texto)
 
     docs_modelo.generar(os.path.join(BASE, "MODELO_DATOS.md"), g.resumen())
+    docs_tecnicos.generar(os.path.join(os.path.dirname(BASE),
+                                       "DOCUMENTACION_TECNICA.md"), g, resultado)
     render_html.render(g, resultado, os.path.join(dir_salida, "grafo.html"),
                        dossier=dossier, texto_informe=texto_informe,
                        informes_por_caso=informes_por_caso)

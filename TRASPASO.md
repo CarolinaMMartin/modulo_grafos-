@@ -52,7 +52,8 @@ caso archivado, hipótesis separada, visualización, validación humana e inform
 ```
 Cuantico/
   README.md                  presentación del repositorio
-  TECNOLOGIAS.md             inventario de tecnologías y algoritmos
+  TECNOLOGIAS.md             qué tecnología se usa y por qué esa
+  DOCUMENTACION_TECNICA.md   pesos, umbrales y parámetros — generado, no editar
   TRASPASO.md                este documento
   CLAUDE.md                  contexto del proyecto (preexistente)
   requisitos.txt             la única dependencia: networkx
@@ -64,7 +65,7 @@ Cuantico/
     servidor.py              la aplicación: es lo que permite decidir en pantalla
     validar.py               CLI de validación humana (equivalente, para técnicos)
     informe_ia.py            informe vía modelo local (opcional)
-    pruebas.py               89 invariantes
+    pruebas.py               103 invariantes
     generar_sinteticos.py    generador del dataset
     README.md                cómo se usa
     ESTADO.md                qué está implementado, simplificado o ausente
@@ -84,6 +85,7 @@ Cuantico/
       render_html.py         visor autocontenido
       informe.py             informe técnico en Markdown
       docs_modelo.py         genera MODELO_DATOS.md
+      docs_tecnicos.py       genera DOCUMENTACION_TECNICA.md
       jurisdiccion.py        SIN CONECTAR — ver sección 8
     estado/validaciones.jsonl        decisiones sobre relaciones existentes
     estado/vinculos_manuales.jsonl   vinculaciones que dispuso una persona
@@ -145,7 +147,7 @@ botón de decisión, el visor lo dice en lugar de fingir que anduvo.
 python grafo/pruebas.py
 ```
 
-89 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
+103 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
 de diseño, no de presentación.
 
 ### Validación humana

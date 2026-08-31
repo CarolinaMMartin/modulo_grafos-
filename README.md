@@ -34,7 +34,7 @@ para mirar: un archivo suelto no puede guardar nada.
 python grafo/pruebas.py
 ```
 
-89 invariantes sobre las reglas que el proyecto declara no negociables.
+103 invariantes sobre las reglas que el proyecto declara no negociables.
 
 ## Qué hay acá
 
@@ -43,7 +43,8 @@ python grafo/pruebas.py
 | [`grafo/`](grafo/) | El módulo. Su [README](grafo/README.md) explica cómo se usa y su [ESTADO.md](grafo/ESTADO.md) dice honestamente qué está implementado y qué no. |
 | [`reportes_sinteticos/`](reportes_sinteticos/) | Dataset de trabajo: diez reportes con la estructura del JSON de NCMEC, cada uno construido para ejercitar una rama distinta de la lógica. |
 | [`TRASPASO.md`](TRASPASO.md) | **Empezar por acá.** Todo lo trabajado: decisiones y su fundamento, errores corregidos, preguntas abiertas y qué falta. |
-| [`TECNOLOGIAS.md`](TECNOLOGIAS.md) | Todo lo que corre acá: tecnologías, algoritmos y qué papel cumple cada uno. |
+| [`DOCUMENTACION_TECNICA.md`](DOCUMENTACION_TECNICA.md) | **Referencia técnica completa**: cada peso, umbral y parámetro, con un ejemplo de cálculo. Se genera solo en cada corrida leyendo los valores del código, así que no puede desactualizarse. |
+| [`TECNOLOGIAS.md`](TECNOLOGIAS.md) | Qué tecnología se usa para cada cosa y por qué esa y no otra. |
 | [`CLAUDE.md`](CLAUDE.md) | Contexto funcional e institucional del proyecto. |
 | `redactar_reporte.py` | Quita el texto libre y los datos de contacto de un reporte real, conservando los identificadores técnicos. |
 

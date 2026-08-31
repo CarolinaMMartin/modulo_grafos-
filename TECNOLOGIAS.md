@@ -8,6 +8,12 @@ pero **todavía no se usa**, con el motivo.
 
 ---
 
+> Este documento explica **qué tecnología se usa para cada cosa y por qué
+> esa y no otra**. Los valores concretos —cada peso, cada umbral, cada
+> parámetro de cada algoritmo— están en
+> [`DOCUMENTACION_TECNICA.md`](DOCUMENTACION_TECNICA.md), que se genera
+> desde el código en cada corrida y por eso no puede desactualizarse.
+
 ## 1. Base de ejecución
 
 ### Python 3.11

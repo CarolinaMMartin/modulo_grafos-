@@ -39,6 +39,15 @@ MAX_REPORTES_POR_IDENTIFICADOR = ont.DF_HUB_SIN_PARES
 
 # Velocidad implausible entre dos observaciones geolocalizadas (km/h).
 VELOCIDAD_IMPOSIBLE_KMH = 900.0
+# Por debajo de esta distancia no se evalua desplazamiento: la geolocalizacion
+# por IP no tiene esa precision y solo produciria ruido.
+DISTANCIA_MINIMA_KM = 50.0
+# La contradiccion es un indicio de inconsistencia, no una refutacion: puede ser
+# una VPN, una cuenta compartida o una geolocalizacion errada.
+CONFIANZA_CONTRADICCION = 0.7
+# Dos menciones de persona que comparten cuenta PODRIAN ser la misma. Nunca se
+# fusionan solas: es una hipotesis a la espera de una decision humana.
+CONFIANZA_MISMA_IDENTIDAD = 0.85
 
 TIPOS_INDEXABLES = sorted({r["tipo_nodo"] for r in ont.REGLAS.values()})
 
@@ -449,7 +458,7 @@ def proponer_identidades(g):
                      u"Por eso el sistema no unifica las menciones. Deja planteada "
                      u"la hipótesis para que un operador la confirme o la descarte."
                      % g.G.nodes[n_cta]["valor"]),
-                    METODO, VERSION, confianza=0.85,
+                    METODO, VERSION, confianza=CONFIANZA_MISMA_IDENTIDAD,
                     atributos=dict(senal="cuenta_compartida", fusion_automatica=False))
                 propuestas.append(dict(arista_id=aid, a=a, b=b,
                                        cuenta=g.G.nodes[n_cta]["valor"]))
@@ -503,7 +512,7 @@ def detectar_contradicciones(g):
             lat2, lon2, u2 = coords[ip2]
             km = _haversine(lat1, lon1, lat2, lon2)
             horas = nz.horas_entre(t1, t2) or 0.0
-            if horas <= 0 or km < 50:
+            if horas <= 0 or km < DISTANCIA_MINIMA_KM:
                 continue
             kmh = km / horas
             if kmh <= VELOCIDAD_IMPOSIBLE_KMH:
@@ -524,7 +533,7 @@ def detectar_contradicciones(g):
                  u"hipótesis."
                  % (g.G.nodes[n_ancla].get("etiqueta"), u1, ont.numero(horas, 1),
                     u2, ont.numero(km, 0), ont.numero(kmh, 0))),
-                METODO, VERSION, confianza=0.7,
+                METODO, VERSION, confianza=CONFIANZA_CONTRADICCION,
                 atributos=dict(km=round(km, 1), horas=round(horas, 2),
                                kmh=round(kmh, 1), ancla=n_ancla))
             hallazgos.append(dict(arista_id=aid, ancla=n_ancla, km=round(km, 1),
