@@ -1,7 +1,7 @@
 # Estado del módulo de grafos
 
-Clasificación honesta de cada capacidad, según pide `CLAUDE.md` §20.7.
-Nada de lo listado como **ausente** debe presentarse como disponible.
+Clasificación de cada capacidad, según pide `CLAUDE.md` §20.7.
+
 
 ## 1. Qué existe hoy
 
@@ -47,15 +47,15 @@ Nada de lo listado como **ausente** debe presentarse como disponible.
 | Informe con trazabilidad a la fuente | **implementada** | `src/informe.py` |
 | Pruebas de invariantes | **implementada** | `pruebas.py` |
 
-## 2. Qué está simplificado a propósito
+## 2. Simplificado para Piloto
 
 | Simplificación | Consecuencia | Qué haría falta |
 |---|---|---|
-| Todo en memoria, con `networkx` | No escala más allá de decenas de miles de nodos | Evaluar JanusGraph o similar recién con volúmenes reales medidos |
+| Todo en memoria, con `networkx` | No escala más allá de decenas de miles de nodos | Proximo podría ser JanusGraph o similar recién con volúmenes reales medidos |
 | Estado institucional como sidecar JSON | No hay transaccionalidad ni concurrencia | Integración con la base transaccional (PostgreSQL) |
 | El libro de validaciones es un archivo local | Detecta modificación de registros previos, **no** impide reescribir el archivo entero, ni sella el tiempo | Almacenamiento append-only del lado del servidor o anclaje externo |
 | Sin control de acceso | Cualquiera que corra el script ve todo | Permisos por rol, caso, jurisdicción y sensibilidad |
-| El informe del visor se redacta con plantillas | Texto correcto pero rígido. Además la versión que redacta `informe_ia.py` no llega al visor: escribe el informe general, no los de cada caso | Un modelo local vía `informe_ia.py`, y decidir si redacta uno por caso |
+| El informe del visor se redacta con plantillas | Texto correcto pero rígido. Además la versión que redacta `informe_ia.py` no llega al visor: escribe el informe general, no los de cada caso | Un modelo local vía `informe_ia.py`, y decidir si redacta uno por caso | ----->preparar para la IA de together
 | La unificación de identidades y la validación de relaciones se hacen por CLI | La vinculación manual ya se hace en pantalla y el servidor expone `/api/decidir`, pero falta el control en el visor | Agregar el botón; el circuito ya existe |
 | El servidor no autentica a nadie | El campo "quién lo dispone" es **atribución, no identidad verificada**: dice quién dijo qué, no prueba que haya sido esa persona | La sesión institucional de la Bóveda |
 | El identificador de legajo es posicional | Al vincular dos reportes se renumeran todos: "L003" pasa a ser otro caso | Un identificador de caso estable, independiente del orden |

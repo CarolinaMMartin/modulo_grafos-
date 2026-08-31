@@ -2,13 +2,6 @@
 """
 Servidor local del visor: lo que convierte el archivo suelto en una aplicacion.
 
-Por que existe: el visor es un HTML autocontenido y un HTML abierto con doble
-clic no puede escribir en ningun lado. Mientras fue solo para mirar, alcanzaba.
-Desde que el operador tiene que poder VINCULAR dos reportes, ya no: la decision
-tiene que quedar registrada, y para eso hace falta algo que escriba en el libro.
-
-Pedirle a un abogado que abra una consola y tipee un comando no es una opcion.
-Este servidor es el minimo que hace falta para que el boton funcione de verdad.
 
     python grafo/servidor.py
 
