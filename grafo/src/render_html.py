@@ -982,14 +982,26 @@ function alternarFoco(v){
 /* El historial guarda tambien COMO estaba el lienzo: que reporte en la cima y
    que cajas abiertas. Guardar solo la seleccion devolvia la ficha pero no el
    dibujo, y volver no recuperaba lo que se estaba mirando. */
+/* La instantanea tiene que cubrir TODO lo que dibujar() lee del estado. Si se
+   agrega un campo nuevo que cambie el dibujo, va tambien aca: guardar solo una
+   parte hace que Volver devuelva la ficha anterior sobre un lienzo que ya es
+   otro. Hay una prueba que compara ambas listas y falla si se desincronizan. */
+function instantanea(){
+  return {caso: estado.caso, raiz: estado.raiz, centro: estado.centro,
+          abiertos: [...estado.abiertos], mov: [...estado.mov]};
+}
 function anotarVista(){
-  if(HIST.pos>=0) HIST.pila[HIST.pos].lienzo =
-    {raiz: estado.raiz, abiertos: [...estado.abiertos]};
+  if(HIST.pos>=0) HIST.pila[HIST.pos].lienzo = instantanea();
 }
 function restaurarVista(v){
   if(!v.lienzo) return;
-  estado.raiz = v.lienzo.raiz;
-  estado.abiertos = new Set(v.lienzo.abiertos);
+  const f = v.lienzo;
+  if(f.caso && f.caso!==estado.caso) aplicarCaso(f.caso);
+  estado.raiz = f.raiz;
+  estado.centro = f.centro;
+  estado.abiertos = new Set(f.abiertos);
+  estado.mov = new Map(f.mov);
+  VP.encuadrado = false;
 }
 function ir(v){
   const act = HIST.pila[HIST.pos];
@@ -2195,13 +2207,21 @@ CASOS.forEach(c=>{
   const o = document.createElement("option");
   o.value = c.id; o.textContent = c.etiqueta; sel.appendChild(o);
 });
-function cambiarCaso(id){
-  estado.caso = id; estado.raiz = null; estado.centro = null;
-  estado.abiertos.clear(); estado.mov.clear();
-  VP.encuadrado = false;
-  HIST.pila = []; HIST.pos = -1;
+/* Poner el caso en pantalla, sin tocar el historial. Lo usan tanto el selector
+   como la restauracion de una entrada anterior. */
+function aplicarCaso(id){
+  estado.caso = id;
   sel.value = id;
   pintarAlertas();
+}
+function cambiarCaso(id){
+  aplicarCaso(id);
+  estado.raiz = null; estado.centro = null;
+  estado.abiertos.clear(); estado.mov.clear();
+  VP.encuadrado = false;
+  /* Antes esto vaciaba la pila. Saltar a un reporte de otro caso era entonces
+     un viaje de ida: no habia forma de volver a lo que se estaba mirando.
+     Cambiar de caso es una navegacion mas. */
   ir({tipo:"inicio"});
 }
 sel.onchange = e=>cambiarCaso(e.target.value);

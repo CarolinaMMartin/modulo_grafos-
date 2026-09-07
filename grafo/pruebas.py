@@ -325,6 +325,35 @@ def main():
               len(colores_dato) == len(render_html.TIPOS_EN_TARJETA))
 
         # ------------------------------------------------------------------
+        print(chr(10)+"== Volver devuelve lo que el operador estaba mirando ==")
+        # El historial guarda una instantanea del lienzo por entrada. Si esa
+        # instantanea no cubre todo lo que dibujar() lee del estado, "Volver"
+        # trae la ficha anterior sobre un dibujo que ya es otro. Paso con
+        # `centro`: al poner un dato en el medio, volver no lo sacaba.
+        plantilla = render_html.PLANTILLA
+        cuerpo_dibujar = plantilla[plantilla.index("function dibujar()"):]
+        cuerpo_dibujar = cuerpo_dibujar[:cuerpo_dibujar.index(chr(10) + "}")]
+        lee_dibujar = set(_re.findall(r"estado\.([a-zA-Z]+)", cuerpo_dibujar))
+        cuerpo_foto = plantilla[plantilla.index("function instantanea()"):]
+        cuerpo_foto = cuerpo_foto[:cuerpo_foto.index(chr(10) + "}")]
+        guarda_foto = set(_re.findall(r"estado\.([a-zA-Z]+)", cuerpo_foto))
+        # `sel` queda afuera a proposito: no es estado del lienzo sino la
+        # entrada del historial misma, y mostrar() la repone desde ahi.
+        faltan = lee_dibujar - guarda_foto - {"sel"}
+        check("la instantanea del historial cubre todo lo que dibuja el lienzo",
+              not faltan, "falta guardar: %s" % sorted(faltan))
+        check("la instantanea se restaura entera",
+              all(("f." + c) in plantilla or ("f.caso" in plantilla and c == "caso")
+                  for c in guarda_foto),
+              str(sorted(guarda_foto)))
+        # Cambiar de caso es una navegacion mas: si vacia la pila, saltar a un
+        # reporte de otro caso se vuelve un viaje de ida.
+        cuerpo_caso = plantilla[plantilla.index("function cambiarCaso("):]
+        cuerpo_caso = cuerpo_caso[:cuerpo_caso.index(chr(10) + "}")]
+        check("cambiar de caso no borra el historial",
+              "HIST.pila = []" not in cuerpo_caso)
+
+        # ------------------------------------------------------------------
         print(chr(10)+"== Vinculaciones que dispone una persona ==")
         vm = res["vinculos_manuales"]
         check("el libro de vinculos manuales es integro", not vm["integridad"],
