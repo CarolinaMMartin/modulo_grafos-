@@ -5,6 +5,7 @@ reporte anonimizado.txt
 
 # Documentacion institucional del proyecto (no es codigo)
 *.pdf
+*.docx
 
 # --- salidas generadas -------------------------------------------------------
 # Todo esto se regenera con: python grafo/construir.py
