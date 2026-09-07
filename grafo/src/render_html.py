@@ -560,6 +560,34 @@ td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
 .cita{font-family:var(--mono);font-size:11px;color:var(--tenue);word-break:break-all;
   background:#0a1120;border:1px solid var(--borde);border-radius:8px;padding:9px 11px}
 .vacio{color:var(--tenue);font-size:12.5px;font-style:italic}
+/* Secciones plegables de la ficha. Todo arranca cerrado: el panel tiene que
+   dejar leer una cosa por vez, no volcar el expediente entero. */
+details.sec{border:1px solid var(--borde);border-radius:10px;margin:8px 0;
+  background:var(--panel2);overflow:hidden}
+details.sec>summary{cursor:pointer;list-style:none;padding:10px 12px;
+  font-size:12.5px;color:var(--suave);display:flex;align-items:center;gap:8px;
+  transition:background .15s}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::before{content:"\25B8";color:var(--cyan);font-size:11px;
+  display:inline-block;transition:transform .18s}
+details.sec[open]>summary::before{transform:rotate(90deg)}
+details.sec>summary:hover{background:rgba(34,211,238,.06)}
+details.sec>summary b{color:var(--texto);font-weight:600}
+details.sec>summary .cuenta{margin-left:auto;font-family:var(--mono);
+  font-size:11px;color:var(--tenue)}
+details.sec .interior{padding:0 12px 12px}
+details.sub2{border-top:1px solid var(--borde);border-radius:0;margin:0;
+  background:transparent}
+details.sub2>summary{padding:9px 12px 9px 10px}
+details.sub2 .interior{padding:0 10px 12px}
+.rotulo-grupo{margin:10px 0 4px;font-size:10.5px;color:var(--tenue);
+  text-transform:uppercase;letter-spacing:.1em}
+/* Marca de coincidencia: el dato que este reporte comparte con el otro. Es lo
+   unico que hay que poder encontrar de un vistazo en la lista del vinculado. */
+.chip.coincide{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.12);
+  color:#6ee7b7}
+.nota-chica{font-size:11.5px;color:var(--tenue);margin:8px 0 0}
+
 /* --- dialogo de decision --------------------------------------------------
    El operador no entra a una consola. Todo lo que registra una decision se
    pide en pantalla, con el fundamento a la vista de quien lo escribe. */
@@ -951,15 +979,41 @@ function alternarFoco(v){
   if(a && a.tipo===v.tipo && a.id===v.id) ir({tipo:"inicio"});
   else ir(v);
 }
+/* El historial guarda tambien COMO estaba el lienzo: que reporte en la cima y
+   que cajas abiertas. Guardar solo la seleccion devolvia la ficha pero no el
+   dibujo, y volver no recuperaba lo que se estaba mirando. */
+function anotarVista(){
+  if(HIST.pos>=0) HIST.pila[HIST.pos].lienzo =
+    {raiz: estado.raiz, abiertos: [...estado.abiertos]};
+}
+function restaurarVista(v){
+  if(!v.lienzo) return;
+  estado.raiz = v.lienzo.raiz;
+  estado.abiertos = new Set(v.lienzo.abiertos);
+}
 function ir(v){
   const act = HIST.pila[HIST.pos];
   if(!(act && act.tipo===v.tipo && act.id===v.id)){
     HIST.pila = HIST.pila.slice(0,HIST.pos+1); HIST.pila.push(v); HIST.pos++;
   }
+  /* Solo se anota la entrada NUEVA. Anotar tambien la anterior la pisaria con
+     el estado que la accion acaba de dejar -"Analizar este reporte" cambia la
+     cima del arbol antes de navegar-, y volver traia ese estado en vez del que
+     el operador tenia. Las acciones que cambian el lienzo sin navegar anotan
+     por su cuenta. */
+  anotarVista();
   mostrar(v);
 }
-function atras(){ if(HIST.pos>0){ HIST.pos--; mostrar(HIST.pila[HIST.pos]); } }
-function adelante(){ if(HIST.pos<HIST.pila.length-1){ HIST.pos++; mostrar(HIST.pila[HIST.pos]); } }
+function atras(){
+  if(HIST.pos<=0) return;
+  anotarVista(); HIST.pos--;
+  restaurarVista(HIST.pila[HIST.pos]); mostrar(HIST.pila[HIST.pos]);
+}
+function adelante(){
+  if(HIST.pos>=HIST.pila.length-1) return;
+  anotarVista(); HIST.pos++;
+  restaurarVista(HIST.pila[HIST.pos]); mostrar(HIST.pila[HIST.pos]);
+}
 function mostrar(v){
   estado.sel = v;
   if(v.tipo==="reporte"){ fichaReporte(v.id); }
@@ -1472,6 +1526,7 @@ function dibujar(){
 }
 function alternar(id){
   if(estado.abiertos.has(id)) estado.abiertos.delete(id); else estado.abiertos.add(id);
+  anotarVista();
   dibujar();
 }
 function encuadrar(){
@@ -1625,63 +1680,106 @@ function fichaCaso(){
   ficha(h);
 }
 
+/* Resumen brevisimo de por que dos reportes quedaron vinculados. Sale de la
+   propia arista, asi que sirve igual para una vinculacion derivada por regla,
+   una que dispuso un operador o cualquier otra que se agregue despues. */
+function porQueEnUnaLinea(a){
+  if(a.origen==="afirmada"){
+    const quien = a.dispuestaPor ? esc(a.dispuestaPor) : "un operador";
+    const fundamento = (a.motivoOperador||"").trim();
+    return "La dispuso "+quien+"."+(fundamento? " "+esc(fundamento) : "");
+  }
+  const m = (a.motivo||"").trim();
+  const frase = m ? m.charAt(0).toUpperCase()+m.slice(1)+"." : "Comparten un dato objetivo.";
+  return frase + (a.confianza!=null ? " Peso "+num(a.confianza)+"." : "");
+}
+
+/* Lista las entidades de un reporte marcando las que tambien estan en otro.
+   La comparacion es por identidad de nodo, no por texto: vale para cualquier
+   par de reportes y para cualquier tipo de dato que se agregue a la ontologia. */
+function listaEntidades(valorReporte, valorContra){
+  const propias = datosDe(valorReporte);
+  if(!propias.length) return '<div class="vacio">Sin datos registrados.</div>';
+  const contra = valorContra
+    ? new Set(datosDe(valorContra).map(m=>m.id)) : new Set();
+  const ordenadas = propias.slice().sort((x,y)=>{
+    const cx = contra.has(x.id)?0:1, cy = contra.has(y.id)?0:1;
+    if(cx!==cy) return cx-cy;
+    if(x.tipoLegible!==y.tipoLegible) return x.tipoLegible.localeCompare(y.tipoLegible);
+    return String(x.etiqueta).localeCompare(String(y.etiqueta));
+  });
+  let h = "";
+  let grupo = null;
+  ordenadas.forEach(m=>{
+    const coincide = contra.has(m.id);
+    const g = coincide ? "\u2713 también en este reporte" : m.tipoLegible;
+    if(g!==grupo){ grupo = g; h += '<div class="rotulo-grupo">'+esc(g)+'</div>'; }
+    const otros = otrosReportesDe(m).length;
+    h += '<span class="chip boton'+(coincide?" coincide":"")+
+      '" data-ir="entidad|'+m.id+'">'+esc(m.etiqueta)+
+      (otros>1? ' <b style="color:var(--ambar)">\u00b7'+otros+'</b>':'')+'</span>';
+  });
+  return h;
+}
+
 function fichaReporte(id){
   const n = NODOS.get(id); if(!n){ fichaCaso(); return; }
   const at = attr(n);
   const vinc = vinculosDe(id).sort((a,b)=>(b.confianza||0)-(a.confianza||0));
   const datos = datosDe(n.valor);
+  const desc = descartadosDelReporte(n.valor);
+  const idn = identidadDe(n.valor);
   const esRaiz = (estado.raiz || caso().reportes[0]) === n.valor;
+
+  // Encabezado: lo minimo para saber que reporte es y en que estado esta.
   let h = '<span class="chip cy">Reporte</span>'+
     (esRaiz?'<span class="chip">en análisis</span>':'')+
-    '<h3>Reporte '+esc(n.valor)+'</h3>';
-
-  h += '<h2>Resumen</h2>'+prosa(
-    'Reporte de '+(at["Plataforma"]||"plataforma no informada")+
-    ', clasificado como '+(at["Clasificación NCMEC"]||"sin clasificar")+
-    '. El hecho es del '+String(at["Fecha del hecho"]||"—").slice(0,10)+
-    ' y se recibió el '+String(at["Fecha de recepción"]||"—").slice(0,10)+'.'+
-    ' Actualmente '+(legible(at["Motivo del archivo"]) || legible(at["Estado en SIPAR"]) || "sin estado")+'.');
-
-  /* La identidad unificada no se dibuja en el lienzo: no es un dato que el
-     reporte informe, sino una conclusión que un operador aprobó a partir de
-     esos datos. Se explica acá, con los reportes que quedaron agrupados. */
-  const idn = identidadDe(n.valor);
-  if(idn && otrosReportesDe(idn).length>1){
-    h += '<h2>Identidad unificada</h2>'+
-      '<div class="tarjeta" style="border-color:rgba(129,140,248,.4)">'+
-      '<div style="font-size:12.5px;color:var(--suave);line-height:1.6">'+
-      'Un operador confirmó que las menciones de persona de '+
-      otrosReportesDe(idn).map(r=>'<b>'+esc(r)+'</b>').join(', ')+
-      ' corresponden a la misma persona. No es un dato del reporte: es una '+
-      'decisión humana registrada, y se revierte desde el libro de validaciones.'+
-      '</div></div>';
+    '<h3>Reporte '+esc(n.valor)+'</h3>'+
+    '<div class="sub" style="font-family:inherit;font-size:12px">'+
+    esc([at["Plataforma"], legible(at["Motivo del archivo"]) ||
+         legible(at["Estado en SIPAR"])].filter(Boolean).join(" \u00b7 "))+
+    '</div>';
+  if(!esRaiz){
+    h += '<div class="fila"><button data-accion="raiz" data-valor="'+
+      esc(n.valor)+'">Analizar este reporte</button></div>';
   }
 
-  if(vinc.length){
-    h += '<h2>Se vincula con ('+vinc.length+')</h2>';
-    vinc.forEach(a=>{
-      const otro = a.a===id?a.b:a.a;
-      h += '<div class="tarjeta click" data-ir="vinculo|'+a.id+'">'+chipPeso(a.confianza)+
-        '<div style="margin-top:4px;font-size:12.5px"><b>Reporte '+esc(NODOS.get(otro).valor)+'</b></div>'+
-        '<div style="color:var(--cyan);font-size:12px">'+esc(a.motivo)+'</div></div>';
-    });
-  } else {
-    h += '<h2>Vinculaciones</h2><div class="vacio">Ninguna.</div>';
-  }
+  // --- vinculaciones: es la pregunta que el operador vino a responder -------
+  let cuerpo = vinc.length ? "" :
+    '<div class="vacio">Este reporte no quedó vinculado con ningún otro.</div>';
+  vinc.forEach(a=>{
+    const otro = NODOS.get(a.a===id?a.b:a.a);
+    cuerpo += '<details class="sec sub2"><summary><b>Reporte '+esc(otro.valor)+'</b>'+
+      '<span class="cuenta">'+(a.confianza!=null? "peso "+num(a.confianza)
+                                                : "por un operador")+
+      '</span></summary><div class="interior">'+
+      '<div style="font-size:12.5px;color:var(--suave);margin:2px 0 6px">'+
+      porQueEnUnaLinea(a)+'</div>'+
+      listaEntidades(otro.valor, n.valor)+
+      '<div class="fila"><button data-ir="vinculo|'+a.id+
+      '">Ver el fundamento completo</button></div>'+
+      '</div></details>';
+  });
+  h += seccion("Vinculaciones", vinc.length, cuerpo);
 
-  /* Sin esto, un reporte que quedó solo no se distingue de uno que el sistema
-     nunca comparó. Acá se ve que sí se lo comparó, con qué, y por qué no
-     prosperó. Es lo que permite discutir la regla. */
-  const desc = descartadosDelReporte(n.valor);
+  // --- entidades del propio reporte ----------------------------------------
+  h += seccion("Entidades", datos.length,
+    listaEntidades(n.valor, null)+
+    '<div class="nota-chica">El número en ámbar indica en cuántos reportes del '+
+    'caso aparece ese dato.</div>'+
+    '<div class="fila"><button data-accion="abrir" data-valor="'+id+
+    '">Mostrarlas en el gráfico</button></div>');
+
+  // --- coincidencias evaluadas que no prosperaron --------------------------
   if(desc.length){
-    h += '<h2>Coincidencias que no alcanzaron ('+desc.length+')</h2>'+prosa(
-      'Estos reportes comparten algún dato con éste y fueron evaluados, pero la '+
-      'coincidencia no alcanzó para proponer una vinculación. Quedan registradas '+
-      'para poder revisar el criterio.');
+    let cuerpoDesc =
+      '<div class="nota-chica" style="margin:0 0 8px">Comparten algún dato con '+
+      'éste y fueron evaluadas, pero no alcanzaron para proponer una '+
+      'vinculación. Quedan registradas para poder revisar el criterio.</div>';
     desc.forEach(x=>{
       const otro = x.a===n.valor ? x.b : x.a;
       const c = casoDe(otro);
-      h += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+esc(otro)+'">'+
+      cuerpoDesc += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+esc(otro)+'">'+
         '<div style="font-size:12.5px"><b>Reporte '+esc(otro)+'</b>'+
         (c? ' <span class="sub">· '+esc(c.etiqueta)+'</span>':'')+'</div>'+
         '<div style="font-size:12px;color:var(--suave);margin-top:5px">Comparten '+
@@ -1690,32 +1788,33 @@ function fichaReporte(id){
         esc(x.motivo||"")+'</div></div>'+
         botonVincular(n.valor, otro);
     });
+    h += seccion("Coincidencias que no alcanzaron", desc.length, cuerpoDesc);
   }
 
-  if(datos.length){
-    h += '<h2>Entidades ('+datos.length+')</h2>'+
-      '<div class="fila"><button data-accion="abrir" data-valor="'+id+'">Mostrarlas en el gráfico</button></div>';
-    const porTipo = new Map();
-    datos.forEach(m=>{ if(!porTipo.has(m.tipoLegible)) porTipo.set(m.tipoLegible,[]);
-                       porTipo.get(m.tipoLegible).push(m); });
-    porTipo.forEach((lista,t)=>{
-      h += '<div style="margin:10px 0 4px;font-size:11px;color:var(--tenue);'+
-        'text-transform:uppercase;letter-spacing:.1em">'+esc(t)+'</div>';
-      lista.forEach(m=>{
-        const o = otrosReportesDe(m).length;
-        h += '<span class="chip boton" data-ir="entidad|'+m.id+'">'+esc(m.etiqueta)+
-          (o>1? ' <b style="color:var(--ambar)">·'+o+'</b>':'')+'</span>';
-      });
-    });
-    h += '<div class="prosa"><p style="font-size:11.5px;color:var(--tenue);margin-top:8px">'+
-      'El número en ámbar indica en cuántos reportes del caso aparece ese dato.</p></div>';
+  // --- identidad unificada, solo si un operador la confirmo ----------------
+  if(idn && otrosReportesDe(idn).length>1){
+    h += seccion("Identidad unificada", otrosReportesDe(idn).length+" reportes",
+      '<div style="font-size:12.5px;color:var(--suave);line-height:1.6">'+
+      'Un operador confirmó que las menciones de persona de '+
+      otrosReportesDe(idn).map(r=>'<b>'+esc(r)+'</b>').join(", ")+
+      ' corresponden a la misma persona. No es un dato del reporte: es una '+
+      'decisión humana registrada, y se revierte desde el libro de validaciones.'+
+      '</div>');
   }
-  if(!esRaiz){
-    h += '<div class="fila"><button data-accion="raiz" data-valor="'+n.valor+'">'+
-      'Analizar este reporte</button></div>';
-  }
-  h += '<h2>Datos del reporte</h2>'+tabla(n.atributos);
+
+  // --- la ficha tecnica, al final y cerrada -------------------------------
+  h += seccion("Datos del reporte", null, tabla(n.atributos));
+
   ficha(h);
+}
+
+/* Una seccion plegada de la ficha. Todas arrancan cerradas: el panel deja leer
+   una cosa por vez en vez de volcar el expediente entero. */
+function seccion(titulo, cuenta, cuerpo){
+  if(!cuerpo) return "";
+  return '<details class="sec"><summary><b>'+esc(titulo)+'</b>'+
+    (cuenta!=null ? '<span class="cuenta">'+esc(cuenta)+'</span>' : '')+
+    '</summary><div class="interior">'+cuerpo+'</div></details>';
 }
 
 function fichaEntidad(id){
@@ -1724,32 +1823,31 @@ function fichaEntidad(id){
   const col = COLOR_TIPO(n.tipo);
   let h = '<span class="chip cy" style="border-color:'+col+'55;color:'+col+
     '"><span class="pt"></span>'+esc(n.tipoLegible)+'</span><h3>'+esc(n.etiqueta)+'</h3>';
-  /* Investigar el dato en vez del reporte: el árbol se cuelga de él. Solo tiene
-     sentido si consta en más de un reporte del caso. */
+
+  /* Investigar el dato en vez del reporte: el arbol se cuelga de el. Solo tiene
+     sentido si consta en mas de un reporte del caso. */
   if(estado.centro===id){
     h += '<div class="fila"><button data-accion="descentrar">'+
       'Volver al reporte en análisis</button></div>';
   } else if(enR.length>1){
     h += '<div class="fila"><button class="primario" data-accion="centrar" '+
-      'data-valor="'+id+'">Poner este dato en el centro</button></div>'+
-      '<div class="sub" style="margin-bottom:4px">El árbol se arma alrededor de '+
-      'este dato y muestra los reportes en los que consta.</div>';
+      'data-valor="'+id+'">Poner este dato en el centro</button></div>';
   }
 
-  /* Lo primero que hay que contestar cuando alguien toca un dato en el lienzo
-     es qué vinculaciones sostiene, no en qué reportes está: para eso ya se ven
-     las líneas. Acá va el porqué. */
+  /* Lo primero que hay que contestar cuando alguien toca un dato es que
+     vinculaciones sostiene, no en que reportes esta: para eso ya estan las
+     lineas del lienzo. */
   const sostiene = VINCULOS.filter(a=>{
     const rs = reportesCaso();
     if(!(rs.has((NODOS.get(a.a)||{}).valor) && rs.has((NODOS.get(a.b)||{}).valor)))
       return false;
     return (a.puente||[]).some(x=>x.nodo && RE(x.nodo)===id);
   });
+  let cuerpo = "";
   if(sostiene.length){
-    h += '<h2>Vinculaciones que sostiene ('+sostiene.length+')</h2>';
     sostiene.forEach(a=>{
       const tramo = (a.puente||[]).find(x=>x.nodo && RE(x.nodo)===id) || {};
-      h += '<div class="tarjeta click" data-ir="vinculo|'+a.id+'">'+
+      cuerpo += '<div class="tarjeta click" data-ir="vinculo|'+a.id+'">'+
         chipPeso(a.confianza)+
         '<div style="margin-top:4px;font-size:12.5px"><b>Reporte '+
         esc((NODOS.get(a.a)||{}).valor)+'</b> con <b>Reporte '+
@@ -1760,43 +1858,47 @@ function fichaEntidad(id){
           : "Es uno de los datos objetivos en que se apoya la vinculación."))+
         '</div></div>';
     });
+    h += seccion("Vinculaciones que sostiene", sostiene.length, cuerpo);
   } else if(enR.length>1){
-    h += '<h2>Vinculaciones que sostiene</h2>'+prosa(
-      'Este dato aparece en más de un reporte del caso, pero la vinculación '+
-      'entre ellos no se apoya en él. Puede estar corroborando otra relación, '+
-      'o no alcanzar por sí solo para individualizar.');
+    h += seccion("Vinculaciones que sostiene", 0,
+      '<div class="nota-chica" style="margin:0">Este dato aparece en más de un '+
+      'reporte del caso, pero la vinculación entre ellos no se apoya en él. '+
+      'Puede estar corroborando otra relación, o no alcanzar por sí solo para '+
+      'individualizar.</div>');
   }
 
-  h += '<h2>Aparece en '+enR.length+' reporte(s) del caso</h2>';
+  cuerpo = "";
   enR.forEach(r=>{
     const nr = nodoReporte(r);
-    h += '<div class="tarjeta click" data-ir="reporte|'+(nr?nr.id:"")+'">'+
+    cuerpo += '<div class="tarjeta click" data-ir="reporte|'+(nr?nr.id:"")+'">'+
       '<div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div></div>';
   });
+  h += seccion("Aparece en el caso", enR.length+" reportes", cuerpo);
 
   const fuera = fueraDelCaso(n);
   if(fuera.length){
-    h += '<h2>También en otros casos ('+fuera.length+')</h2>'+prosa(
-      'Este mismo dato aparece en reportes que no forman parte de este caso. '+
-      'Que no haya una línea hacia ellos no significa que el sistema no lo '+
-      'haya visto: significa que la coincidencia no alcanzó para sostener una '+
-      'vinculación.');
+    cuerpo = '<div class="nota-chica" style="margin:0 0 8px">Este mismo dato '+
+      'aparece en reportes que no forman parte de este caso. Que no haya una '+
+      'línea hacia ellos no significa que el sistema no lo haya visto: '+
+      'significa que la coincidencia no alcanzó para sostener una vinculación.'+
+      '</div>';
     fuera.forEach(r=>{
       const c = casoDe(r);
-      h += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+esc(r)+'">'+
-        '<div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div>'+
+      cuerpo += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+
+        esc(r)+'"><div style="font-size:12.5px"><b>Reporte '+esc(r)+'</b></div>'+
         '<div class="sub" style="margin-top:3px">'+esc(c?c.etiqueta:"otro caso")+
         '</div></div>';
     });
+    h += seccion("También en otros casos", fuera.length, cuerpo);
   }
 
   const desc = descartadosDelDato(id);
   if(desc.length){
-    h += '<h2>Coincidencias que no alcanzaron ('+desc.length+')</h2>';
-    desc.forEach(x=>{ h += tarjetaDescartada(x, id); });
+    cuerpo = "";
+    desc.forEach(x=>{ cuerpo += tarjetaDescartada(x, id); });
+    h += seccion("Coincidencias que no alcanzaron", desc.length, cuerpo);
   }
 
-  h += '<h2>Datos</h2>'+tabla(n.atributos);
   const rel = D.aristas.filter(a=>!a.entreReportes && (RE(a.a)===id||RE(a.b)===id));
   const vistos = new Set();
   const lista = [];
@@ -1807,16 +1909,19 @@ function fichaEntidad(id){
     lista.push([a,m,RE(a.a)!==id]);
   });
   if(lista.length){
-    h += '<h2>Cómo se conecta</h2>';
+    cuerpo = "";
     lista.forEach(([a,m,inv])=>{
-      h += '<div class="tarjeta click'+(a.relacion==="CONTRADICE"?" alarma":"")+
+      cuerpo += '<div class="tarjeta click'+(a.relacion==="CONTRADICE"?" alarma":"")+
         '" data-ir="relacion|'+a.id+'"><span class="chip">'+esc(a.origenLegible)+'</span>'+
         '<div style="margin-top:4px;font-size:12.5px">'+
         (inv? esc(m.etiqueta)+' '+esc(a.relacionLegible)+' <b>esta entidad</b>'
             : '<b>Esta entidad</b> '+esc(a.relacionLegible)+' '+esc(m.etiqueta))+
         '</div></div>';
     });
+    h += seccion("Cómo se conecta", lista.length, cuerpo);
   }
+
+  h += seccion("Datos", null, tabla(n.atributos));
   ficha(h);
 }
 

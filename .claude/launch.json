@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "visor-boveda-cij",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["grafo/servidor.py", "--sin-navegador"],
+      "port": 8731,
+      "autoPort": true
+    }
+  ]
+}

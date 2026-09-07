@@ -192,10 +192,31 @@ class Handler(BaseHTTPRequestHandler):
         return dict(ok=True, accion="decidir", registro=reg)
 
 
+PUERTO_POR_DEFECTO = 8731
+
+
+def _puerto_inicial():
+    """Puerto: la variable PORT del entorno gana sobre el valor por defecto.
+
+    Esta aplicacion no necesita un puerto en particular -no recibe callbacks ni
+    webhooks, y el visor se sirve desde el mismo origen, asi que tampoco hay
+    CORS de por medio-. Respetar PORT permite que quien la levante le asigne
+    uno libre y evita el choque cuando ya hay una instancia corriendo.
+    """
+    crudo = os.environ.get("PORT")
+    if not crudo:
+        return PUERTO_POR_DEFECTO
+    try:
+        return int(crudo)
+    except ValueError:
+        print("PORT=%r no es un numero; se usa %d" % (crudo, PUERTO_POR_DEFECTO))
+        return PUERTO_POR_DEFECTO
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser(description="Servidor local del visor")
-    ap.add_argument("--puerto", type=int, default=8731)
+    ap.add_argument("--puerto", type=int, default=_puerto_inicial())
     ap.add_argument("--sin-navegador", action="store_true")
     args = ap.parse_args()
 
