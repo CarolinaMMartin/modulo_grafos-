@@ -283,6 +283,12 @@ def main():
               not mt.identificadores(u"Reported User (Profile NX-800147): hola"))
         check("una palabra sin digito y sin frase que la introduzca no entra",
               not mt.identificadores(u"se organiza afuera de PlayHub, en NexoChat"))
+        check("la palabra pegada a la frase introductoria no se toma por alias",
+              {h["clave"] for h in mt.identificadores(
+                  u"agregame como Zorro.Gris_88 que te paso el link")}
+              == {"zorrogris88"})
+        check("una frase introductoria sin identificador atras no inventa uno",
+              not mt.identificadores(u"buscame como el pibe de siempre"))
         check("un numero corrido sin separadores no se lee como telefono",
               not [h for h in mt.identificadores(u"expediente 990100001 en tramite")
                    if h["tipo"] == "TELEFONO"])

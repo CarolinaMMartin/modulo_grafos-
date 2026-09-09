@@ -167,21 +167,20 @@ Una IP aislada no identifica a una persona. Se valora junto con fecha, hora, pre
 
 ## 8. Estado de la última construcción
 
-- Nodos: **91** · Aristas: **147**
-- Por origen: afirmada 3, derivada 39, inferida 3, observada 102
+- Nodos: **65** · Aristas: **118**
+- Por origen: afirmada 3, derivada 28, inferida 3, observada 84
 - Incumplimientos de procedencia: **0**
 
 | Tipo de nodo | Cantidad |
 |---|---|
-| `ORGANIZACION` | 15 |
-| `REPORTE` | 12 |
-| `CUENTA` | 12 |
-| `PERSONA_MENCION` | 12 |
-| `IP` | 9 |
-| `UBICACION` | 9 |
-| `ALIAS` | 8 |
-| `EVENTO` | 6 |
-| `DISPOSITIVO` | 4 |
-| `TELEFONO` | 2 |
-| `ALIAS_PAGO` | 1 |
+| `REPORTE` | 10 |
+| `ORGANIZACION` | 10 |
+| `CUENTA` | 10 |
+| `PERSONA_MENCION` | 10 |
+| `IP` | 7 |
+| `ALIAS` | 5 |
+| `UBICACION` | 5 |
+| `EVENTO` | 4 |
+| `DISPOSITIVO` | 2 |
+| `TELEFONO` | 1 |
 | `IDENTIDAD` | 1 |

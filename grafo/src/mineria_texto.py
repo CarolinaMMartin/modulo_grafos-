@@ -92,6 +92,24 @@ CUE_FUERTE = _cue([
 ])
 
 
+# Palabras que nunca son un alias. Hacen falta porque una frase como "agregame
+# como Zorro.Gris_88" tiene la frase introductoria pegada a "como", y sin esta
+# lista "como" entraba al grafo como identificador. Solo se aplica a lo que no
+# lleva ningun digito: una palabra con numeros no es una palabra corriente.
+PALABRAS_QUE_NO_SON_ALIAS = frozenset(u"""
+como que para por con sin desde hasta donde cuando cuanto ahi alli aca aqui
+este esta esto estos estas ese esa eso esos esas aquel aquella
+mio mia tuyo tuya suyo suya nuestro nuestra
+pero porque entonces tambien tampoco siempre nunca ahora luego antes despues
+todo toda todos todas nada nadie alguien algo otro otra otros otras
+mismo misma mucho mucha poco poca mejor peor
+hola chau gracias favor bueno buena claro dale listo obvio igual
+usuario alias perfil cuenta cuentas contacto contactos telefono celular
+numero numeros nombre apodo direccion mail correo whatsapp telegram instagram
+user profile account phone name email chat
+""".split())
+
+
 def _tapar(texto, expresiones):
     """Reemplaza por espacios lo que no debe volver a mirarse.
 
@@ -217,6 +235,8 @@ def identificadores(texto, pais_default="AR"):
             continue
         clave, notas = clave_alias(crudo)
         if not clave:
+            continue
+        if not tiene_digito and clave in PALABRAS_QUE_NO_SON_ALIAS:
             continue
         if fuerte:
             conf = 0.74 if tiene_digito else 0.58
