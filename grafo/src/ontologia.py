@@ -74,6 +74,15 @@ TIPOS_NODO = {
                    desc="Cuenta de plataforma: ESP + espUserId"),
     "ALIAS": dict(color="#f4b183", identificador=True, fusionable=True,
                   desc="Nombre visible / screen name (identificador debil)"),
+    # ADICION PENDIENTE DE VALIDACION: no figura en contexto.md 10.1. Un alias
+    # de pago no es un nombre visible: no lo eligio nadie para mostrarse sino
+    # para cobrar, y dos cuentas que cobran por la misma via comparten algo
+    # bastante mas concreto que un apodo. Se separo del ALIAS porque meterlo
+    # ahi lo habria hecho valer 0,22 -"refuerza, nunca sostiene solo"- y la via
+    # de cobro compartida es de las pocas cosas que en la practica atan a dos
+    # operaciones distintas.
+    "ALIAS_PAGO": dict(color="#c55a11", identificador=True, fusionable=True,
+                       desc="Alias de cobro o transferencia (CVU/CBU/billetera)"),
     "EMAIL": dict(color="#00b0f0", identificador=True, fusionable=True,
                   desc="Direccion de correo normalizada"),
     "TELEFONO": dict(color="#008080", identificador=True, fusionable=True,
@@ -134,6 +143,21 @@ RELACIONES = {
     "RESPONDE_A": dict(origen=DERIVADA, desc="Respuesta de prestador -> oficio"),
     "IDENTIFICADO_COMO": dict(origen=DERIVADA,
                               desc="Mencion -> identidad unificada por decision humana"),
+    # ADICION PENDIENTE DE VALIDACION: no figuran en contexto.md 10.3. Un
+    # identificador leido de una conversacion o de una biografia no es
+    # observado -no hay campo que lo declare- sino derivado por una regla a
+    # partir de un texto observado. Se separan de ASOCIADO_A_* a proposito: el
+    # texto lo menciona, no consta que le pertenezca a nadie, y esa diferencia
+    # es la que despues no se puede recuperar si las dos cosas se dibujan
+    # iguales.
+    "MENCIONA_TELEFONO": dict(origen=DERIVADA,
+                              desc="Evento o cuenta -> telefono escrito en texto libre"),
+    "MENCIONA_EMAIL": dict(origen=DERIVADA,
+                           desc="Evento o cuenta -> correo escrito en texto libre"),
+    "MENCIONA_ALIAS": dict(origen=DERIVADA,
+                           desc="Evento o cuenta -> alias escrito en texto libre"),
+    "MENCIONA_ALIAS_PAGO": dict(origen=DERIVADA,
+                                desc="Evento o cuenta -> alias de cobro escrito en texto libre"),
 
     # -- afirmadas: no las produce el sistema, las dispone una persona -------
     "VINCULADO_POR_OPERADOR": dict(
@@ -191,6 +215,15 @@ REGLAS = {
         version="1.0", tipo_nodo="ALIAS", peso_base=0.22,
         corrobora_solamente=True, usa_discriminancia=True,
         desc="Mismo nombre visible: refuerza, nunca sostiene solo"),
+    # ADICION PENDIENTE DE VALIDACION, junto con el tipo de nodo ALIAS_PAGO.
+    # El peso esta entre el del correo (0,90) y el del alias (0,22): una via de
+    # cobro compartida es concreta, pero un alias de pago se presta, se hereda
+    # y se tipea mal, asi que no llega a valer lo que un identificador que el
+    # prestador declara. Como todos los pesos del sistema, esta sin calibrar.
+    "R10_ALIAS_PAGO": dict(
+        version="1.0", tipo_nodo="ALIAS_PAGO", peso_base=0.62,
+        corrobora_solamente=False, usa_discriminancia=True,
+        desc="Misma via de cobro: mismo alias de pago normalizado"),
     "R09_UBICACION": dict(
         version="1.0", tipo_nodo="UBICACION", peso_base=0.08,
         corrobora_solamente=True, usa_discriminancia=True,
@@ -263,6 +296,7 @@ ETIQUETA_TIPO = {
     "IDENTIDAD": u"Identidad confirmada",
     "CUENTA": u"Cuenta de plataforma",
     "ALIAS": u"Nombre visible",
+    "ALIAS_PAGO": u"Alias de cobro",
     "EMAIL": u"Correo electrónico",
     "TELEFONO": u"Teléfono",
     "IP": u"Dirección IP",
@@ -282,6 +316,10 @@ ETIQUETA_RELACION = {
     "USA_CUENTA": u"opera con la cuenta",
     "ALIAS_DE": u"se presenta con el nombre",
     "ASOCIADO_A_TELEFONO": u"está asociada al teléfono",
+    "MENCIONA_TELEFONO": u"menciona el teléfono",
+    "MENCIONA_EMAIL": u"menciona el correo",
+    "MENCIONA_ALIAS": u"menciona el alias",
+    "MENCIONA_ALIAS_PAGO": u"menciona el alias de cobro",
     "ASOCIADO_A_EMAIL": u"está asociada al correo",
     "OBSERVADO_DESDE_IP": u"fue observada desde la IP",
     "USA_DISPOSITIVO": u"se usó desde el dispositivo",

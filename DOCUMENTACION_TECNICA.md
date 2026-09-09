@@ -92,6 +92,7 @@ Cada regla declara cuatro cosas.
 | `R07_IP_SUELTA` | `IP` | 0,28 | **no, solo refuerza** | sí | 1.0 |
 | `R08_ALIAS` | `ALIAS` | 0,22 | **no, solo refuerza** | sí | 1.0 |
 | `R09_UBICACION` | `UBICACION` | 0,08 | **no, solo refuerza** | sí | 1.0 |
+| `R10_ALIAS_PAGO` | `ALIAS_PAGO` | 0,62 | sí | sí | 1.0 |
 
 ### Qué detecta cada una
 
@@ -104,6 +105,7 @@ Cada regla declara cuatro cosas.
 - **`R07_IP_SUELTA`** — Misma IP fuera de la ventana temporal: indicio, no atribucion.
 - **`R08_ALIAS`** — Mismo nombre visible: refuerza, nunca sostiene solo.
 - **`R09_UBICACION`** — Misma ciudad estimada: contexto, nunca sostiene solo.
+- **`R10_ALIAS_PAGO`** — Misma via de cobro: mismo alias de pago normalizado.
 
 ### Por qué esos pesos y no otros
 
@@ -113,7 +115,7 @@ La cuenta de plataforma encabeza con **0,98** porque el par `ESP + espUserId` id
 
 Debajo del umbral quedan las **3 reglas que solo refuerzan** (`R07_IP_SUELTA`, `R08_ALIAS`, `R09_UBICACION`). Su peso —entre 0,08 y 0,28— está deliberadamente por debajo del umbral de propuesta: aunque dispararan todas juntas, no alcanzan para crear un vínculo. Es la traducción de la regla del relevamiento: *una relación debe apoyarse en datos objetivos coincidentes, no en semejanza contextual*.
 
-Ninguna regla que sostiene baja de **0,72** ni llega a **0,99**.
+Ninguna regla que sostiene baja de **0,62** ni llega a **0,99**.
 
 ## 5. Cómo se combinan los pesos
 
@@ -195,6 +197,8 @@ Además del decaimiento, hay un corte duro: pasado cierto punto el identificador
 | `DF_HUB_SIN_PARES` | 100 | desde acá no genera pares para comparar y se informa aparte como *hub* |
 | `CORPUS_MINIMO_PARA_FRACCION` | 200 | recién con este volumen se aplica también el criterio de fracción |
 | `FRACCION_BAJA_DISCRIMINANCIA` | 0,20 | con corpus grande, aparecer en más de esta fracción degrada |
+
+Hay un segundo descuento, independiente del anterior. Cuando el identificador que comparten los dos reportes no está declarado en ningún campo sino escrito en un texto libre —la conversación, la biografía del perfil—, el peso se multiplica por `FACTOR_TEXTO_LIBRE` = 0,85. No es que la extracción falle: es que cambia lo que el dato significa. Que el prestador informe un teléfono es un dato de la cuenta; que alguien lo escriba en un chat es una afirmación de esa persona, que puede estar equivocada, ser de un tercero o ser mentira.
 
 > **La rareza es una propiedad del identificador, no del tamaño de la base.** El primer diseño medía la fracción del corpus, y con diez reportes un dispositivo compartido por cuatro daba 40 % y quedaba degradado, perdiendo un vínculo legítimo. Ese mismo dispositivo en cien mil reportes es altamente discriminante. Por eso el umbral principal es **absoluto** sobre `df`, y la fracción solo entra a partir de 200 reportes. Hay invariantes que verifican que `discriminancia(4)` da lo mismo con 10 y con 100.000 reportes.
 

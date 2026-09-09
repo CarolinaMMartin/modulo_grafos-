@@ -29,6 +29,7 @@ Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.
 | `IDENTIDAD` | no | **no** | Agrupamiento de menciones confirmado por una persona |
 | `CUENTA` | sí | sí | Cuenta de plataforma: ESP + espUserId |
 | `ALIAS` | sí | sí | Nombre visible / screen name (identificador debil) |
+| `ALIAS_PAGO` | sí | sí | Alias de cobro o transferencia (CVU/CBU/billetera) |
 | `EMAIL` | sí | sí | Direccion de correo normalizada |
 | `TELEFONO` | sí | sí | Numero telefonico en formato E.164 |
 | `IP` | sí | sí | Direccion IP. Solo tiene valor junto a fecha, hora, prestador y puerto cuando exista |
@@ -73,6 +74,10 @@ Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.
 | `CONTRADICE` | Vinculo que debilita otro, por ejemplo un viaje imposible |
 | `RESPONDE_A` | Respuesta de prestador -> oficio |
 | `IDENTIFICADO_COMO` | Mencion -> identidad unificada por decision humana |
+| `MENCIONA_TELEFONO` | Evento o cuenta -> telefono escrito en texto libre |
+| `MENCIONA_EMAIL` | Evento o cuenta -> correo escrito en texto libre |
+| `MENCIONA_ALIAS` | Evento o cuenta -> alias escrito en texto libre |
+| `MENCIONA_ALIAS_PAGO` | Evento o cuenta -> alias de cobro escrito en texto libre |
 
 ### Inferidas
 
@@ -116,6 +121,7 @@ Si falta la fuente, el locator o la explicación, la arista **no se crea**: se r
 | `R06_IP_VENTANA` | 1.0 | `IP` | 0.72 | no | sí | Misma IP dentro de la ventana temporal del prestador. La IP se valora siempre junto con su fecha y hora |
 | `R07_IP_SUELTA` | 1.0 | `IP` | 0.28 | sí | sí | Misma IP fuera de la ventana temporal: indicio, no atribucion |
 | `R08_ALIAS` | 1.0 | `ALIAS` | 0.22 | sí | sí | Mismo nombre visible: refuerza, nunca sostiene solo |
+| `R10_ALIAS_PAGO` | 1.0 | `ALIAS_PAGO` | 0.62 | no | sí | Misma via de cobro: mismo alias de pago normalizado |
 | `R09_UBICACION` | 1.0 | `UBICACION` | 0.08 | sí | sí | Misma ciudad estimada: contexto, nunca sostiene solo |
 
 ### Combinación
@@ -161,20 +167,21 @@ Una IP aislada no identifica a una persona. Se valora junto con fecha, hora, pre
 
 ## 8. Estado de la última construcción
 
-- Nodos: **65** · Aristas: **118**
-- Por origen: afirmada 3, derivada 28, inferida 3, observada 84
+- Nodos: **91** · Aristas: **147**
+- Por origen: afirmada 3, derivada 39, inferida 3, observada 102
 - Incumplimientos de procedencia: **0**
 
 | Tipo de nodo | Cantidad |
 |---|---|
-| `REPORTE` | 10 |
-| `ORGANIZACION` | 10 |
-| `CUENTA` | 10 |
-| `PERSONA_MENCION` | 10 |
-| `IP` | 7 |
-| `ALIAS` | 5 |
-| `UBICACION` | 5 |
-| `EVENTO` | 4 |
-| `DISPOSITIVO` | 2 |
-| `TELEFONO` | 1 |
+| `ORGANIZACION` | 15 |
+| `REPORTE` | 12 |
+| `CUENTA` | 12 |
+| `PERSONA_MENCION` | 12 |
+| `IP` | 9 |
+| `UBICACION` | 9 |
+| `ALIAS` | 8 |
+| `EVENTO` | 6 |
+| `DISPOSITIVO` | 4 |
+| `TELEFONO` | 2 |
+| `ALIAS_PAGO` | 1 |
 | `IDENTIDAD` | 1 |

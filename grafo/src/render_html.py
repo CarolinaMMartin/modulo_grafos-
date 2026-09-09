@@ -65,6 +65,7 @@ MOTIVO_CORTO = {
     "EVIDENCIA": u"mismo archivo",
     "IP": u"misma IP",
     "ALIAS": u"mismo nombre visible",
+    "ALIAS_PAGO": u"misma vía de cobro",
     "UBICACION": u"misma zona",
 }
 
@@ -79,8 +80,8 @@ MOTIVO_CORTO = {
 # competir con la cuenta que la origino y se leeria como si fuera una segunda
 # coincidencia independiente. Se muestra como distintivo sobre los reportes que
 # agrupa y se explica en la ficha.
-TIPOS_EN_TARJETA = ("CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
-                    "DISPOSITIVO", "EVIDENCIA", "UBICACION")
+TIPOS_EN_TARJETA = ("CUENTA", "ALIAS", "ALIAS_PAGO", "TELEFONO", "EMAIL",
+                    "IP", "DISPOSITIVO", "EVIDENCIA", "UBICACION")
 
 # Color de cada tipo de dato en el lienzo. La ontologia declara un color
 # institucional pensado para papel; sobre fondo oscuro varios de esos tonos no
@@ -90,6 +91,7 @@ TIPOS_EN_TARJETA = ("CUENTA", "ALIAS", "TELEFONO", "EMAIL", "IP",
 COLOR_VISOR = {
     "CUENTA": "#fb923c",
     "ALIAS": "#fdba74",
+    "ALIAS_PAGO": "#facc15",
     "EMAIL": "#38bdf8",
     "TELEFONO": "#2dd4bf",
     "IP": "#4ade80",
@@ -107,7 +109,8 @@ NIVEL_JERARQUICO = {
     "REPORTE": 0,
     "EVENTO": 1, "PERSONA_MENCION": 1, "IDENTIDAD": 1,
     "CUENTA": 2,
-    "ALIAS": 3, "EMAIL": 3, "TELEFONO": 3, "IP": 3, "DISPOSITIVO": 3,
+    "ALIAS": 3, "ALIAS_PAGO": 3, "EMAIL": 3, "TELEFONO": 3, "IP": 3,
+    "DISPOSITIVO": 3,
     "EVIDENCIA": 3, "SEGMENTO": 3,
     "UBICACION": 4, "ORGANIZACION": 4, "DOCUMENTO": 4, "JURISDICCION": 4,
 }

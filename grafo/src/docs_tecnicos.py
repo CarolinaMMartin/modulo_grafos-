@@ -394,6 +394,17 @@ def _discriminancia(a):
          [u"`FRACCION_BAJA_DISCRIMINANCIA`", _n(ont.FRACCION_BAJA_DISCRIMINANCIA),
           u"con corpus grande, aparecer en más de esta fracción degrada"]]))
     a.append(u"")
+    a.append(u"Hay un segundo descuento, independiente del anterior. Cuando el "
+             u"identificador que comparten los dos reportes no está declarado en "
+             u"ningún campo sino escrito en un texto libre —la conversación, la "
+             u"biografía del perfil—, el peso se multiplica por "
+             u"`FACTOR_TEXTO_LIBRE` = %s. No es que la extracción falle: es que "
+             u"cambia lo que el dato significa. Que el prestador informe un "
+             u"teléfono es un dato de la cuenta; que alguien lo escriba en un "
+             u"chat es una afirmación de esa persona, que puede estar equivocada, "
+             u"ser de un tercero o ser mentira."
+             % _n(resolucion.FACTOR_TEXTO_LIBRE))
+    a.append(u"")
     a.append(u"> **La rareza es una propiedad del identificador, no del tamaño de "
              u"la base.** El primer diseño medía la fracción del corpus, y con "
              u"diez reportes un dispositivo compartido por cuatro daba 40 %% y "

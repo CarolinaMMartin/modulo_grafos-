@@ -24,6 +24,7 @@ import alertas as mod_alertas          # noqa: E402
 import construir                        # noqa: E402
 import docs_tecnicos                    # noqa: E402
 import dossier as mod_dossier          # noqa: E402
+import mineria_texto as mt              # noqa: E402
 import normalizacion as nz              # noqa: E402
 import redaccion                        # noqa: E402
 import render_html                      # noqa: E402
@@ -258,6 +259,83 @@ def main():
               os.path.exists(os.path.join(tmp, "textos_restringidos.json")))
 
         # ------------------------------------------------------------------
+        print("\n== Identificadores escritos en texto libre ==")
+        # El dato que conecta dos reportes de una misma red no suele estar en
+        # un campo: esta escrito en la conversacion. Lo que se prueba aca es
+        # que se lo lee, que converge escrito de otra manera, y que en ningun
+        # momento se lo hace pasar por un dato declarado.
+        def _claves(texto):
+            return {(h["tipo"], h["clave"]) for h in mt.identificadores(texto)}
+
+        check("el mismo telefono escrito de dos formas da una sola clave",
+              _claves(u"Contacto alternativo: +54 9 11 6000-0147")
+              == _claves(u"Agendá 11-6000-0147"))
+        check("el mismo alias con y sin separadores da una sola clave",
+              _claves(u"Buscame como Puente_Azul47")
+              == _claves(u"Escribí a puenteazul47"))
+        check("un alias de cobro se distingue de un nombre visible",
+              _claves(u"Transferencias: luna.rio.47") == {("ALIAS_PAGO", "lunario47")})
+        check("la marca de tiempo de la transcripcion no se lee como telefono",
+              not [h for h in mt.identificadores(
+                  u"[2026-07-04 21:06:12 UTC] Reported User: hola")
+                  if h["tipo"] == "TELEFONO"])
+        check("el perfil que agrega la plataforma no se duplica como alias",
+              not mt.identificadores(u"Reported User (Profile NX-800147): hola"))
+        check("una palabra sin digito y sin frase que la introduzca no entra",
+              not mt.identificadores(u"se organiza afuera de PlayHub, en NexoChat"))
+        check("un numero corrido sin separadores no se lee como telefono",
+              not [h for h in mt.identificadores(u"expediente 990100001 en tramite")
+                   if h["tipo"] == "TELEFONO"])
+
+        # -- de punta a punta, con dos reportes que solo comparten un texto --
+        def _reporte(rid, esp, usuario, bio, chat):
+            return dict(reportId=rid, reportedInformation=dict(
+                reportingEsp=dict(espName=esp),
+                incidentSummary=dict(platform=esp),
+                incidentDetails=dict(chatIncident=[dict(
+                    id=int(rid) + 1, notes=[dict(value=chat)])]),
+                reportedPeople=dict(reportedPersons=[dict(
+                    id=int(rid) + 2, espUserId=usuario, profileBio=bio)])))
+
+        tmp_txt = tempfile.mkdtemp(prefix="grafo_texto_")
+        datos_txt = os.path.join(tmp_txt, "datos")
+        os.makedirs(datos_txt)
+        for rid, esp, usuario, bio, chat in (
+                ("880000001", "ServicioUno", "SU-1",
+                 u"Contacto alternativo: +54 9 11 5555-0123.", u"hola"),
+                ("880000002", "ServicioDos", "SD-2", u"sin datos",
+                 u"Agendá 11-5555-0123.")):
+            with open(os.path.join(datos_txt, rid + ".json"), "w",
+                      encoding="utf-8") as fh:
+                json.dump(_reporte(rid, esp, usuario, bio, chat), fh)
+        g_txt, res_txt = construir.construir(
+            datos_txt, os.path.join(tmp_txt, "salida"),
+            ts_corrida="2026-01-01T00:00:00+00:00")
+
+        menciones = [d for _, _, _, d in g_txt.aristas(vigentes=False)
+                     if str(d["relation_type"]).startswith("MENCIONA_")]
+        check("lo leido de un texto produce aristas", bool(menciones))
+        check("ninguna de esas aristas se hace pasar por observada",
+              all(d["origin"] == ont.DERIVADA for d in menciones))
+        check("todas declaran confianza y de que texto salieron",
+              all(d.get("confidence") and d.get("source_locator") for d in menciones))
+        check("el metodo que las produjo se distingue del extractor de campos",
+              all(d["method"] == "mineria_texto" for d in menciones))
+        vinculos_txt = [d for _, _, _, d in g_txt.aristas(vigentes=False)
+                        if d["relation_type"] == "COINCIDE_CON"]
+        check("dos reportes que solo comparten un telefono escrito quedan vinculados",
+              len(vinculos_txt) == 1, str(len(vinculos_txt)))
+        if vinculos_txt:
+            v_txt = vinculos_txt[0]
+            check("la explicacion avisa que no esta declarado en ningun campo",
+                  u"declarado en un campo" in v_txt["explicacion"])
+            check("pesa menos que el mismo dato declarado por el prestador",
+                  v_txt["confidence"] < ont.REGLAS["R03_TELEFONO"]["peso_base"],
+                  str(v_txt["confidence"]))
+        check("el descuento por venir de un texto es explicito y menor que uno",
+              0 < resolucion.FACTOR_TEXTO_LIBRE < 1)
+        shutil.rmtree(tmp_txt, ignore_errors=True)
+
         print("\n== El informe es del caso, no del archivo ==")
         d_total = mod_dossier.construir(g, res)
         casos = render_html.casos_de(g, res)

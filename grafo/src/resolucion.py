@@ -51,6 +51,21 @@ CONFIANZA_MISMA_IDENTIDAD = 0.85
 
 TIPOS_INDEXABLES = sorted({r["tipo_nodo"] for r in ont.REGLAS.values()})
 
+# Un identificador que los dos reportes traen escrito en un texto libre pesa
+# menos que el mismo identificador declarado en un campo. No porque la
+# extraccion falle, sino por lo que significa: que el prestador informe un
+# telefono es un dato de la cuenta, que alguien lo escriba en una conversacion
+# es una afirmacion de esa persona, que puede estar equivocada, ser de un
+# tercero o ser mentira. El descuento es unico y explicito para que se pueda
+# discutir; como todos los pesos, esta sin calibrar.
+FACTOR_TEXTO_LIBRE = 0.85
+
+
+def _solo_de_texto(aristas):
+    """True si todo lo que sostiene este identificador salio de un texto libre."""
+    return bool(aristas) and all(
+        str(a.get("relation_type", "")).startswith("MENCIONA_") for a in aristas)
+
 
 # ---------------------------------------------------------------------------
 # Indice invertido: identificador -> reportes (blocking)
@@ -136,15 +151,19 @@ def evaluar_coincidencia(g, n_nodo, aristas_a, aristas_b, factor_disc):
     tipo = g.G.nodes[n_nodo].get("tipo")
     datos = g.G.nodes[n_nodo]
     disparos = []
+    desde_texto = _solo_de_texto(aristas_a) and _solo_de_texto(aristas_b)
 
     def agregar(regla_id, peso, frase, corrobora=None):
         meta = ont.REGLAS[regla_id]
         fd = factor_disc if meta["usa_discriminancia"] else 1.0
+        ft = FACTOR_TEXTO_LIBRE if desde_texto else 1.0
         disparos.append(dict(
             regla=regla_id, regla_version=meta["version"],
             nodo=n_nodo, tipo=tipo, valor=datos.get("valor"),
-            peso_base=meta["peso_base"], peso_efectivo=round(peso * fd, 4),
+            peso_base=meta["peso_base"], peso_efectivo=round(peso * fd * ft, 4),
             factor_discriminancia=round(fd, 4),
+            factor_texto_libre=round(ft, 4),
+            desde_texto=desde_texto,
             corrobora_solamente=(meta["corrobora_solamente"] if corrobora is None
                                  else corrobora),
             nota=frase))
@@ -161,13 +180,16 @@ def evaluar_coincidencia(g, n_nodo, aristas_a, aristas_b, factor_disc):
 
     elif tipo == "TELEFONO":
         agregar("R03_TELEFONO", ont.REGLAS["R03_TELEFONO"]["peso_base"],
-                u"ambos consignan el mismo número telefónico, que una vez "
-                u"normalizado resulta %s" % datos.get("valor"))
+                u"en ambos %s el mismo número telefónico, que una vez "
+                u"normalizado resulta %s"
+                % (u"aparece escrito" if desde_texto else u"se consigna",
+                   datos.get("valor")))
 
     elif tipo == "EMAIL":
         agregar("R04_EMAIL", ont.REGLAS["R04_EMAIL"]["peso_base"],
-                u"ambos consignan la misma dirección de correo (%s)"
-                % datos.get("valor"))
+                u"en ambos %s la misma dirección de correo (%s)"
+                % (u"aparece escrita" if desde_texto else u"se consigna",
+                   datos.get("valor")))
 
     elif tipo == "EVIDENCIA":
         agregar("R05_EVIDENCIA", ont.REGLAS["R05_EVIDENCIA"]["peso_base"],
@@ -225,7 +247,14 @@ def evaluar_coincidencia(g, n_nodo, aristas_a, aristas_b, factor_disc):
 
     elif tipo == "ALIAS":
         agregar("R08_ALIAS", ont.REGLAS["R08_ALIAS"]["peso_base"],
-                u"en ambos figura el mismo nombre visible, «%s»" % datos.get("valor"))
+                u"en ambos figura el mismo %s, «%s»"
+                % (u"alias" if desde_texto else u"nombre visible",
+                   datos.get("valor")))
+
+    elif tipo == "ALIAS_PAGO":
+        agregar("R10_ALIAS_PAGO", ont.REGLAS["R10_ALIAS_PAGO"]["peso_base"],
+                u"los dos apuntan a la misma vía de cobro, el alias de pago "
+                u"«%s»" % datos.get("valor"))
 
     elif tipo == "UBICACION":
         agregar("R09_UBICACION", ont.REGLAS["R09_UBICACION"]["peso_base"],
@@ -385,6 +414,30 @@ def _explicar(g, n_a, n_b, disparos, confianza, dup):
     corroboran = sorted([d for d in disparos if d["corrobora_solamente"]],
                         key=lambda x: -x["peso_efectivo"])
 
+    # Si algun elemento salio de un texto libre hay que decirlo, pero una sola
+    # vez: repetir la salvedad en cada frase vuelve la explicacion ilegible, y
+    # una explicacion que no se lee no protege a nadie.
+    de_texto = [d for d in disparos if d.get("desde_texto")]
+    if not de_texto:
+        salvedad = u""
+    elif len(de_texto) == len(disparos):
+        salvedad = (
+            u"Nada de lo anterior está declarado en un campo del reporte: está "
+            u"escrito en la conversación o en la biografía del perfil, y lo "
+            u"extrajo una regla del sistema. Consta que el texto lo menciona, no "
+            u"que pertenezca a la persona reportada; por eso pesa algo menos que "
+            u"un dato que informa el prestador y hay que confirmarlo contra el "
+            u"expediente.")
+    else:
+        salvedad = (
+            u"De lo anterior, %s no está declarado en un campo del reporte sino "
+            u"escrito en la conversación o en la biografía del perfil, y lo "
+            u"extrajo una regla del sistema. Consta que el texto lo menciona, no "
+            u"que pertenezca a la persona reportada; por eso pesa algo menos que "
+            u"un dato que informa el prestador y hay que confirmarlo contra el "
+            u"expediente."
+            % _enumerar([u"«%s»" % d["valor"] for d in de_texto]))
+
     parrafos = []
     parrafos.append(
         u"Los reportes %s y %s quedan vinculados con una confianza de %s, que el "
@@ -408,6 +461,9 @@ def _explicar(g, n_a, n_b, disparos, confianza, dup):
             u"únicamente en semejanzas de contexto."
             % _enumerar([d["nota"] for d in corroboran],
                         separador=u"; ", conector=u"; y, por último, "))
+
+    if salvedad:
+        parrafos.append(salvedad)
 
     if dup:
         parrafos.append(

@@ -43,6 +43,7 @@ Clasificación de cada capacidad, según pide `contexto.md` §20.7.
 | Vincular y revertir **desde la pantalla**, con un cuadro que pide quién lo dispone y el fundamento | **implementada** | `servidor.py`, `render_html` (`accionVincular`) |
 | Servidor local que registra la decisión, reconstruye el grafo y devuelve al operador a donde estaba | **implementada** | `servidor.py` |
 | Banco de pruebas: importar reportes desde la pantalla y procesarlos con las mismas reglas, sin tocar el dataset | **implementada** | `servidor._importar` / `_quitar`, `construir.DIR_ENTRADA` |
+| Identificadores escritos en texto libre —teléfono, alias, alias de cobro— extraídos y normalizados, como derivados y con menos peso que un campo declarado | **implementada** | `src/mineria_texto.py`, relaciones `MENCIONA_*` |
 | Re-aplicación de decisiones humanas tras reconstruir | **implementada** | `validacion.aplicar` |
 | Visor interactivo con filtros y foco progresivo | **implementada** | `src/render_html.py` |
 | Informe con trazabilidad a la fuente | **implementada** | `src/informe.py` |
@@ -72,11 +73,24 @@ en la fuente, no salen de una regla y no son hipótesis del sistema a la espera
 de validación. Está documentado en `TRASPASO.md` §4.13 y **pendiente de validar
 con los especialistas** (§9.5). No debe presentarse como ontología aprobada.
 
+En el mismo estado están el tipo de nodo `ALIAS_PAGO` —un alias de cobro no es
+un nombre visible: no lo eligió nadie para mostrarse sino para cobrar— y las
+relaciones `MENCIONA_TELEFONO`, `MENCIONA_EMAIL`, `MENCIONA_ALIAS` y
+`MENCIONA_ALIAS_PAGO`, que separan el identificador que un texto libre menciona
+del que un campo declara. No figuran en `contexto.md` §10.1 ni §10.3, están
+marcadas como tales en el código y documentadas en `TRASPASO.md` §4.16.
+
 ## 3. Qué está ausente
 
 - Extracción desde el PDF estandarizado y desde XML (hoy solo JSON).
 - Cualquier procesamiento multimodal: imagen, audio, video, OCR, transcripción.
-- Embeddings y búsqueda semántica.
+  Falta, en concreto, ingerir el manifiesto de `fileDetails` y comparar hashes
+  perceptuales y huellas de audio. Requiere además un mecanismo nuevo: hoy dos
+  reportes se vinculan porque comparten un nodo, y dos imágenes parecidas no son
+  el mismo nodo (`TRASPASO.md` §4.16).
+- Embeddings y búsqueda semántica. Falta, en concreto, reconocer que *«galpón
+  del mural azul cerca de la estación»* y *«depósito con mural celeste, entrada
+  lateral»* podrían ser el mismo lugar. Es trabajo para el modelo local.
 - GNN. Existe el baseline determinista contra el cual compararla; el modelo no.
 - Vínculo entre oficios y respuestas de prestadores (`RESPONDE_A` está en el
   vocabulario, sin implementación: falta definir el formato de las respuestas).

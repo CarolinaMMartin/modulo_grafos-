@@ -14,12 +14,25 @@ minimizacion y exportacion controlada (contexto.md 14.9 y 14.10).
 import json
 import re
 
+import mineria_texto as mt
 import normalizacion as nz
 import nucleo
 import ontologia as ont
 
 METODO = "extractor_ncmec"
-VERSION = "1.2"
+VERSION = "1.3"
+
+# Los identificadores que se leen de un texto libre no salen del mismo metodo
+# que los que se leen de un campo: llevan el suyo, con su version, para que una
+# auditoria pueda decir cual de los dos produjo cada arista.
+METODO_TEXTO = "mineria_texto"
+
+RELACION_MENCION = {
+    "TELEFONO": "MENCIONA_TELEFONO",
+    "EMAIL": "MENCIONA_EMAIL",
+    "ALIAS": "MENCIONA_ALIAS",
+    "ALIAS_PAGO": "MENCIONA_ALIAS_PAGO",
+}
 
 RE_PERFIL_CHAT = re.compile(r"(Reported User|Other User)\s*\(Profile\s+(\w+)\)", re.I)
 
@@ -163,6 +176,10 @@ class ExtractorNCMEC(object):
                                   tipo="transcripcion_chat", caracteres=len(texto),
                                   texto=texto)
             self.g.G.nodes[n_ev].setdefault("transcripciones", []).append(h)
+            # Los identificadores se cuelgan del hecho y no de una cuenta: en
+            # una conversacion los escribe cualquiera de los dos, y el
+            # extractor no esta en condiciones de decidir de quien es cada uno.
+            self._mencionados(texto, loc_nota, n_ev, sid, u"la conversación")
 
             vistos = {}
             for rol_txt, perfil in RE_PERFIL_CHAT.findall(texto):
@@ -233,7 +250,39 @@ class ExtractorNCMEC(object):
         self._contactos(p, base, ancla, sid)
         self._capturas(p, base, ancla, sid)
         self._ubicaciones_esp(p, base, ancla, sid)
-        self._bio(p, base, n_per, sid)
+        self._bio(p, base, n_per, ancla, sid)
+
+    def _mencionados(self, texto, locator, ancla, sid, de_donde):
+        """Identificadores que aparecen escritos en un texto libre.
+
+        La arista es DERIVADA y no observada, y la relacion es MENCIONA_ y no
+        ASOCIADO_A: consta que el texto lo menciona, no que le pertenezca a
+        nadie. Es la diferencia entre "el prestador informa este telefono" y
+        "alguien lo escribio en una conversacion", y si las dos se dibujaran
+        igual despues no hay forma de recuperarla.
+        """
+        if not texto:
+            return
+        for h in mt.identificadores(texto):
+            atributos = dict(desde_texto=True, forma_original=h["escrito"])
+            if h["tipo"] == "TELEFONO":
+                atributos["area"] = nz.prefijo_ar(h["clave"])
+            n = self.g.nodo(h["tipo"], h["clave"], etiqueta=h["escrito"], **atributos)
+            frase = (u" La frase que lo introduce lo presenta como dato de %s."
+                     % (u"cobro" if h["cue"] == "pago" else u"contacto")
+                     if h["cue"] else u"")
+            self.g.arista(
+                ancla, n, RELACION_MENCION[h["tipo"]], sid, locator,
+                u"En %s aparece escrito «%s», que es %s.%s%s Lo extrajo una regla "
+                u"del texto: ningún campo del reporte lo declara, de modo que "
+                u"consta que el texto lo menciona y no que pertenezca a la "
+                u"persona reportada."
+                % (de_donde, h["escrito"], h["como"], frase,
+                   (u" " + u"; ".join(h["notas"]) + u".") if h["notas"] else u""),
+                METODO_TEXTO, mt.MINERIA_VERSION, confianza=h["confianza"],
+                atributos=dict(normalizacion=nz.NORMALIZACION_VERSION,
+                               forma_original=h["escrito"],
+                               cue=h["cue"], desde_texto=True))
 
     def _alias(self, p, base, ancla, sid):
         candidatos = []
@@ -247,10 +296,15 @@ class ExtractorNCMEC(object):
             candidatos.append((p["screenName"], base + ".screenName", "screen name"))
 
         for valor, loc, tipo in candidatos:
-            alias, notas = nz.normalizar_alias(valor)
+            # La clave la da mineria_texto y no normalizar_alias, para que un
+            # nombre visible declarado en un campo y el mismo alias escrito en
+            # una conversacion caigan en el mismo nodo. Si se compararan
+            # distinto, «Puente_Azul47» y «puenteazul47» quedarian como dos
+            # cosas y el vinculo se perderia por una barra baja.
+            alias, notas = mt.clave_alias(valor)
             if not alias:
                 continue
-            n_al = self.g.nodo("ALIAS", alias, etiqueta=alias, forma_original=valor)
+            n_al = self.g.nodo("ALIAS", alias, etiqueta=valor, forma_original=valor)
             self.g.arista(
                 ancla, n_al, "ALIAS_DE", sid, loc,
                 u"%s declarado en el reporte: «%s».%s"
@@ -390,7 +444,7 @@ class ExtractorNCMEC(object):
                 observed_at=ts.isoformat() if ts else None,
                 atributos=dict(verificada=bool(u.get("verified")), aproximada=True))
 
-    def _bio(self, p, base, n_per, sid):
+    def _bio(self, p, base, n_per, ancla, sid):
         bio = p.get("profileBio")
         if not bio:
             return
@@ -398,6 +452,10 @@ class ExtractorNCMEC(object):
         self.textos[h] = dict(locator=base + ".profileBio", source_evidence_id=sid,
                               tipo="bio_perfil", caracteres=len(bio), texto=bio)
         self.g.G.nodes[n_per]["bio_hash"] = h
+        # La biografia es donde se pone lo que no entra en ningun campo: un
+        # segundo telefono, un alias de otra aplicacion, la via de cobro.
+        self._mencionados(bio, base + ".profileBio", ancla, sid,
+                          u"la biografía del perfil")
 
     # --------------------------------------------------------- automatico
     def _geolookups(self, r, sid):

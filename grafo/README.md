@@ -169,6 +169,45 @@ guarda como `<reportId>.json`, no con el nombre con que vino.
 **La carpeta está fuera del repositorio**, porque ahí puede terminar un reporte
 real. Ver `grafo/entrada/LEEME.md`.
 
+### Identificadores escritos en el texto
+
+Hay reportes donde el dato que los conecta con otro **no está en ningún campo**:
+está escrito en la conversación o en la biografía del perfil. *«Agendá
+11-6000-0147»*, *«buscame como Puente_Azul47»*, *«el anticipo sale desde
+LUNA-RIO-47»*. Quien opera sabe no repetir la cuenta, la IP ni el dispositivo,
+así que si el sistema solo mirara campos, dos reportes de la misma red
+quedarían sueltos —que es justamente el caso que hay que detectar.
+
+`src/mineria_texto.py` los lee y los normaliza, de modo que la misma cosa
+escrita de otra manera converja:
+
+| En un reporte | En el otro | Quedan como |
+|---|---|---|
+| `+54 9 11 6000-0147` | `11-6000-0147` | el mismo teléfono |
+| `Puente_Azul47` | `puenteazul47` | el mismo alias |
+| `luna.rio.47` | `LUNA-RIO-47` | la misma vía de cobro |
+
+**No se hacen pasar por datos declarados.** La relación se llama `MENCIONA_` y
+no `ASOCIADO_A`, el origen es *derivada* y no *observada*, y la explicación del
+vínculo lo dice con todas las letras: consta que el texto lo menciona, no que
+pertenezca a la persona reportada. Además pesa menos: la coincidencia se
+multiplica por `FACTOR_TEXTO_LIBRE` (0,85), porque que el prestador informe un
+teléfono es un dato de la cuenta y que alguien lo escriba en un chat es una
+afirmación de esa persona, que puede estar equivocada, ser de un tercero o ser
+mentira.
+
+Qué se admite: teléfonos, correos y arrobas se reconocen por su forma. El caso
+difícil es el alias suelto —una palabra en medio de una frase—, y ahí la regla
+es conservadora: **se admite si lleva un dígito, o si una frase lo introduce
+expresamente** («buscame como», «el anticipo sale desde»). Sin eso, cualquier
+palabra escrita raro entraría al grafo como identificador y después nadie
+podría descartarlas de a una.
+
+El alias de cobro se separó del nombre visible (`ALIAS_PAGO`, regla
+`R10_ALIAS_PAGO`, peso 0,62). Meterlo en `ALIAS` lo habría hecho valer 0,22
+—*refuerza, nunca sostiene solo*—, y dos cuentas que cobran por la misma vía
+comparten algo bastante más concreto que un apodo.
+
 ### Lo que no se dibuja
 
 - **Las plataformas y los prestadores.** Todos los reportes de Grindr comparten
@@ -310,9 +349,10 @@ grafo/
    persona (`validar.py unificar`) y no borra las menciones: agrega una capa de
    identidad por encima, reversible.
 
-5. **El texto sensible no entra al grafo.** Transcripciones y bios quedan en un
-   almacén aparte referenciado por hash. Del chat solo se leen los
-   identificadores de perfil que la plataforma agrega de forma estructurada.
+5. **El texto sensible no entra al grafo, pero los identificadores que
+   menciona sí.** Transcripciones y bios quedan en un almacén aparte
+   referenciado por hash. Lo que entra al grafo es el identificador
+   normalizado, con el locator del texto del que salió. Ver más abajo.
 
 6. **Nada se decide automáticamente.** El sistema propone vínculos, duplicados,
    unificaciones de identidad y reaperturas. La decisión es siempre del operador.

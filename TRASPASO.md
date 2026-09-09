@@ -332,11 +332,77 @@ La unificación existe pero **la aprueba una persona** (`validar.py unificar`), 
 - es **reversible**: revertir la validación deshace la identidad sola en la
   próxima construcción.
 
-### 4.11 El texto sensible no entra al grafo
+### 4.11 El texto sensible no entra al grafo, pero los identificadores que menciona sí
 
 Transcripciones de chat y bios de perfil quedan en `salida/textos_restringidos.json`,
-referenciadas por hash. Del chat solo se leen los identificadores de perfil que
-la plataforma agrega de forma estructurada. Hay invariantes que lo verifican.
+referenciadas por hash. El texto no se copia al grafo. Hay invariantes que lo
+verifican.
+
+Lo que sí entra es el **identificador normalizado** que ese texto menciona, con
+el locator del texto del que salió. Ver 4.16.
+
+### 4.16 Lo que conecta dos reportes no siempre está en un campo
+
+Al probar el motor con un lote de reportes preparado para eso, el resultado fue
+que parseaba bien y no correlacionaba nada. La razón: el lote estaba armado con
+las cuentas, las IP, los dispositivos y las plataformas **todos distintos**, y
+las tres cosas que ataban los dos reportes estaban escritas en el texto:
+
+| En un reporte | En el otro |
+|---|---|
+| bio: *«Contacto alternativo: +54 9 11 6000-0147»* | chat: *«Agendá 11-6000-0147»* |
+| chat: *«Buscame como Puente_Azul47»* | chat: *«Escribí a puenteazul47»* |
+| bio: *«Transferencias: luna.rio.47»* | chat: *«El anticipo sale desde LUNA-RIO-47»* |
+
+No es una rareza del lote: es cómo se ve una red que sabe no repetir
+identificadores. Un motor que solo mira campos estructurados no la ve nunca.
+
+`src/mineria_texto.py` extrae esos identificadores y los normaliza para que
+converjan. Las decisiones que importan:
+
+- **No se hacen pasar por observados.** La relación es `MENCIONA_TELEFONO`,
+  `MENCIONA_ALIAS`, `MENCIONA_ALIAS_PAGO`, `MENCIONA_EMAIL`, todas de origen
+  *derivada*, y el método que las produce (`mineria_texto`) es distinto del que
+  lee los campos (`extractor_ncmec`). Una auditoría puede separar las dos cosas.
+  La diferencia entre *«el prestador informa este teléfono»* y *«alguien lo
+  escribió en una conversación»* no se recupera después si las dos se guardan
+  igual.
+- **Pesan menos.** `FACTOR_TEXTO_LIBRE` = 0,85 sobre la coincidencia, y la
+  explicación lo dice en un párrafo aparte, una sola vez y en castellano.
+- **Se cuelgan del hecho, no de una cuenta.** En una conversación los escribe
+  cualquiera de los dos, y el extractor no está en condiciones de decidir de
+  quién es cada uno.
+- **La regla del alias suelto es conservadora**: se admite si lleva un dígito o
+  si una frase lo introduce expresamente. Sin eso, cualquier palabra escrita
+  raro entraría al grafo como identificador. Prefiere perderse un alias antes
+  que llenar el grafo de ruido que después nadie descarta de a uno.
+- **El alias de cobro es un tipo aparte** (`ALIAS_PAGO`, regla `R10`, peso
+  0,62). Meterlo en `ALIAS` lo habría hecho valer 0,22 —*refuerza, nunca
+  sostiene solo*—, y dos cuentas que cobran por la misma vía comparten algo
+  bastante más concreto que un apodo.
+- **La clave de comparación del alias cambió para todos**, no solo para los del
+  texto: se comparan sin mayúsculas, acentos ni separadores, porque si no
+  `Puente_Azul47` y `puenteazul47` quedaban como dos cosas y el vínculo se
+  perdía por una barra baja. La forma con la que apareció se conserva, que es
+  lo que el operador va a buscar en el expediente.
+
+`ALIAS_PAGO` y las relaciones `MENCIONA_*` **no figuran en `contexto.md` 10.1 y
+10.3**. Son adiciones a la ontología, marcadas como tales en el código y
+pendientes de validación, igual que el origen `afirmada`.
+
+Sobre el mismo lote quedaron sin resolver tres señales, y hacen falta piezas
+que hoy no existen:
+
+1. **El lugar descrito con palabras** —*«galpón del mural azul cerca de la
+   estación»* contra *«depósito con mural celeste, entrada lateral»*— necesita
+   similitud semántica. Es trabajo para el modelo local, no para una regla.
+2. **La imagen casi duplicada** (pHash a distancia 1, SHA-256 distintos) y
+3. **la huella de audio compartida** necesitan ingerir el manifiesto de
+   `fileDetails`, que viene como archivo aparte, y además un mecanismo nuevo:
+   hoy dos reportes se vinculan porque **comparten un nodo**, y dos imágenes
+   parecidas no son el mismo nodo. La salida natural es indexar el pHash por
+   bandas (LSH) para que la coincidencia aproximada vuelva a ser un nodo
+   compartido, y verificar después la distancia de Hamming.
 
 ### 4.12 El informe es del caso, y el archivo no se enumera
 
