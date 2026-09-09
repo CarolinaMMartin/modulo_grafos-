@@ -7,6 +7,10 @@ reporte anonimizado.txt
 *.pdf
 *.docx
 
+# Banco de pruebas: puede contener reportes reales sin redactar.
+grafo/entrada/*
+!grafo/entrada/LEEME.md
+
 # --- salidas generadas -------------------------------------------------------
 # Todo esto se regenera con: python grafo/construir.py
 grafo/salida/

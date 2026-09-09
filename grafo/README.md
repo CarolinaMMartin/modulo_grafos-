@@ -117,7 +117,7 @@ estos reportes**. Se abre un cuadro que pide quién lo dispone y el fundamento
 —obligatorio, y va al informe—, se registra en el libro, se reconstruye el grafo
 y la pantalla vuelve al mismo reporte con el aviso de lo que quedó asentado.
 
-La vinculación se dibuja con su propio trazo, entra en el informe del caso y
+La vinculación se dibuja con su propio color, entra en el informe del caso y
 agrupa los dos reportes en el mismo legajo. No lleva peso: no hay nada calculado
 que ponderar. Se revierte desde su ficha, y el registro anterior no se borra.
 
@@ -133,11 +133,41 @@ python validar.py desvincular 900000104 900000109 --usuario op_04
 
 Un solo criterio, y está en la leyenda del panel izquierdo:
 
-- el **trazo** dice de dónde sale la relación — lleno: consta en la fuente;
-  rayado: derivada por una regla; punteado: hipótesis sin validar; raya y punto:
-  la estableció un operador;
-- el **color** dice de qué tipo de dato se trata, y es el mismo en la barra de
-  la caja, en la línea y en su punta de flecha.
+- el **grosor** dice cuánto pesa la vinculación: cuanto más gruesa, más peso. La
+  escala es la misma en todos los casos —de 0,50 a 1,00, no relativa a lo que hay
+  en pantalla—, así que dos líneas iguales pesan igual aunque estén en casos
+  distintos. Las que no tienen peso calculado, las que dispuso una persona, van
+  con un grosor fijo;
+- el **color** de una línea entre dos reportes dice cómo se obtuvo la
+  vinculación: derivada por una regla, posible duplicado del mismo hecho,
+  hipótesis todavía sin validar, o establecida por un operador;
+- el **color** de una línea que toca un dato dice de qué tipo de dato se trata,
+  y es el mismo en la barra de la caja, en la línea y en su punta de flecha.
+
+Antes el trazo discontinuo distinguía el origen de la relación. Se sacó: a
+simple vista un rayado y un punteado se parecen, y el peso —que es el número que
+el operador mira para decidir— no se veía en ninguna parte. Ahora está en lo
+primero que registra el ojo.
+
+### Probar con otros reportes
+
+En el panel izquierdo, arriba de todo, **Probar con otros reportes** toma
+archivos `.json` de reporte, los guarda en `grafo/entrada/` y reconstruye el
+grafo entero. Se procesan con las mismas reglas que el dataset del proyecto y
+entran al caso que les corresponda; el panel los lista aparte, para que nadie
+confunda un reporte que alguien trajo a probar con el material del proyecto, y
+cada uno se saca con **Quitar**.
+
+Lo mismo sin la pantalla: copiar los archivos a `grafo/entrada/` y correr
+`python grafo/construir.py`.
+
+Al importar se valida lo mínimo que el extractor necesita —que sea un JSON, que
+sea un objeto y que traiga `reportId`—; lo que falte adentro se tolera, y el
+visor lo muestra como lo que es, un reporte con pocos datos. El archivo se
+guarda como `<reportId>.json`, no con el nombre con que vino.
+
+**La carpeta está fuera del repositorio**, porque ahí puede terminar un reporte
+real. Ver `grafo/entrada/LEEME.md`.
 
 ### Lo que no se dibuja
 

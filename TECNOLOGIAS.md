@@ -281,6 +281,14 @@ línea de color desde el dato hasta ese reporte, por un carril horizontal propio
 para que no se superpongan. Es lo que hace visible, de un vistazo, qué dato
 sostiene qué vinculación.
 
+El **grosor** de una vinculación es su peso, en una escala absoluta —de 0,50 a
+1,00— y no relativa al caso que se esté mirando: si dependiera del máximo del
+caso, la misma vinculación se vería distinta según con quién comparta la
+pantalla y dejaría de poder compararse entre casos. El **color**, en las líneas
+entre reportes, dice cómo se obtuvo la vinculación; en las líneas que tocan un
+dato, de qué tipo de dato se trata. No se usan trazos discontinuos: a simple
+vista un rayado y un punteado se parecen.
+
 ### Etiquetas de vínculo
 
 Cada arista lleva escrito qué relación representa, en castellano: *opera con la

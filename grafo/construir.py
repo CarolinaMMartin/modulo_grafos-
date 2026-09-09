@@ -50,6 +50,19 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 # Los reportes viven en la carpeta de trabajo, no dentro del modulo:
 # son material del proyecto, no un recurso interno del codigo.
 DIR_DATOS = os.path.join(os.path.dirname(BASE), "reportes_sinteticos")
+# Banco de pruebas: lo que se deje aca se ingiere junto con el dataset, sin
+# mezclarse con el. Queda fuera del repositorio porque puede contener un
+# reporte real.
+DIR_ENTRADA = os.path.join(BASE, "entrada")
+
+
+def carpetas(dir_datos):
+    """Admite una carpeta o varias. Las ultimas pisan a las primeras si dos
+    traen el mismo reporte, que es lo que permite probar una variante sin
+    tocar el dataset."""
+    if isinstance(dir_datos, (list, tuple)):
+        return [d for d in dir_datos if d and os.path.isdir(d)]
+    return [dir_datos] if dir_datos and os.path.isdir(dir_datos) else []
 
 
 def construir(dir_datos, dir_salida, ts_corrida=None):
@@ -60,17 +73,32 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
     if not os.path.isdir(dir_salida):
         os.makedirs(dir_salida)
 
-    estado_path = os.path.join(dir_datos, "estado_institucional.json")
+    dirs = carpetas(dir_datos)
     estados = {}
-    if os.path.exists(estado_path):
-        with open(estado_path, "r", encoding="utf-8") as fh:
-            estados = json.load(fh)
+    for d in dirs:
+        estado_path = os.path.join(d, "estado_institucional.json")
+        if os.path.exists(estado_path):
+            with open(estado_path, "r", encoding="utf-8") as fh:
+                estados.update(json.load(fh))
 
     g = nucleo.Grafo(ts_corrida=ts_corrida, estricto=True)
     ext = extractor_ncmec.ExtractorNCMEC(g)
 
-    rutas = sorted(r for r in glob.glob(os.path.join(dir_datos, "*.json"))
-                   if os.path.basename(r) != "estado_institucional.json")
+    # Un reporte que aparece en dos carpetas se ingiere una sola vez: gana el
+    # de la ultima, que es la de entrada.
+    por_reporte = {}
+    for d in dirs:
+        for r in sorted(glob.glob(os.path.join(d, "*.json"))):
+            if os.path.basename(r) == "estado_institucional.json":
+                continue
+            por_reporte[os.path.splitext(os.path.basename(r))[0]] = r
+    rutas = [por_reporte[k] for k in sorted(por_reporte)]
+    # Cuales vinieron del banco de pruebas: el visor los distingue del dataset
+    # del proyecto, para que nadie confunda un reporte que trajo alguien a
+    # probar con uno que forma parte del material.
+    raiz_entrada = os.path.abspath(DIR_ENTRADA)
+    importados = sorted(rid for rid, r in por_reporte.items()
+                        if os.path.abspath(os.path.dirname(r)) == raiz_entrada)
     for ruta in rutas:
         rid = os.path.splitext(os.path.basename(ruta))[0]
         ext.ingerir(ruta, estados.get(rid))
@@ -79,6 +107,7 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
         corrida=g.ts_corrida,
         ontologia_version=ont.ONTOLOGIA_VERSION,
         reportes_ingeridos=len(rutas),
+        importados=importados,
         avisos_extraccion=ext.avisos,
     )
 
@@ -172,7 +201,7 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
 
 def main():
     ap = argparse.ArgumentParser(description="Construye el grafo de la boveda CIJ")
-    ap.add_argument("--datos", default=DIR_DATOS)
+    ap.add_argument("--datos", default=[DIR_DATOS, DIR_ENTRADA], nargs="*")
     ap.add_argument("--salida", default=os.path.join(BASE, "salida"))
     args = ap.parse_args()
 

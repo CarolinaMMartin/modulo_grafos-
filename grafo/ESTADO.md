@@ -29,7 +29,7 @@ Clasificación de cada capacidad, según pide `contexto.md` §20.7.
 | Colapso visual de aristas paralelas, informando en cuántos reportes constan | **implementada** | `GRUPO` / `MIEMBROS` en `aplicar` |
 | Informe en prosa, uno por caso, embebido en el visor y descargable | **implementada** | `dossier.recortar`, `src/redaccion.py` |
 | Panel de filtros: buscar, peso mínimo, tipos de dato, solo datos compartidos | **implementada** | `src/render_html.py` |
-| Criterio único de línea: el trazo dice el origen, el color dice el tipo de dato | **implementada** | `render_html.COLOR_VISOR`, hoja de estilos |
+| Criterio único de línea: el grosor dice el peso, el color dice cómo se obtuvo la vinculación (o, en las líneas a un dato, de qué dato se trata) | **implementada** | `render_html.COLOR_VISOR`, hoja de estilos |
 | Foco por dato o por vinculación: apaga lo que no interviene, y el segundo clic lo devuelve | **implementada** | `render_html`, `alternarFoco` |
 | Cajas movibles de a una, con los conectores recalculados | **implementada** | `render_html.arrastrable` |
 | Un dato puesto en el centro: el árbol se cuelga de él | **implementada** | `render_html.centrarEn` |
@@ -42,6 +42,7 @@ Clasificación de cada capacidad, según pide `contexto.md` §20.7.
 | Vinculación que establece un operador cuando el sistema no vinculó, con origen propio `afirmada` | **implementada** | `validacion.LibroVinculos` |
 | Vincular y revertir **desde la pantalla**, con un cuadro que pide quién lo dispone y el fundamento | **implementada** | `servidor.py`, `render_html` (`accionVincular`) |
 | Servidor local que registra la decisión, reconstruye el grafo y devuelve al operador a donde estaba | **implementada** | `servidor.py` |
+| Banco de pruebas: importar reportes desde la pantalla y procesarlos con las mismas reglas, sin tocar el dataset | **implementada** | `servidor._importar` / `_quitar`, `construir.DIR_ENTRADA` |
 | Re-aplicación de decisiones humanas tras reconstruir | **implementada** | `validacion.aplicar` |
 | Visor interactivo con filtros y foco progresivo | **implementada** | `src/render_html.py` |
 | Informe con trazabilidad a la fuente | **implementada** | `src/informe.py` |

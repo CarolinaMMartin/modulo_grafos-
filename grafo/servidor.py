@@ -44,11 +44,26 @@ LIBRO_VALIDACIONES = os.path.join(BASE, "estado", "validaciones.jsonl")
 LIBRO_VINCULOS = os.path.join(BASE, "estado", "vinculos_manuales.jsonl")
 
 CUERPO_MAXIMO = 64 * 1024          # ningun motivo legitimo pesa mas que esto
+# Los reportes se suben de a varios y un JSON de NCMEC con transcripciones pesa.
+CUERPO_MAXIMO_IMPORTAR = 12 * 1024 * 1024
 _candado = threading.Lock()        # una escritura por vez: el libro es un archivo
 
 
 def reconstruir():
-    construir.construir(construir.DIR_DATOS, SALIDA)
+    construir.construir([construir.DIR_DATOS, construir.DIR_ENTRADA], SALIDA)
+
+
+def _nombre_seguro(valor):
+    """Nombre de archivo a partir del numero de reporte.
+
+    Se arma con el reportId y no con el nombre que trae el archivo subido: un
+    nombre de archivo es entrada no confiable y no tiene por que decidir donde
+    se escribe.
+    """
+    limpio = "".join(c for c in str(valor) if c.isalnum() or c in "-_")
+    if not limpio:
+        raise ValueError("el numero de reporte no sirve como nombre de archivo")
+    return limpio[:60] + ".json"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -118,6 +133,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/vincular": self._vincular,
             "/api/desvincular": self._desvincular,
             "/api/decidir": self._decidir,
+            "/api/importar": self._importar,
+            "/api/quitar": self._quitar,
         }
         if ruta not in acciones:
             self._error(404, "no existe")
@@ -127,7 +144,8 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             self._error(400, "cuerpo invalido")
             return
-        if largo <= 0 or largo > CUERPO_MAXIMO:
+        tope = CUERPO_MAXIMO_IMPORTAR if ruta == "/api/importar" else CUERPO_MAXIMO
+        if largo <= 0 or largo > tope:
             self._error(400, "cuerpo invalido o demasiado grande")
             return
         try:
@@ -170,6 +188,64 @@ class Handler(BaseHTTPRequestHandler):
         libro = validacion.LibroVinculos(LIBRO_VINCULOS)
         reg = libro.registrar(a, b, "vincular", usuario, motivo)
         return dict(ok=True, accion="vincular", registro=reg)
+
+    def _importar(self, datos):
+        """Guarda reportes en la carpeta de entrada.
+
+        Valida lo minimo que el extractor necesita para no fallar despues: que
+        sea un JSON, que sea un objeto y que traiga numero de reporte. Lo que
+        falte adentro lo tolera el extractor, y el visor lo muestra como lo que
+        es -un reporte con pocos datos-, que tambien es un caso a probar.
+        """
+        archivos = datos.get("archivos")
+        if not isinstance(archivos, list) or not archivos:
+            raise ValueError("no llego ningun archivo")
+        if len(archivos) > 200:
+            raise ValueError("demasiados archivos de una vez")
+        if not os.path.isdir(construir.DIR_ENTRADA):
+            os.makedirs(construir.DIR_ENTRADA)
+
+        resultados = []
+        for a in archivos:
+            nombre = str((a or {}).get("nombre") or "sin nombre")[:120]
+            try:
+                r = json.loads((a or {}).get("contenido") or "")
+            except (ValueError, TypeError):
+                resultados.append(dict(nombre=nombre, ok=False,
+                                       motivo="no es un JSON valido"))
+                continue
+            if not isinstance(r, dict):
+                resultados.append(dict(nombre=nombre, ok=False,
+                                       motivo="el JSON no es un objeto"))
+                continue
+            rid = r.get("reportId")
+            if rid in (None, ""):
+                resultados.append(dict(nombre=nombre, ok=False,
+                                       motivo="no trae reportId"))
+                continue
+            try:
+                destino = os.path.join(construir.DIR_ENTRADA, _nombre_seguro(rid))
+            except ValueError as e:
+                resultados.append(dict(nombre=nombre, ok=False, motivo=str(e)))
+                continue
+            reemplaza = os.path.exists(destino)
+            with open(destino, "w", encoding="utf-8") as fh:
+                json.dump(r, fh, ensure_ascii=False, indent=1)
+            resultados.append(dict(nombre=nombre, ok=True, reporte=str(rid),
+                                   reemplaza=reemplaza))
+        if not any(x["ok"] for x in resultados):
+            raise ValueError("ningun archivo se pudo importar")
+        return dict(ok=True, accion="importar", resultados=resultados)
+
+    def _quitar(self, datos):
+        """Saca un reporte del banco de pruebas. Solo toca la carpeta de
+        entrada: el dataset del proyecto no se borra desde la pantalla."""
+        rid = self._texto(datos, "reporte", maximo=60)
+        destino = os.path.join(construir.DIR_ENTRADA, _nombre_seguro(rid))
+        if not os.path.exists(destino):
+            raise ValueError("ese reporte no esta en la carpeta de entrada")
+        os.remove(destino)
+        return dict(ok=True, accion="quitar", reporte=rid)
 
     def _desvincular(self, datos):
         a = self._texto(datos, "reporte_a")

@@ -361,6 +361,7 @@ def _datos(g, res, dossier=None, texto_informe=None):
             for x in res.get("vinculacion", {}).get("descartados", [])],
         legajos=res.get("legajos", []),
         casos=_casos(g, res, legajo_de),
+        importados=res.get("importados", []),
     )
     if dossier is not None:
         salida["informe"] = dict(
@@ -513,24 +514,26 @@ svg.arrastrando{cursor:grabbing}
 
 /* --- conectores --------------------------------------------------------
    Criterio unico, y no se mezcla:
-     el TRAZO dice como se obtuvo la relacion  -> lleno: consta en la fuente;
-       rayado: derivada por una regla; punteado: hipotesis a validar.
-     el COLOR dice de que tipo de dato se trata (COLOR_VISOR).
-     el GROSOR de una vinculacion acompana su peso.
-   Ver la leyenda del panel izquierdo. */
+     el COLOR de una linea entre reportes dice como se obtuvo la vinculacion.
+     el COLOR de una linea a un dato dice de que tipo de dato se trata
+       (COLOR_VISOR).
+     el GROSOR dice el peso: mas gruesa, mas peso.
+   Antes el trazo discontinuo distinguia el origen, pero a simple vista un
+   rayado y un punteado se parecen, y el peso -que es lo que el operador mira
+   para decidir- no se veia en ningun lado. Ver la leyenda del panel izquierdo. */
 .con{fill:none;stroke:#3d5070;stroke-width:1.5;
   transition:stroke .18s,stroke-width .18s,opacity .18s}
-.con.vinculo{stroke:#22d3ee;stroke-width:2;stroke-dasharray:11 5}
-/* El duplicado NO va en ámbar: el ámbar es el color del tipo de dato
-   "ubicación", y una línea entre reportes con color de dato rompe el criterio
-   -se contaba como una línea de Monte Grande-. Queda en el cian de las
-   vinculaciones, con la raya más corta, y lo dice el rótulo con todas las
-   letras. */
-.con.duplicado{stroke-dasharray:4 4}
-.con.inferida{stroke:#a78bfa;stroke-width:1.8;stroke-dasharray:2 4}
-/* La afirmada por una persona: raya y punto, el trazo con el que se marca a
-   mano un plano. No lleva peso porque no hay nada calculado. */
-.con.afirmada{stroke:#7dd3fc;stroke-width:2.6;stroke-dasharray:14 4 3 4}
+.con.vinculo{stroke:#22d3ee}
+/* El duplicado NO va en ámbar ni en ningún color de tipo de dato: una línea
+   entre reportes con color de dato rompe el criterio -el ámbar se contaba como
+   una línea de Monte Grande-. Va en rosa, que no está en la paleta de datos, y
+   además lo dice el rótulo con todas las letras. */
+.con.duplicado{stroke:#f472b6}
+.con.inferida{stroke:#a78bfa}
+/* La afirmada por una persona va en un tono neutro, distinto de todos los
+   colores de dato: no la calculó el sistema. No lleva peso porque no hay nada
+   calculado, así que tampoco varía el grosor. */
+.con.afirmada{stroke:#e5edf7;stroke-width:2.4}
 .con.cruce{stroke-width:1.7;opacity:.72}
 .con.realzada{opacity:1;stroke-width:2.8;filter:drop-shadow(0 0 4px currentColor)}
 .con.origen{stroke-width:0}
@@ -624,6 +627,16 @@ details.sub2 .interior{padding:0 10px 12px}
     <h1>Vinculaciones</h1>
     <div class="sub" id="meta"></div>
 
+    <h2>Probar con otros reportes</h2>
+    <div style="font-size:11.5px;color:var(--tenue);line-height:1.55;margin-bottom:8px">
+      Se procesan con las mismas reglas, junto al dataset del proyecto. Quedan
+      en <span class="cita" style="padding:1px 5px">grafo/entrada/</span>, fuera
+      del repositorio.</div>
+    <input type="file" id="archivos" multiple accept=".json,application/json"
+           style="display:none">
+    <div class="fila"><button id="btnImportar">Elegir archivos...</button></div>
+    <div id="importados"></div>
+
     <h2>Buscar en el caso</h2>
     <input type="text" id="buscar" placeholder="cuenta, IP, dispositivo, alias...">
 
@@ -645,7 +658,6 @@ details.sub2 .interior{padding:0 10px 12px}
     <div id="tipos"></div>
 
     <h2>Cómo leer el lienzo</h2>
-    <div class="rotuloGrupo" style="margin-top:4px">El trazo dice de dónde sale</div>
     <div id="leyenda"></div>
 
     <div class="tarjeta cyan" style="margin-top:18px">
@@ -889,6 +901,102 @@ function sinApp(que){
     '<div class="pie"><button class="primario" id="dlgCerrar">Entendido</button></div>';
   velo.classList.add("visible");
   document.getElementById("dlgCerrar").onclick = cerrarDialogo;
+}
+
+/* Banco de pruebas: subir reportes y sacarlos, sin salir de la pantalla.
+   El servidor los valida, los guarda y reconstruye el grafo entero; aca solo
+   se leen los archivos y se informa que paso con cada uno. */
+function pintarImportados(){
+  const lista = D.importados || [];
+  const cont = document.getElementById("importados");
+  if(!cont) return;
+  if(!lista.length){
+    cont.innerHTML = '<div style="font-size:11.5px;color:var(--tenue);'+
+      'font-style:italic">Ningún reporte importado. El caso se arma solo con '+
+      'el dataset del proyecto.</div>';
+    return;
+  }
+  cont.innerHTML =
+    '<div class="rotuloGrupo">Importados (' + lista.length + ')</div>' +
+    lista.map(r=>
+      '<div style="display:flex;align-items:center;gap:6px;margin:4px 0">'+
+      '<span class="chip boton" data-ir="reporte|REPORTE::'+esc(String(r).toLowerCase())+
+      '" style="flex:1">'+esc(r)+'</span>'+
+      '<button data-accion="quitarImportado" data-valor="'+esc(r)+
+      '" title="Sacarlo del banco de pruebas" style="padding:4px 9px">Quitar</button>'+
+      '</div>').join("");
+}
+
+function importarArchivos(archivos){
+  if(!EN_APP) return sinApp("importar reportes");
+  if(!archivos || !archivos.length) return;
+  const lector = f => new Promise((ok,mal)=>{
+    const fr = new FileReader();
+    fr.onload = ()=>ok({nombre:f.name, contenido:String(fr.result)});
+    fr.onerror = ()=>mal(new Error("no se pudo leer "+f.name));
+    fr.readAsText(f, "utf-8");
+  });
+  const btn = document.getElementById("btnImportar");
+  btn.disabled = true; btn.textContent = "Importando...";
+  Promise.all([...archivos].map(lector))
+    .then(lista=>pedir("/api/importar", {archivos:lista}))
+    .then(function(j){
+      const r = j.resultados || [];
+      const bien = r.filter(x=>x.ok), mal = r.filter(x=>!x.ok);
+      let msg = bien.length===1 ? "Se importó el reporte "+bien[0].reporte
+              : "Se importaron "+bien.length+" reportes";
+      const reemplazados = bien.filter(x=>x.reemplaza).length;
+      if(reemplazados) msg += " ("+reemplazados+" reemplazó a uno que ya estaba)";
+      msg += ".";
+      if(mal.length) msg += " Quedaron afuera "+mal.length+": "+
+        mal.map(x=>x.nombre+" — "+x.motivo).join("; ")+".";
+      recargarCon(msg);
+    })
+    .catch(function(e){
+      btn.disabled = false; btn.textContent = "Elegir archivos...";
+      avisar("No se pudo importar: "+e.message);
+    });
+}
+
+/* Confirmacion sin campos. No pide operador ni fundamento a proposito: sacar
+   un archivo del banco de pruebas no es una decision sobre un caso y no entra
+   en ningun libro. Pedir una identificacion ahi haria pensar que si. */
+function confirmar(cfg){
+  const velo = document.getElementById("velo"), m = document.getElementById("modal");
+  m.innerHTML =
+    '<h3>'+esc(cfg.titulo)+'</h3>'+
+    '<div class="intro">'+cfg.intro+'</div>'+
+    '<div class="mal" id="dlgMal"></div>'+
+    '<div class="pie"><button id="dlgCancelar">Cancelar</button>'+
+    '<button class="primario" id="dlgAceptar">'+esc(cfg.aceptar)+'</button></div>';
+  velo.classList.add("visible");
+  const mal = document.getElementById("dlgMal");
+  const btn = document.getElementById("dlgAceptar");
+  btn.focus();
+  document.getElementById("dlgCancelar").onclick = cerrarDialogo;
+  btn.onclick = ()=>{
+    mal.textContent = ""; btn.disabled = true; btn.textContent = "Un momento...";
+    cfg.alAceptar().then(
+      msg=>recargarCon(msg),
+      err=>{ btn.disabled = false; btn.textContent = cfg.aceptar;
+             mal.textContent = String(err && err.message ? err.message : err); });
+  };
+}
+
+function accionQuitarImportado(reporte){
+  if(!EN_APP) return sinApp("quitar este reporte");
+  confirmar({
+    titulo: "Quitar el reporte "+reporte+" del banco de pruebas",
+    intro: 'Sale de la carpeta de entrada y deja de procesarse. No toca el '+
+      'dataset del proyecto ni los libros de decisiones: si alguien había '+
+      'vinculado o validado algo sobre este reporte, ese registro se conserva '+
+      'y vuelve a aplicarse si el reporte se importa de nuevo.',
+    aceptar: "Quitar",
+    alAceptar: function(){
+      return pedir("/api/quitar", {reporte:reporte})
+        .then(()=>"Reporte "+reporte+" quitado del banco de pruebas.");
+    }
+  });
 }
 
 function accionVincular(a, b){
@@ -1249,6 +1357,19 @@ function ruta(x1, y1, x2, y2, ym){
     " H"+(x2-r*sx)+" Q"+x2+","+ym+" "+x2+","+(ym+r*s2)+
     " V"+y2;
 }
+/* Grosor de una linea segun el peso de la vinculacion.
+
+   La escala es absoluta -de 0,5 a 1- y no relativa al caso que se este
+   mirando: si dependiera del maximo del caso, la misma vinculacion se veria
+   distinta segun con quien la comparta la pantalla, y dejaria de poder
+   compararse entre casos. */
+const PESO_MINIMO_ESCALA = 0.5, GRUESO_MIN = 1.3, GRUESO_MAX = 4.4;
+function grosorPorPeso(peso){
+  if(peso==null) return null;
+  const t = Math.max(0, Math.min(1, (peso-PESO_MINIMO_ESCALA)/(1-PESO_MINIMO_ESCALA)));
+  return (GRUESO_MIN + t*(GRUESO_MAX-GRUESO_MIN)).toFixed(2);
+}
+
 function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
                                  dato, punto, apagado, realzado}){
   const x1 = desde.x, y1 = desde.y, x2 = hasta.x, y2 = hasta.y;
@@ -1261,6 +1382,10 @@ function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
   // style y no setAttribute: el atributo de presentación pierde contra
   // cualquier regla de la hoja de estilos, y .con ya define un stroke.
   if(color) p.style.stroke = color;
+  // El grosor lo fija el peso, no la hoja de estilos: es el unico lugar donde
+  // se conoce el valor de esta vinculacion en particular.
+  const grueso = grosorPorPeso(peso);
+  if(grueso) p.style.strokeWidth = grueso;
   if(dato) p.setAttribute("data-dato",dato);
   p.setAttribute("marker-end", color ? marcador(color)
     : ((clase||"").indexOf("vinculo")===0 ? "url(#flechaCyan)" : "url(#flecha)"));
@@ -1593,6 +1718,7 @@ document.getElementById("cuerpo").addEventListener("click", e=>{
     VP.encuadrado = false; ir({tipo:"inicio"});
   }
   if(acc.dataset.accion==="abrir"){ estado.abiertos.add(acc.dataset.valor); dibujar(); }
+  if(acc.dataset.accion==="quitarImportado"){ accionQuitarImportado(acc.dataset.valor); }
   if(acc.dataset.accion==="centrar"){ centrarEn(acc.dataset.valor); }
   if(acc.dataset.accion==="descentrar"){ centrarEn(null); }
   if(acc.dataset.accion==="vincular"){ accionVincular(acc.dataset.a, acc.dataset.b); }
@@ -2128,18 +2254,34 @@ function pintarTipos(){
 /* Leyenda del único criterio de color y trazo del lienzo. Si hay que mirar el
    dibujo y adivinar qué significa una línea, la línea no sirve. */
 function pintarLeyenda(){
-  const trazos = [
-    ["solid",  "#6b7f9e", "Consta en la fuente del reporte"],
-    ["dashed", "#22d3ee", "Derivada por una regla del sistema"],
-    ["dotted", "#a78bfa", "Hipótesis todavía sin validar"],
-    ["dashed", "#7dd3fc", "Establecida por un operador"],
+  const origenes = [
+    ["#6b7f9e", "Consta en la fuente del reporte"],
+    ["#22d3ee", "Derivada por una regla del sistema"],
+    ["#f472b6", "Posible duplicado del mismo hecho"],
+    ["#a78bfa", "Hipótesis todavía sin validar"],
+    ["#e5edf7", "Establecida por un operador"],
   ];
+  /* Muestra la escala con las lineas de verdad, no con una descripcion: el
+     grosor se entiende viendolo. */
+  const escala = [0.55, 0.75, 0.99].map(p=>
+    '<div style="display:flex;align-items:center;gap:8px;margin:5px 0">'+
+    '<span style="display:inline-block;width:34px;height:0;'+
+    'border-top:'+grosorPorPeso(p)+'px solid #22d3ee"></span>'+
+    '<span style="font-family:var(--mono);font-size:11px;color:var(--tenue)">'+
+    'peso '+num(p)+'</span></div>').join("");
   document.getElementById("leyenda").innerHTML =
-    trazos.map(([e,c,t])=>
+    '<div class="rotuloGrupo" style="margin-top:0">El grosor es el peso</div>'+
+    escala+
+    '<div style="font-size:11.5px;color:var(--suave);line-height:1.6;margin-top:6px">'+
+    'Cuanto más gruesa la línea, más pesa la vinculación. La escala es la misma '+
+    'en todos los casos, así que dos líneas iguales pesan igual aunque estén en '+
+    'pantallas distintas.</div>'+
+    '<div class="rotuloGrupo">El color, cómo se obtuvo</div>'+
+    origenes.map(([c,t])=>
       '<div style="display:flex;align-items:center;font-size:11.5px;'+
       'color:var(--suave);margin:6px 0"><span class="trazo" style="border-top-style:'+
-      e+';border-top-color:'+c+'"></span>'+esc(t)+'</div>').join("")+
-    '<div class="rotuloGrupo">Y el color, de qué dato se trata</div>'+
+      'solid;border-top-color:'+c+'"></span>'+esc(t)+'</div>').join("")+
+    '<div class="rotuloGrupo">Y en las líneas a un dato, de qué dato se trata</div>'+
     '<div style="font-size:11.5px;color:var(--suave);line-height:1.6">'+
     'Cada tipo de dato tiene su color, el mismo en la barra de la caja y en la '+
     'línea que la lleva a los otros reportes donde ese dato aparece. '+
@@ -2200,6 +2342,15 @@ function sincronizarControles(){
 sincronizarControles();
 pintarTipos();
 pintarLeyenda();
+pintarImportados();
+document.getElementById("btnImportar").onclick = ()=>{
+  if(!EN_APP) return sinApp("importar reportes");
+  document.getElementById("archivos").click();
+};
+document.getElementById("archivos").addEventListener("change", function(e){
+  importarArchivos(e.target.files);
+  e.target.value = "";        // permite volver a elegir el mismo archivo
+});
 
 /* ============================================================ arranque ==== */
 const sel = document.getElementById("selCaso");

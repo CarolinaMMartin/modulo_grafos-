@@ -150,6 +150,28 @@ python grafo/pruebas.py
 103 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
 de diseño, no de presentación.
 
+### Probar con otros reportes
+
+`grafo/entrada/` es el banco de pruebas: todo `.json` que se deje ahí se ingiere
+junto al dataset de `reportes_sinteticos/` y se procesa con las mismas reglas.
+Sirve para pasarle reportes distintos a los algoritmos sin tocar el material del
+proyecto.
+
+Desde el visor, la primera sección del panel izquierdo —**Probar con otros
+reportes**— los sube, los valida y reconstruye sin salir de la pantalla, los
+lista aparte y los saca con **Quitar**. Sin el visor, copiar los archivos ahí y
+correr `python grafo/construir.py`.
+
+Se valida lo mínimo que el extractor necesita: que sea un JSON, que sea un
+objeto y que traiga `reportId`. Lo que falte adentro se tolera —un reporte con
+pocos datos también es un caso que vale la pena probar—. El archivo se guarda
+como `<reportId>.json` y no con el nombre con que vino: un nombre de archivo es
+entrada no confiable y no tiene por qué decidir dónde se escribe.
+
+**La carpeta está fuera del repositorio.** Ahí puede terminar un reporte real, y
+esos no se versionan; si alguno tiene que compartirse, antes pasa por
+`redactar_reporte.py` (§11).
+
 ### Validación humana
 
 ```bash
@@ -582,10 +604,18 @@ que se estaba mirando. Los cambios salieron de mirarla en uso, uno por uno.
 
 **Un solo criterio de línea, y está en la leyenda del panel.**
 
-- El **trazo** dice de dónde sale la relación: lleno, consta en la fuente;
-  rayado, derivada por una regla; punteado, hipótesis sin validar. Es la
-  separación observada/derivada/inferida, dibujada.
-- El **color** dice de qué dato se trata. Es el mismo en la barra de la caja, en
+- El **grosor** dice el peso de la vinculación, en escala absoluta (0,50 a
+  1,00) y no relativa al caso en pantalla: si dependiera del máximo del caso, la
+  misma vinculación se vería distinta según con quién comparta la pantalla y
+  dejaría de poder compararse entre casos. Empezó siendo el trazo el que decía
+  el origen —lleno, rayado, punteado—, pero a simple vista un rayado y un
+  punteado se parecen, y el peso, que es lo que el operador mira para decidir,
+  no se veía en ningún lado.
+- El **color** de una línea entre dos reportes dice cómo se obtuvo la
+  vinculación: derivada, posible duplicado, hipótesis sin validar, o dispuesta
+  por un operador. Es la separación observada/derivada/inferida/afirmada,
+  dibujada.
+- El **color** de una línea que toca un dato dice de qué dato se trata. Es el mismo en la barra de la caja, en
   la línea y en su punta de flecha. Toda línea que toca un dato es de su color,
   incluida la que baja del reporte del que cuelga: mientras esa era gris, al
   elegir un dato quedaba un reporte encendido sin ninguna línea de su color y
