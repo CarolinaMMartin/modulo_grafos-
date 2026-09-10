@@ -34,7 +34,12 @@ para mirar: un archivo suelto no puede guardar nada.
 python grafo/pruebas.py
 ```
 
-103 invariantes sobre las reglas que el proyecto declara no negociables.
+123 invariantes sobre las reglas que el proyecto declara no negociables.
+
+Para probarlo con otros reportes: el panel izquierdo del visor abre con **Probar
+con otros reportes**, que toma archivos `.json`, los procesa con las mismas
+reglas y reconstruye. Quedan en `grafo/entrada/`, que está fuera del
+repositorio.
 
 ## Qué hay acá
 
@@ -51,9 +56,17 @@ python grafo/pruebas.py
 ## Qué hace el sistema
 
 Toma reportes, extrae entidades —cuentas, dispositivos, direcciones IP,
-teléfonos, nombres visibles, ubicaciones— y busca cuáles comparten dos reportes.
-Cuando encuentra algo, propone una vinculación con un peso y explica en prosa
-qué la sostiene y qué solamente la refuerza.
+teléfonos, nombres visibles, alias de cobro, ubicaciones— y busca cuáles
+comparten dos reportes. Cuando encuentra algo, propone una vinculación con un
+peso y explica en prosa qué la sostiene y qué solamente la refuerza.
+
+Las lee de los campos del reporte **y del texto libre**: hay reportes donde lo
+único que los conecta está escrito en la conversación o en la biografía del
+perfil —*«agendá 11-6000-0147»*, *«buscame como Puente_Azul47»*—, porque quien
+opera sabe no repetir la cuenta ni la IP ni el dispositivo. Esos identificadores
+no se hacen pasar por datos declarados: van como derivados, pesan menos y la
+explicación lo dice. Está en `grafo/src/mineria_texto.py` y el fundamento en
+[`TRASPASO.md`](TRASPASO.md) §4.16.
 
 Tres criterios lo gobiernan:
 
@@ -61,7 +74,8 @@ Tres criterios lo gobiernan:
    fuente, método y versión. Sin eso, la relación no se crea.
 2. **Nunca se mezcla lo que consta en la fuente con lo que el sistema dedujo.**
    Observada, derivada e inferida son tres clases separadas, en la persistencia
-   y en la pantalla.
+   y en la pantalla. Un teléfono que el prestador informa y uno que alguien
+   escribió en un chat no se guardan igual.
 3. **Nada se decide solo.** El sistema propone vinculaciones, duplicados,
    unificaciones de identidad y reaperturas. La decisión es siempre del
    operador, y queda registrada.

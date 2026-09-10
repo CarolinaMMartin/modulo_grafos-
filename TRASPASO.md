@@ -65,7 +65,7 @@ Cuantico/
     servidor.py              la aplicación: es lo que permite decidir en pantalla
     validar.py               CLI de validación humana (equivalente, para técnicos)
     informe_ia.py            informe vía modelo local (opcional)
-    pruebas.py               103 invariantes
+    pruebas.py               123 invariantes
     generar_sinteticos.py    generador del dataset
     README.md                cómo se usa
     ESTADO.md                qué está implementado, simplificado o ausente
@@ -75,6 +75,7 @@ Cuantico/
       nucleo.py              contenedor del grafo y procedencia obligatoria
       normalizacion.py       teléfonos, correos, IP, alias, tiempo
       extractor_ncmec.py     JSON de NCMEC -> relaciones OBSERVADAS
+      mineria_texto.py       identificadores escritos en texto libre -> DERIVADAS
       resolucion.py          vínculos DERIVADOS, identidades, contra-evidencia
       identidades.py         consolida las unificaciones aprobadas
       alertas.py             reapertura tipada por motivo de archivo
@@ -87,6 +88,7 @@ Cuantico/
       docs_modelo.py         genera MODELO_DATOS.md
       docs_tecnicos.py       genera DOCUMENTACION_TECNICA.md
       jurisdiccion.py        SIN CONECTAR — ver sección 8
+    entrada/                   banco de pruebas (fuera del repositorio)
     estado/validaciones.jsonl        decisiones sobre relaciones existentes
     estado/vinculos_manuales.jsonl   vinculaciones que dispuso una persona
     salida/                    resultados de la última corrida (no versionado)
@@ -147,7 +149,7 @@ botón de decisión, el visor lo dice en lugar de fingir que anduvo.
 python grafo/pruebas.py
 ```
 
-103 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
+123 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
 de diseño, no de presentación.
 
 ### Probar con otros reportes

@@ -189,7 +189,9 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
                   encoding="utf-8") as fh:
             fh.write(texto)
 
-    docs_modelo.generar(os.path.join(BASE, "MODELO_DATOS.md"), g.resumen())
+    resumen_modelo = g.resumen()
+    resumen_modelo["importados"] = resultado.get("importados") or []
+    docs_modelo.generar(os.path.join(BASE, "MODELO_DATOS.md"), resumen_modelo)
     docs_tecnicos.generar(os.path.join(os.path.dirname(BASE),
                                        "DOCUMENTACION_TECNICA.md"), g, resultado)
     render_html.render(g, resultado, os.path.join(dir_salida, "grafo.html"),

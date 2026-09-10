@@ -136,6 +136,16 @@ def generar(ruta, resumen=None):
         a("- Por origen: %s"
           % ", ".join("%s %d" % (k, v) for k, v in sorted(resumen["aristas_por_origen"].items())))
         a("- Incumplimientos de procedencia: **%d**" % resumen["incumplimientos"])
+        # Si la construccion incluyo reportes del banco de pruebas hay que
+        # decirlo aca: si no, este documento -que esta versionado- muestra
+        # numeros que nadie puede reproducir clonando el repositorio, porque
+        # esos reportes no estan adentro.
+        importados = resumen.get("importados") or []
+        if importados:
+            a("- **Incluye %d reporte(s) del banco de pruebas** (`grafo/entrada/`), "
+              "que no forman parte del repositorio: %s. Sin ellos los números de "
+              "arriba son otros."
+              % (len(importados), ", ".join("`%s`" % r for r in importados)))
         a("\n| Tipo de nodo | Cantidad |")
         a("|---|---|")
         for t, c in sorted(resumen["nodos_por_tipo"].items(), key=lambda x: -x[1]):
