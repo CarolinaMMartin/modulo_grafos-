@@ -189,11 +189,21 @@ def construir(dir_datos, dir_salida, ts_corrida=None):
                   encoding="utf-8") as fh:
             fh.write(texto)
 
-    resumen_modelo = g.resumen()
-    resumen_modelo["importados"] = resultado.get("importados") or []
-    docs_modelo.generar(os.path.join(BASE, "MODELO_DATOS.md"), resumen_modelo)
-    docs_tecnicos.generar(os.path.join(os.path.dirname(BASE),
-                                       "DOCUMENTACION_TECNICA.md"), g, resultado)
+    # MODELO_DATOS.md y DOCUMENTACION_TECNICA.md estan versionados y publican
+    # numeros de la ultima corrida. Si la corrida incluyo reportes del banco de
+    # pruebas no se regeneran: esos reportes no estan en el repositorio, asi
+    # que nadie podria reproducir esos numeros clonandolo, y ademas cada
+    # importacion dejaria el arbol de trabajo sucio sin que nadie haya tocado
+    # nada. El grafo, el visor y los informes si se regeneran siempre.
+    importados = resultado.get("importados") or []
+    if importados:
+        print("Documentacion generada: sin cambios, porque la corrida incluye "
+              "%d reporte(s) del banco de pruebas (%s)."
+              % (len(importados), ", ".join(importados)))
+    else:
+        docs_modelo.generar(os.path.join(BASE, "MODELO_DATOS.md"), g.resumen())
+        docs_tecnicos.generar(os.path.join(os.path.dirname(BASE),
+                                           "DOCUMENTACION_TECNICA.md"), g, resultado)
     render_html.render(g, resultado, os.path.join(dir_salida, "grafo.html"),
                        dossier=dossier, texto_informe=texto_informe,
                        informes_por_caso=informes_por_caso)
