@@ -714,6 +714,26 @@ título manda: si la marca de la derecha no entra, se reduce a un punto de color
 y su texto queda en el globo de ayuda. Antes que recortar el número de reporte,
 se pierde la marca.
 
+### La letra
+
+Todo el visor estaba en monoespaciada: los títulos de las cajas, los rótulos de
+las líneas, los subtítulos, los chips, el pie. Una pantalla que lee un abogado
+parecía una terminal.
+
+Ahora hay dos familias y cada una tiene su motivo:
+
+- **La de lectura es la del sistema** (`Segoe UI Variable Text` y una cadena de
+  respaldo hasta Arial). El visor no carga nada de internet, así que no hay
+  fuente propia que valga: se toma la mejor que haya instalada.
+- **La monoespaciada quedó para lo que de verdad se lee carácter por carácter**:
+  un comando, un hash, un locator, y el valor exacto que el operador va a copiar
+  al expediente —la clase `.valor`—. Es lo único que la justifica: distinguir un
+  0 de una O, un 1 de una l.
+
+Lo único que se perdía al sacarla era la alineación de las cifras, y eso se
+resuelve con `font-variant-numeric: tabular-nums`, que alinea los números sin
+volver monoespaciado el texto que los rodea.
+
 ### Qué no se dibuja, y por qué
 
 - **Plataformas y prestadores.** Todos los reportes de Grindr comparten Grindr:

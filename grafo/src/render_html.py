@@ -385,12 +385,32 @@ PLANTILLA = r"""<!doctype html>
   --borde:#1a2740; --texto:#dbe4f0; --tenue:#7d8ba3; --suave:#9fb0c9;
   --cyan:#22d3ee; --cyan-tenue:rgba(34,211,238,.10); --cyan-borde:rgba(34,211,238,.32);
   --verde:#34d399; --ambar:#fbbf24; --alarma:#f87171;
+  /* Dos familias, y cada una tiene su motivo.
+
+     La de lectura es la del sistema. El visor no carga nada de internet, asi
+     que no hay fuente propia que valga: se toma la mejor que haya instalada y
+     se cae con gracia hasta Arial.
+
+     La monoespaciada quedo reservada para lo que de verdad se lee caracter por
+     caracter -un comando, un hash, un locator-. Estaba en casi todo el visor:
+     los rotulos de las lineas, los titulos de las cajas, los subtitulos, los
+     chips. Eso hacia que una pantalla que lee un abogado pareciera una
+     terminal. Los numeros que ya no van en monoespaciada llevan tabular-nums,
+     que es lo unico que se necesitaba de ella: que las cifras alineen. */
+  --sans:"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,
+    -apple-system,Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:"Cascadia Mono","JetBrains Mono",Consolas,"DejaVu Sans Mono",monospace;
+  --cifras:"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,
+    -apple-system,Inter,Roboto,Arial,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--fondo);color:var(--texto);display:flex;
-  font:13.5px/1.6 "Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden}
+  font:13.5px/1.62 var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+/* Las cifras alinean sin necesidad de una monoespaciada. */
+.sub,.chip,.cuenta,#ruta,#pie,td,.caja .titulo,.caja .marca,.rotulo{
+  font-variant-numeric:tabular-nums}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:#1c2942;border-radius:5px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -435,7 +455,7 @@ h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--cy
   margin:20px 0 8px;font-weight:600;opacity:.85}
 h3{font-size:14.5px;margin:8px 0 4px;font-weight:600;line-height:1.35}
 p{margin:0 0 10px}
-.sub{font-size:11.5px;color:var(--tenue);font-family:var(--mono)}
+.sub{font-size:11.5px;color:var(--tenue);letter-spacing:.005em}
 
 .tarjeta{background:var(--panel2);border:1px solid var(--borde);border-radius:10px;
   padding:11px 12px;margin:8px 0}
@@ -446,7 +466,7 @@ p{margin:0 0 10px}
 .tarjeta.click:hover{border-color:var(--cyan-borde);transform:translateX(2px)}
 
 .chip{display:inline-flex;align-items:center;gap:5px;padding:2.5px 9px;border-radius:999px;
-  font-size:10.5px;font-family:var(--mono);border:1px solid var(--borde);
+  font-size:11px;border:1px solid var(--borde);
   background:#0d1626;color:var(--suave);margin:0 5px 5px 0;white-space:nowrap}
 .chip.cy{border-color:var(--cyan-borde);background:var(--cyan-tenue);color:#67e8f9}
 .chip.ok{border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.08);color:#6ee7b7}
@@ -480,7 +500,7 @@ input[type=text]:focus{border-color:var(--cyan-borde)}
 .grupo button{border:0;border-radius:0;background:transparent;padding:7px 13px}
 .grupo button+button{border-left:1px solid var(--borde)}
 .solo{background:rgba(8,13,23,.94)}
-#ruta{margin-left:auto;font-size:11px;color:var(--tenue);font-family:var(--mono);
+#ruta{margin-left:auto;font-size:11.5px;color:var(--tenue);
   background:rgba(8,13,23,.94);border-radius:8px;padding:6px 11px;
   max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -497,10 +517,13 @@ svg.arrastrando{cursor:grabbing}
 .caja.sel rect.cuerpo{stroke:#fff;stroke-width:2}
 .caja.raiz rect.cuerpo{fill:#10243a;stroke:var(--cyan);stroke-width:1.8}
 .caja .barra{rx:2}
-.caja .titulo{fill:#e6eefb;font-size:12.5px;font-family:var(--mono);
+.caja .titulo{fill:#e6eefb;font-size:12.5px;font-family:var(--sans);
+  font-weight:600;letter-spacing:.005em;
   dominant-baseline:middle;pointer-events:none}
-.caja .sub{fill:#7d8ba3;font-size:10px;dominant-baseline:middle;pointer-events:none}
-.caja .marca{fill:var(--ambar);font-size:9.5px;font-family:var(--mono);
+.caja .sub{fill:#7d8ba3;font-size:10px;font-family:var(--sans);
+  dominant-baseline:middle;pointer-events:none}
+.caja .marca{fill:var(--ambar);font-size:10px;font-family:var(--sans);
+  font-weight:600;
   text-anchor:end;dominant-baseline:middle;pointer-events:none}
 /* El orden importa: realzada gana sobre raiz, y apagada gana sobre todo. Con
    la misma especificidad manda la última, y una caja filtrada que se siga
@@ -544,7 +567,7 @@ svg.arrastrando{cursor:grabbing}
 .con.apagada{opacity:.08}
 .con.sel{stroke:#fff;stroke-width:3;opacity:1}
 .zona{stroke:transparent;stroke-width:16;fill:none;cursor:pointer}
-.rotulo{font-size:10px;font-family:var(--mono);fill:#8fa1bb;text-anchor:middle;
+.rotulo{font-size:10.5px;font-family:var(--sans);fill:#8fa1bb;text-anchor:middle;
   pointer-events:none;paint-order:stroke;stroke:#080d17;stroke-width:4;
   stroke-linejoin:round}
 .rotulo.vinculo{fill:#a5d8e8}
@@ -554,16 +577,22 @@ svg.arrastrando{cursor:grabbing}
 table{width:100%;border-collapse:collapse;font-size:12px}
 td{padding:5px 2px;vertical-align:top;border-bottom:1px solid rgba(26,39,64,.7)}
 td:first-child{color:var(--tenue);width:44%;padding-right:10px}
-td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
+td.mono{font-family:var(--mono);font-size:11.5px;overflow-wrap:anywhere}
 .prosa{font-size:13px;line-height:1.7;color:#c8d4e4}
 .prosa p{margin:0 0 11px}
 .prosa h1{font-size:16px;margin:16px 0 8px}
 .prosa h2{color:var(--cyan);font-size:11px;margin:18px 0 8px}
 .prosa h3{font-size:13.5px;margin:14px 0 6px;color:#e2e8f0}
 .prosa li{margin:0 0 5px}
-.cadena{font-family:var(--mono);font-size:11.5px;color:var(--suave);line-height:2}
+/* El valor exacto -el que se copia al expediente y se compara caracter por
+   caracter- se sigue mostrando en monoespaciada. Es lo unico que la justifica:
+   distinguir un 0 de una O, un 1 de una l. */
+.valor{font-family:var(--mono);font-size:.94em;letter-spacing:.01em}
+.cadena{font-size:12px;color:var(--suave);line-height:2;
+  font-variant-numeric:tabular-nums}
 .cadena .fl{color:var(--tenue);padding:0 3px}
-.cita{font-family:var(--mono);font-size:11px;color:var(--tenue);word-break:break-all;
+.cita{font-family:var(--mono);font-size:11px;color:var(--tenue);
+  overflow-wrap:anywhere;
   background:#0a1120;border:1px solid var(--borde);border-radius:8px;padding:9px 11px}
 .vacio{color:var(--tenue);font-size:12.5px;font-style:italic}
 /* Secciones plegables de la ficha. Todo arranca cerrado: el panel tiene que
@@ -579,8 +608,7 @@ details.sec>summary::before{content:"\25B8";color:var(--cyan);font-size:11px;
 details.sec[open]>summary::before{transform:rotate(90deg)}
 details.sec>summary:hover{background:rgba(34,211,238,.06)}
 details.sec>summary b{color:var(--texto);font-weight:600}
-details.sec>summary .cuenta{margin-left:auto;font-family:var(--mono);
-  font-size:11px;color:var(--tenue)}
+details.sec>summary .cuenta{margin-left:auto;font-size:11.5px;color:var(--tenue)}
 details.sec .interior{padding:0 12px 12px}
 details.sub2{border-top:1px solid var(--borde);border-radius:0;margin:0;
   background:transparent}
@@ -620,7 +648,7 @@ details.sub2 .interior{padding:0 10px 12px}
   display:none;max-width:80vw}
 #aviso.visible{display:block}
 #pie{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--tenue);
-  font-family:var(--mono);pointer-events:none;background:rgba(6,10,18,.85);
+  pointer-events:none;background:rgba(6,10,18,.85);
   border-radius:8px;padding:6px 10px}
 </style></head><body>
 
@@ -1757,7 +1785,7 @@ function chipPeso(c){
 function cadena(ids, destacado){
   return '<div class="cadena">'+ids.map(id=>{
     const t = esc(etq(id));
-    return id===destacado ? "<b style='color:#67e8f9'>"+t+"</b>"
+    return id===destacado ? "<b class='valor' style='color:#67e8f9'>"+t+"</b>"
       : '<span class="chip boton" data-ir="entidad|'+id+'">'+t+'</span>';
   }).join('<span class="fl">→</span>')+'</div>';
 }
@@ -2103,7 +2131,8 @@ function fichaVinculo(id){
     sost.forEach(p=>{
       h += '<div class="tarjeta cyan">'+chipPeso(p.peso)+
         '<div style="font-size:12.5px;margin:2px 0 8px"><b>'+esc(p.tipo)+'</b> '+
-        '<span class="chip boton" data-ir="entidad|'+p.nodo+'">'+esc(p.valor)+'</span></div>'+
+        '<span class="chip boton valor" data-ir="entidad|'+p.nodo+'">'+
+        esc(p.valor)+'</span></div>'+
         '<div style="font-size:11px;color:var(--tenue)">Desde el reporte '+
         esc(NODOS.get(a.a).valor)+'</div>'+cadena(p.camino_a,p.nodo)+
         '<div style="font-size:11px;color:var(--tenue);margin-top:6px">Desde el reporte '+
@@ -2115,8 +2144,8 @@ function fichaVinculo(id){
       'color:var(--tenue)">Coinciden, pero no alcanzan por sí solos para vincular.</p></div>';
     corr.forEach(p=>{
       h += '<div class="tarjeta">'+chipPeso(p.peso)+'<div style="font-size:12.5px">'+
-        '<b>'+esc(p.tipo)+'</b> <span class="chip boton" data-ir="entidad|'+p.nodo+'">'+
-        esc(p.valor)+'</span></div></div>';
+        '<b>'+esc(p.tipo)+'</b> <span class="chip boton valor" '+
+        'data-ir="entidad|'+p.nodo+'">'+esc(p.valor)+'</span></div></div>';
     });
   }
   if(a.explicacion) h += '<h2>Fundamento</h2>'+prosa(a.explicacion);
@@ -2270,7 +2299,7 @@ function pintarLeyenda(){
     '<div style="display:flex;align-items:center;gap:8px;margin:5px 0">'+
     '<span style="display:inline-block;width:34px;height:0;'+
     'border-top:'+grosorPorPeso(p)+'px solid #22d3ee"></span>'+
-    '<span style="font-family:var(--mono);font-size:11px;color:var(--tenue)">'+
+    '<span style="font-size:11.5px;color:var(--tenue)">'+
     'peso '+num(p)+'</span></div>').join("");
   document.getElementById("leyenda").innerHTML =
     '<div class="rotuloGrupo" style="margin-top:0">El grosor es el peso</div>'+
