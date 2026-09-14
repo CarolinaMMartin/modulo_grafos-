@@ -10,9 +10,9 @@ proceso, asi que viven aparte y se re-aplican sobre el grafo reconstruido.
 Eso funciona porque el identificador de arista es determinista: la misma
 evidencia con el mismo metodo produce el mismo arista_id en cada corrida.
 
-Alcance real de la cadena de hashes: detecta modificacion o borrado de
-registros anteriores. No es un sello de tiempo confiable ni impide que alguien
-con acceso de escritura reescriba el archivo completo. Para esas garantias hace
+Alcance real de la cadena de hashes: detecta cambios que rompen la cadena.
+Sin un anclaje externo no detecta la eliminacion de una cola valida. No es un
+sello de tiempo confiable ni impide reescribir el archivo completo. Para esas garantias hace
 falta almacenamiento append-only del lado del servidor o anclaje externo, que
 todavia no esta definido en el proyecto.
 """
@@ -65,6 +65,7 @@ class LibroValidaciones(object):
             prev_hash=self._ultimo_hash(),
         )
         reg["hash"] = _hash_registro(reg)
+        os.makedirs(os.path.dirname(os.path.abspath(self.ruta)), exist_ok=True)
         with open(self.ruta, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(reg, ensure_ascii=False) + "\n")
         self._registros.append(reg)
@@ -105,9 +106,8 @@ class LibroValidaciones(object):
             d["validated_by"] = reg["usuario"]
             d["validated_at"] = reg["ts"]
             d["historial_validacion"] = historial[aid]
-            if reg["decision"] == "rechazada":
-                # No se borra: se marca. La historia de la decision se conserva.
-                d["vigente"] = False
+            # Reaplicar una revision debe funcionar tambien sobre el mismo grafo.
+            d["vigente"] = reg["decision"] != "rechazada"
             aplicadas += 1
         return dict(aplicadas=aplicadas, huerfanas=huerfanas,
                     integridad=self.verificar())
@@ -173,6 +173,7 @@ class LibroVinculos(object):
             prev_hash=self._ultimo_hash(),
         )
         reg["hash"] = _hash_registro(reg)
+        os.makedirs(os.path.dirname(os.path.abspath(self.ruta)), exist_ok=True)
         with open(self.ruta, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(reg, ensure_ascii=False) + "\n")
         self._registros.append(reg)

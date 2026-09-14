@@ -18,7 +18,8 @@ Alcance y limites, para no confundirlo con lo que no es:
 
 Lo que si hace bien, porque es lo que no se puede perder:
 
-  - Toda escritura pasa por el libro append-only encadenado por hash.
+  - Las decisiones humanas pasan por libros append-only encadenados por hash.
+    Los reportes importados se validan antes de reemplazar el JSON de entrada.
   - Despues de cada escritura reconstruye el grafo entero desde los reportes,
     de modo que lo que se ve en pantalla siempre sale de una corrida completa
     y nunca de un parche en memoria.
@@ -63,10 +64,7 @@ def _nombre_seguro(valor):
     nombre de archivo es entrada no confiable y no tiene por que decidir donde
     se escribe.
     """
-    limpio = "".join(c for c in str(valor) if c.isalnum() or c in "-_")
-    if not limpio:
-        raise ValueError("el numero de reporte no sirve como nombre de archivo")
-    return limpio[:60] + ".json"
+    return extractor_ncmec.validar_report_id(valor) + ".json"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -115,12 +113,14 @@ class Handler(BaseHTTPRequestHandler):
     def _servir(self, solo_encabezados):
         ruta = self.path.split("?")[0]
         if ruta in ("/", "/index.html", "/grafo.html"):
-            archivo = os.path.join(SALIDA, "grafo.html")
-            if not os.path.exists(archivo):
-                reconstruir()
-            with open(archivo, "rb") as fh:
-                self._responder(200, fh.read(), "text/html; charset=utf-8",
-                                solo_encabezados=solo_encabezados)
+            with _candado:
+                archivo = os.path.join(SALIDA, "grafo.html")
+                if not os.path.exists(archivo):
+                    reconstruir()
+                with open(archivo, "rb") as fh:
+                    contenido = fh.read()
+            self._responder(200, contenido, "text/html; charset=utf-8",
+                            solo_encabezados=solo_encabezados)
             return
         if ruta == "/api/estado":
             self._responder(200, json.dumps(dict(ok=True, app=True)),
@@ -131,6 +131,17 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- POST --------------------------------------------------------------
     def do_POST(self):
+        # El navegador solo puede escribir desde el propio visor local.
+        host = self.headers.get("Host", "")
+        permitidos = {"127.0.0.1:%d" % self.server.server_port,
+                      "localhost:%d" % self.server.server_port}
+        origen = self.headers.get("Origin")
+        if host not in permitidos or (origen and origen != "http://" + host):
+            self._error(403, "el pedido no proviene del visor local")
+            return
+        if self.headers.get_content_type() != "application/json":
+            self._error(415, "el pedido debe usar application/json")
+            return
         ruta = self.path.split("?")[0]
         acciones = {
             "/api/vincular": self._vincular,
@@ -163,13 +174,21 @@ class Handler(BaseHTTPRequestHandler):
         with _candado:
             try:
                 respuesta = acciones[ruta](datos)
-                reconstruir()
             except ValueError as e:
                 self._error(400, str(e))
                 return
             except Exception as e:                      # noqa: BLE001
                 self.log_message("error interno: %s", e)
                 self._error(500, "no se pudo completar la operacion")
+                return
+            try:
+                reconstruir()
+            except Exception as e:
+                self.log_message("operacion guardada; fallo al reconstruir: %s", e)
+                self._json(500, dict(ok=False, operacion_guardada=True,
+                    error="La operacion quedo guardada, pero no se pudo actualizar el visor. "
+                          "No repita la decision. Reinicie la aplicacion para reconstruir.",
+                    resultado=respuesta))
                 return
         self._json(200, respuesta)
 
@@ -191,6 +210,7 @@ class Handler(BaseHTTPRequestHandler):
         b = self._texto(datos, "reporte_b")
         usuario = self._texto(datos, "usuario")
         motivo = self._texto(datos, "motivo")
+        self._comprobar_reportes(a, b)
         libro = validacion.LibroVinculos(LIBRO_VINCULOS)
         reg = libro.registrar(a, b, "vincular", usuario, motivo)
         return dict(ok=True, accion="vincular", registro=reg)
@@ -243,6 +263,12 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             try:
                 destino = os.path.join(construir.DIR_ENTRADA, _nombre_seguro(rid))
+                for existente in os.listdir(construir.DIR_ENTRADA):
+                    if existente.casefold() == os.path.basename(destino).casefold():
+                        with open(os.path.join(construir.DIR_ENTRADA, existente), encoding="utf-8") as fh:
+                            previo = json.load(fh).get("reportId")
+                        if str(previo) != str(rid):
+                            raise ValueError("reportId colisiona con otro identificador por mayusculas/minusculas")
             except ValueError as e:
                 resultados.append(dict(nombre=nombre, ok=False, motivo=str(e)))
                 continue
@@ -288,9 +314,17 @@ class Handler(BaseHTTPRequestHandler):
         b = self._texto(datos, "reporte_b")
         usuario = self._texto(datos, "usuario")
         motivo = self._texto(datos, "motivo", obligatorio=False)
+        self._comprobar_reportes(a, b)
         libro = validacion.LibroVinculos(LIBRO_VINCULOS)
         reg = libro.registrar(a, b, "desvincular", usuario, motivo)
         return dict(ok=True, accion="desvincular", registro=reg)
+
+    @staticmethod
+    def _comprobar_reportes(a, b):
+        with open(os.path.join(SALIDA, "grafo.json"), encoding="utf-8") as fh:
+            reportes = {n["valor"] for n in json.load(fh)["nodos"] if n["tipo"] == "REPORTE"}
+        if a not in reportes or b not in reportes:
+            raise ValueError("uno de los reportes no existe en la vista actual; actualice la pantalla")
 
     def _decidir(self, datos):
         arista = self._texto(datos, "arista")
@@ -341,12 +375,22 @@ def main():
     ap.add_argument("--puerto", type=int, default=_puerto_inicial())
     ap.add_argument("--sin-navegador", action="store_true")
     args = ap.parse_args()
+    if not 0 <= args.puerto <= 65535:
+        ap.error("el puerto debe estar entre 0 y 65535; 0 elige uno disponible")
+    # Reservar el puerto antes de escribir salidas evita reconstruir encima
+    # de otra instancia que ya esta atendiendo en ese puerto.
+    try:
+        servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Handler)
+    except OSError as exc:
+        ap.error("no se pudo abrir el puerto %s: %s" % (args.puerto, exc))
+    try:
+        print("Construyendo el grafo...")
+        reconstruir()
+    except Exception:
+        servidor.server_close()
+        raise
 
-    print("Construyendo el grafo...")
-    reconstruir()
-
-    url = "http://127.0.0.1:%d/" % args.puerto
-    servidor = ThreadingHTTPServer(("127.0.0.1", args.puerto), Handler)
+    url = "http://127.0.0.1:%d/" % servidor.server_port
     print("")
     print("  Visor de vinculaciones: %s" % url)
     print("")
@@ -360,6 +404,7 @@ def main():
         servidor.serve_forever()
     except KeyboardInterrupt:
         print("\nServidor detenido.")
+    finally:
         servidor.server_close()
 
 

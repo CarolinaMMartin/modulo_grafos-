@@ -16,7 +16,6 @@ from urllib.request import Request, urlopen
 import servidor
 import construir
 import resolucion
-import render_html
 import validacion
 
 

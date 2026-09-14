@@ -19,19 +19,18 @@ Tres decisiones que se apartan de un enfoque ingenuo:
 
 3. CORROBORACION OBLIGATORIA. Un vinculo necesita al menos una regla que lo
    sostenga por si sola. Alias, ciudad e IP sin ventana temporal solo refuerzan
-   (relevamiento 3.5: una relacion debe apoyarse en datos objetivos
+   (una relacion debe apoyarse en datos objetivos
    coincidentes, no en semejanza contextual).
 """
 
 import math
 from collections import defaultdict
-from datetime import datetime
 
 import normalizacion as nz
 import ontologia as ont
 
 METODO = "resolucion_determinista"
-VERSION = "1.3"
+VERSION = "1.4"
 
 # Velocidad implausible entre dos observaciones geolocalizadas (km/h).
 VELOCIDAD_IMPOSIBLE_KMH = 900.0
@@ -638,7 +637,7 @@ def proponer_identidades(g):
     """POSIBLE_MISMA_IDENTIDAD entre menciones de persona de reportes distintos.
 
     No se fusionan nodos. Se propone la hipotesis con su explicacion para que
-    una persona la confirme o la rechace (contexto.md 11.2).
+    una persona la confirme o la rechace.
     """
     propuestas = []
     por_cuenta = defaultdict(set)
@@ -695,9 +694,11 @@ def detectar_contradicciones(g):
     coords = {}
     for u, v, k, d in g.aristas(relacion="GEOLOCALIZA_EN"):
         lat, lon = g.G.nodes[v].get("lat"), g.G.nodes[v].get("lon")
-        if lat and lon:
+        if lat is not None and lon is not None:
             try:
-                coords[u] = (float(lat), float(lon), g.G.nodes[v].get("valor"))
+                lat, lon = float(lat), float(lon)
+                if math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180:
+                    coords[u] = (lat, lon, g.G.nodes[v].get("valor"))
             except (TypeError, ValueError):
                 pass
 

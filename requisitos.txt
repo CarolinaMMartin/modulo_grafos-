@@ -1,12 +1,6 @@
-# Dependencias del modulo de grafos.
-#
-# NetworkX calcula el grafo; NumPy y SciPy se usan en sus rutinas numericas
-# de disposicion y PageRank. El servidor usa la biblioteca estandar.
-#
-#   pip install -r requisitos.txt
-#
-# Python 3.8 o superior.
-
-networkx>=2.6
-numpy
-scipy
+# Python 3.12–3.14 de 64 bits (excepto 3.14.1, excluido por NetworkX).
+# Versiones compatibles verificadas el 2026-09-14. Actualizar junto con pruebas.
+# NetworkX: grafo y algoritmos. NumPy/SciPy: calculo numerico de PageRank.
+networkx==3.6.1
+numpy==2.5.3
+scipy==1.18.1

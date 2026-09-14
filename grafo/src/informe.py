@@ -2,7 +2,7 @@
 """
 Informe en Markdown de una corrida del grafo.
 
-Criterio rector (contexto.md 22): cada hallazgo debe poder responder que conecta,
+Criterio rector: cada hallazgo debe poder responder que conecta,
 de donde surge, cuando ocurrio, que metodo lo produjo, con que confianza, quien
 lo reviso y que evidencia permite comprobarlo. El informe no repite contenido
 sensible: enlaza al locator dentro de la fuente.
@@ -172,13 +172,15 @@ def escribir(g, res, ruta):
                  l["confianza_min"], l["confianza_max"],
                  " · posibles duplicados: %s" % l["duplicados"] if l["duplicados"] else ""))
 
-    a("\n### Comunidades (Louvain)\n")
+    a("\n### Comunidades\n")
     if not res["comunidades"]:
-        a("_El grafo todavía no tiene densidad suficiente para que aporte algo "
-          "distinto de las componentes conexas._")
+        a("_Sin comunidades de dos o más reportes._")
     else:
         for c in res["comunidades"]:
-            a("- **%s**: %s" % (c["comunidad"], ", ".join(c["reportes"])))
+            a("- **%s**: %s · método `%s`" %
+              (c["comunidad"], ", ".join(c["reportes"]), c["algoritmo"]))
+            if c.get("aviso_fallback"):
+                a("  Se utilizó la alternativa por: %s" % c["aviso_fallback"])
 
     cen = res["centralidades"]
     a("\n### Centralidades\n")
@@ -189,6 +191,16 @@ def escribir(g, res, ruta):
         for metrica in ("grado", "intermediacion", "pagerank"):
             for x in (cen.get(metrica) or [])[:5]:
                 a("| %s | %s | %s | %.4f |" % (metrica, x["etiqueta"], x["tipo"], x["valor"]))
+
+    for metrica, motivo in (cen.get("omitidas") or {}).items():
+        a("- `%s` no calculada: %s." % (metrica, motivo))
+    a("\n### Puentes\n")
+    a("Conexiones cuya eliminación separa una componente. Se muestra un máximo "
+      "de %d; no es un ranking de importancia.\n" % analisis.TOP_CENTRALIDADES)
+    for puente in cen.get("puentes", []):
+        a("- %s — %s" % (puente["a_etiqueta"], puente["b_etiqueta"]))
+    if not cen.get("puentes"):
+        a("_Sin puentes._")
 
     a("\n### Candidatos de enlace (baseline sin modelo)\n")
     a("Pares que ninguna regla determinista sostiene todavía, ordenados por "

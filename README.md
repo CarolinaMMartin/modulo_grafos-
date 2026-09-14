@@ -1,162 +1,46 @@
-# Aplicación integrada — Grafos y vinculaciones CIJ
+# Módulo de grafos · Vinculaciones
 
-**Windows:** extraé todo el ZIP y abrí **INICIAR_WINDOWS.bat**. La primera instalación necesita Internet para descargar las dependencias de Python; después se utiliza localmente. Instrucciones y conservación de trabajos anteriores en **LEEME_INICIO.md**.
+Aplicación local para explorar reportes CyberTipline, encontrar datos compartidos, revisar vinculaciones y conservar el fundamento y el historial de las decisiones. El visor tiene temas claro y oscuro, navegación hacia atrás y adelante, y grafos SVG con tipografía sin serif.
 
-Esta entrega ya integra la aplicación base y la actualización de revisión. Incluye el diseño adaptado del archivo adjunto, modos claro y oscuro y tipografía sin serif. Las decisiones humanas y los datos incluidos se conservaron. No hay que aplicar otro parche.
+## Iniciar
 
-La barra lateral tiene **‹ Volver** y **Siguiente ›**, siempre visibles mientras
-el detalle está abierto. Volver recupera la ficha anterior, sus secciones abiertas,
-la posición de lectura y la vista del grafo. También funcionan **Alt + ←** y
-**Alt + →**. Navegar hacia atrás no deshace validaciones ni decisiones guardadas.
+1. Instalar **Python 3.12 de 64 bits** y habilitar su acceso desde la consola. También se admiten 3.13 y 3.14, excepto 3.14.1.
+2. Descargar y extraer el repositorio completo.
+3. En Windows, abrir **INICIAR_WINDOWS.bat**. En otros sistemas, ejecutar `python3 iniciar.py`.
 
-Los cruces se activan desde «Qué se muestra». La marca «en N reportes ›» centra
-el análisis en el dato; al pasar el puntero se resaltan los reportes donde consta.
-El origen se explica con nombres legibles y el localizador exacto se conserva
-en el detalle técnico. Los vínculos manuales se distinguen de las coincidencias
-que no justificaron una propuesta automática.
+El iniciador crea `.venv`, instala las versiones de `requisitos.txt` y abre el visor en `http://127.0.0.1:8731/`. La primera instalación y las actualizaciones de dependencias necesitan Internet; el visor y sus cálculos se ejecutan localmente. Dejar abierta la consola. Para detener: **Ctrl+C**.
 
-Ver [ACTUALIZACION.md](ACTUALIZACION.md) para las pruebas y los cambios integrados.
+Para actualizar una copia obtenida con Git: cerrar la aplicación, ejecutar `git pull --ff-only` y volver a abrir el iniciador. Conservar `grafo/entrada/` y `grafo/estado/`: contienen los reportes importados y las decisiones. Las instrucciones para copias ZIP y entornos antiguos están en [LEEME_INICIO.md](LEEME_INICIO.md).
 
-La documentación original se conserva a continuación como referencia del proyecto.
+## Trabajo en el visor
 
----
+- Elegir un legajo y desplegar sus reportes. La marca **en N reportes ›** cuenta reportes distintos del caso; sigue visible después de seleccionar, centrar o volver. El puntero resalta cuáles son; la marca centra el dato.
+- **Volver** en la barra lateral recupera la ficha anterior y su vista; **Adelante** permite retomarla. La navegación no revierte decisiones guardadas.
+- Las líneas de cruce están apagadas inicialmente. Se activan en **Qué se muestra** y su estado se conserva al navegar.
+- Azul: vinculación calculada por reglas. Violeta rosado: posible duplicado. Gris: vínculo establecido por un operador. La tarjeta con fondo invertido indica el centro del análisis. La leyenda explica también los tipos de datos y el grosor.
+- Al revisar una relación se muestran la explicación y la ubicación legible de los datos de origen. El detalle técnico conserva el locator original para auditoría.
+- Las revisiones y los vínculos manuales piden operador y fundamento cuando corresponde. Se guardan antes de reconstruir los resultados.
 
-# Módulo de grafos — Bóveda CIJ
+## Documentación vigente
 
-Grafo de conocimiento sobre reportes de NCMEC: detecta vinculaciones entre
-reportes, explica de dónde sale cada una y avisa cuándo un caso archivado
-recibió el dato que le faltaba.
-
-Corre entero en local, sin servicios de red. Requiere Python y las dependencias
-de `requisitos.txt`: NetworkX, NumPy y SciPy. Se recomienda Python 3.12 o superior.
-
-```bash
-pip install -r requisitos.txt
-python grafo/servidor.py
-```
-
-Eso abre el visor en el navegador. **Es la forma de usarlo**: los botones que
-registran decisiones —vincular dos reportes, revertir una vinculación— solo
-funcionan acá, porque son los que escriben en el libro. El servidor escucha
-únicamente en esta computadora.
-
-El visor trabaja **sobre un caso por vez**. No es un explorador del archivo
-general: abre en el primer caso y solo muestra sus relaciones. Los demás se
-eligen en el selector de la barra superior.
-
-Para generar las salidas sin levantar nada:
-
-```bash
-python grafo/construir.py
-```
-
-Eso deja `grafo/salida/grafo.html`, que se abre con doble clic pero sirve solo
-para mirar: un archivo suelto no puede guardar nada.
-
-```bash
-python grafo/pruebas.py
-```
-
-153 invariantes sobre las reglas que el proyecto declara no negociables.
-
-Para probarlo con otros reportes: el panel izquierdo del visor abre con **Probar
-con otros reportes**, que toma archivos `.json`, los procesa con las mismas
-reglas y reconstruye. Quedan en `grafo/entrada/`, que está fuera del
-repositorio.
-
-## Qué hay acá
-
-| Carpeta | Qué es |
+| Documento | Contenido |
 |---|---|
-| [`grafo/`](grafo/) | El módulo. Su [README](grafo/README.md) explica cómo se usa y su [ESTADO.md](grafo/ESTADO.md) dice honestamente qué está implementado y qué no. |
-| [`reportes_sinteticos/`](reportes_sinteticos/) | Dataset de trabajo: diez reportes con la estructura del JSON de NCMEC, cada uno construido para ejercitar una rama distinta de la lógica. |
-| [`TRASPASO.md`](TRASPASO.md) | **Empezar por acá.** Todo lo trabajado: decisiones y su fundamento, errores corregidos, preguntas abiertas y qué falta. |
-| [`DOCUMENTACION_TECNICA.md`](DOCUMENTACION_TECNICA.md) | **Referencia técnica completa**: cada peso, umbral y parámetro, con un ejemplo de cálculo. Se genera solo en cada corrida leyendo los valores del código, así que no puede desactualizarse. |
-| [`TECNOLOGIAS.md`](TECNOLOGIAS.md) | Qué tecnología se usa para cada cosa y por qué esa y no otra. |
-| [`contexto.md`](contexto.md) | Contexto funcional e institucional del proyecto. |
-| `redactar_reporte.py` | Quita el texto libre y los datos de contacto de un reporte real, conservando los identificadores técnicos. |
+| [Inicio y actualización](LEEME_INICIO.md) | Instalación, operación y recuperación del entorno |
+| [Documentación técnica](DOCUMENTACION_TECNICA.md) | Tecnologías, arquitectura, algoritmos, API, persistencia y límites |
+| [Modelo de datos](grafo/MODELO_DATOS.md) | Vocabulario y contrato de procedencia, generados desde el código |
+| [Parámetros](docs/PARAMETROS.md) | Reglas, pesos, umbrales y versiones vigentes |
+| [Desarrollo siguiente](ETAPA2_VINCULACION_CONTEXTUAL.md) | Etiquetado, evaluación contextual y condiciones para experimentar con GNN |
 
-## Qué hace el sistema
+El repositorio incluye un [dataset de demostración](reportes_sinteticos/README.md). No es una muestra de evaluación del desempeño. El sistema actual aplica reglas y algoritmos clásicos; no entrena ni ejecuta una GNN.
 
-Toma reportes, extrae entidades —cuentas, dispositivos, direcciones IP,
-teléfonos, nombres visibles, alias de cobro, ubicaciones— y busca cuáles
-comparten dos reportes. Puede sumar un manifiesto separado con hashes
-criptográficos, pHash y huellas de audio, y comparar descripciones de lugar
-mediante un vocabulario controlado. Cuando encuentra algo, propone una
-vinculación con un puntaje no calibrado y explica en prosa qué la sostiene y
-qué solamente la refuerza.
+## Verificar el desarrollo
 
-Las lee de los campos del reporte **y del texto libre**: hay reportes donde lo
-único que los conecta está escrito en la conversación o en la biografía del
-perfil —*«agendá 11-6000-0147»*, *«buscame como Puente_Azul47»*—, porque quien
-opera sabe no repetir la cuenta ni la IP ni el dispositivo. Esos identificadores
-no se hacen pasar por datos declarados: van como derivados, pesan menos y la
-explicación lo dice. Está en `grafo/src/mineria_texto.py` y el fundamento en
-[`TRASPASO.md`](TRASPASO.md) §4.16.
+Con las dependencias instaladas y Node.js 24 para las pruebas JavaScript:
 
-Tres criterios lo gobiernan:
+```bash
+python verificar.py
+```
 
-1. **Cada relación dice de dónde sale.** Fuente, campo exacto dentro de esa
-   fuente, método y versión. Sin eso, la relación no se crea.
-2. **Nunca se mezcla lo que consta en la fuente con lo que el sistema dedujo.**
-   Observada, derivada e inferida son tres clases separadas, en la persistencia
-   y en la pantalla. Un teléfono que el prestador informa y uno que alguien
-   escribió en un chat no se guardan igual.
-3. **Nada se decide solo.** El sistema propone vinculaciones, duplicados,
-   unificaciones de identidad y reaperturas. La decisión es siempre del
-   operador, y queda registrada.
+Usar el Python de `.venv` si las dependencias están allí. El comando verifica dependencias, código Python, invariantes, importación y revisión HTTP, navegación, contadores, colores y referencias de documentación. No instala Node.js como dependencia de la aplicación.
 
-Un reporte archivado no es un caso negativo: describe insuficiencia de evidencia
-en el momento del archivo. El sistema avisa cuando otro reporte aporta
-exactamente aquello que le faltaba.
-
-## Sobre los datos
-
-Los nueve reportes `9000001xx` son sintéticos: los generó
-`grafo/generar_sinteticos.py` y su contenido es un marcador de posición.
-
-`255553607.json` proviene de un reporte real y está **redactado**: se le quitaron
-la transcripción del chat, la bio del perfil, los resúmenes de analistas y los
-datos de contacto de quienes intervinieron en el trámite. Se conservaron los
-identificadores técnicos, que son los que hacen verificable la lógica de
-vinculación. El original sin redactar no está en este repositorio.
-
-Nada de lo que hay acá debe usarse como evidencia ni tratarse como material de
-una actuación en trámite.
-
-## Estado
-
-Piloto. Es un corte vertical completo y funcionando, no un producto. Lo que
-falta —análisis de los binarios multimedia, búsqueda semántica general, GNN,
-integración con SIPAR y KIWI, control de acceso— está enumerado en
-[`grafo/ESTADO.md`](grafo/ESTADO.md), junto con lo que está simplificado a
-propósito y por qué.
-
-## Para incorporarlo
-
-Quien vaya a integrarlo conviene que lea, en este orden,
-[`TRASPASO.md`](TRASPASO.md) —el razonamiento completo— y
-[`grafo/ESTADO.md`](grafo/ESTADO.md) —qué está implementado, qué simplificado y
-qué ausente—. Tres cosas que no se ven en el código:
-
-**Lo que hay que preservar al integrarlo.** `grafo/estado/` es lo único que no
-se recalcula: guarda las decisiones humanas —validaciones, unificaciones de
-identidad y vinculaciones manuales— en libros append-only encadenados por hash.
-El grafo es una proyección reconstruible y `grafo/salida/` se regenera entero en
-cada corrida; `grafo/estado/` no. Perderlo es perder el trabajo del operador.
-
-**Lo que hace falta reemplazar.** `grafo/servidor.py` es un servidor de piloto:
-escucha solo en `127.0.0.1`, no autentica a nadie y no aplica permisos. El campo
-*«quién lo dispone»* es atribución, no identidad verificada. En la Bóveda eso lo
-reemplaza la sesión institucional, y el estado lateral debería mudarse a la base
-transaccional.
-
-**Un apartamiento del documento rector.** El módulo declara un cuarto origen de
-relación, `afirmada`, que [`contexto.md`](contexto.md) §10.1 no contempla: es para
-las vinculaciones que dispone una persona. Está fundado en `TRASPASO.md` §4.13 y
-pendiente de validar con los especialistas (§9.5). No presentarlo como ontología
-aprobada.
-
-Las salidas estructuradas —`grafo.json` con la procedencia de cada arista,
-`analisis.json` con el resultado de cada módulo, `grafo.graphml` para Gephi o
-Cytoscape— están descriptas en [`grafo/README.md`](grafo/README.md).
+Las tablas de referencia se actualizan explícitamente con `python grafo/documentar.py`. Iniciar o reconstruir el grafo **no reescribe la documentación**.

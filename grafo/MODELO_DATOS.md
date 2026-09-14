@@ -1,11 +1,11 @@
 <!-- GENERADO POR src/docs_modelo.py A PARTIR DE src/ontologia.py.
-     No editar a mano: los cambios se pisan en la proxima construccion. -->
+     No editar a mano: regenerar con python grafo/documentar.py. -->
 
 # Modelo de datos del grafo — Bóveda CIJ
 
 Versión de ontología: **`0.4.0`**
 
-Ontología preliminar. Debe validarse con los equipos jurídicos e institucionales antes de considerarse estable (contexto.md 10.2).
+Ontología preliminar. Debe validarse con los equipos jurídicos e institucionales antes de considerarse estable.
 
 ## 1. Clases de relación
 
@@ -119,13 +119,13 @@ Si falta la fuente, el locator o la explicación, la arista **no se crea**: se r
 | `observed_at` | cuándo ocurrió el hecho, distinto de cuándo se calculó |
 | `created_at` | cuándo se produjo la arista |
 | `validation_status` / `validated_by` / `validated_at` | revisión humana |
-| `case_scope` | alcance y permisos |
+| `case_scope` | metadato de alcance; no implementa permisos de acceso |
 | `explicacion` | por qué existe, en lenguaje legible |
 | `vigente` | una arista rechazada se marca, no se borra |
 
 ## 5. Reglas deterministas de vinculación
 
-`corrobora solamente`: nunca sostiene un vínculo por sí sola, solo refuerza otro sostenido por un dato objetivo fuerte. Es la traducción de la regla del relevamiento 3.5.
+`corrobora solamente`: nunca sostiene un vínculo por sí sola, solo refuerza otro sostenido por un dato objetivo fuerte. Es una condición explícita de combinar().
 
 | Regla | Ver. | Tipo | Peso base | Corrobora solamente | Pondera por rareza | Qué detecta |
 |---|---|---|---|---|---|---|
@@ -186,8 +186,8 @@ Una IP aislada no identifica a una persona. Se valora junto con fecha, hora, pre
 | movistar | 12 h |
 
 - Rango CGNAT: `100.64.0.0/10`.
-- CGNAT **sin** puerto de origen: el peso se multiplica por `0.35` y la regla pasa a corroborar solamente. El prestador no puede identificar al abonado.
-- CGNAT **con** puerto y timestamp: factor `0.85`, la atribución vuelve a ser posible.
+- CGNAT **sin** puerto de origen: el peso se multiplica por `0.35` y la regla pasa a corroborar solamente. El módulo no presume atribución al abonado.
+- CGNAT **con** puerto y timestamp: factor `0.85`, se conserva como señal sujeta a confirmación.
 - Las fechas se manejan en UTC. Un valor sin zona horaria se marca como supuesto: tres horas de corrimiento alcanzan para atribuir una conexión al abonado equivocado.
 
 ## 7. Umbrales
@@ -198,23 +198,3 @@ Una IP aislada no identifica a una persona. Se valora junto con fecha, hora, pre
 | `UMBRAL_PROBABLE` | 0.70 | franja media del puntaje interno |
 | `UMBRAL_ALTA` | 0.90 | franja alta del puntaje interno |
 | `UMBRAL_CLUSTER` | 0.70 | mínimo para agrupar en un legajo lógico y para emitir alertas |
-
-## 8. Estado de la última construcción
-
-- Nodos: **65** · Aristas: **118**
-- Por origen: afirmada 3, derivada 28, inferida 3, observada 84
-- Incumplimientos de procedencia: **0**
-
-| Tipo de nodo | Cantidad |
-|---|---|
-| `REPORTE` | 10 |
-| `ORGANIZACION` | 10 |
-| `CUENTA` | 10 |
-| `PERSONA_MENCION` | 10 |
-| `IP` | 7 |
-| `ALIAS` | 5 |
-| `UBICACION` | 5 |
-| `EVENTO` | 4 |
-| `DISPOSITIVO` | 2 |
-| `TELEFONO` | 1 |
-| `IDENTIDAD` | 1 |

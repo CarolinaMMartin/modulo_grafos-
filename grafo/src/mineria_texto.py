@@ -16,7 +16,7 @@ numero escrito en un chat puede ser de otra persona, puede estar mal tipeado o
 puede ser una fanfarroneada. Por eso la relacion se llama MENCIONA_ y no
 ASOCIADO_A: el texto lo menciona, no consta que le pertenezca a nadie.
 
-El texto en si no entra al grafo (contexto.md 14.9). Entra el identificador
+El texto en si no entra al grafo. Entra el identificador
 normalizado, con el locator del texto del que salio.
 
 Que se admite y que no

@@ -13,11 +13,11 @@ def generar(ruta, resumen=None):
     L = []
     a = L.append
     a("<!-- GENERADO POR src/docs_modelo.py A PARTIR DE src/ontologia.py.")
-    a("     No editar a mano: los cambios se pisan en la proxima construccion. -->\n")
+    a("     No editar a mano: regenerar con python grafo/documentar.py. -->\n")
     a("# Modelo de datos del grafo — Bóveda CIJ\n")
     a("Versión de ontología: **`%s`**\n" % ont.ONTOLOGIA_VERSION)
     a("Ontología preliminar. Debe validarse con los equipos jurídicos e "
-      "institucionales antes de considerarse estable (contexto.md 10.2).\n")
+      "institucionales antes de considerarse estable.\n")
 
     a("## 1. Clases de relación\n")
     a("Las %d clases nunca se mezclan, ni en la persistencia ni en la interfaz.\n"
@@ -75,7 +75,7 @@ def generar(ruta, resumen=None):
         ("`observed_at`", "cuándo ocurrió el hecho, distinto de cuándo se calculó"),
         ("`created_at`", "cuándo se produjo la arista"),
         ("`validation_status` / `validated_by` / `validated_at`", "revisión humana"),
-        ("`case_scope`", "alcance y permisos"),
+        ("`case_scope`", "metadato de alcance; no implementa permisos de acceso"),
         ("`explicacion`", "por qué existe, en lenguaje legible"),
         ("`vigente`", "una arista rechazada se marca, no se borra"),
     ]:
@@ -83,8 +83,7 @@ def generar(ruta, resumen=None):
 
     a("\n## 5. Reglas deterministas de vinculación\n")
     a("`corrobora solamente`: nunca sostiene un vínculo por sí sola, solo refuerza "
-      "otro sostenido por un dato objetivo fuerte. Es la traducción de la regla del "
-      "relevamiento 3.5.\n")
+      "otro sostenido por un dato objetivo fuerte. Es una condición explícita de combinar().\n")
     a("| Regla | Ver. | Tipo | Peso base | Corrobora solamente | Pondera por rareza | Qué detecta |")
     a("|---|---|---|---|---|---|---|")
     for r, m in ont.REGLAS.items():
@@ -123,10 +122,9 @@ def generar(ruta, resumen=None):
         a("| %s | %d h |" % ("*(default)*" if k == "_default" else k, v))
     a("\n- Rango CGNAT: `%s`." % ont.CGNAT_RED)
     a("- CGNAT **sin** puerto de origen: el peso se multiplica por `%.2f` y la regla "
-      "pasa a corroborar solamente. El prestador no puede identificar al abonado."
+      "pasa a corroborar solamente. El módulo no presume atribución al abonado."
       % ont.FACTOR_NAT_SIN_PUERTO)
-    a("- CGNAT **con** puerto y timestamp: factor `%.2f`, la atribución vuelve a ser "
-      "posible." % ont.FACTOR_NAT_CON_PUERTO)
+    a("- CGNAT **con** puerto y timestamp: factor `%.2f`, se conserva como señal sujeta a confirmación." % ont.FACTOR_NAT_CON_PUERTO)
     a("- Las fechas se manejan en UTC. Un valor sin zona horaria se marca como "
       "supuesto: tres horas de corrimiento alcanzan para atribuir una conexión al "
       "abonado equivocado.")

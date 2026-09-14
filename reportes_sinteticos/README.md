@@ -1,50 +1,20 @@
-# Dataset de trabajo — reportes CyberTipline
+# Dataset de demostración
 
-Diez reportes con la estructura del JSON que envía NCMEC, más un archivo lateral
-con el estado institucional de cada uno.
+Contiene diez reportes y `estado_institucional.json`, que aporta el estado y motivo de archivo de cada uno para probar las reglas. Nueve reportes son sintéticos; `255553607.json` es una fuente redactada que conserva identificadores técnicos. **No corresponde describir todo el conjunto como anónimo o sintético.**
 
-Sirven para probar la lógica de vinculación sin usar datos reales de casos en
-trámite. Cada reporte sintético está construido para ejercitar una rama distinta
-del razonamiento, de modo que el conjunto no es una muestra estadística: es un
-banco de pruebas.
+| Reporte | Escenario que ejercita |
+|---|---|
+| 255553607 | Fuente base para las coincidencias |
+| 900000101 | Misma cuenta y dispositivo; IP fuera de ventana |
+| 900000102 y 900000103 | Teléfono normalizado y aporte para revisar un antecedente archivado |
+| 900000104 | Alias y ciudad compartidos: insuficientes para una propuesta automática |
+| 900000105 | Dispositivo compartido con otra cuenta |
+| 900000106 | Indicios de duplicado y contradicción geotemporal |
+| 900000107 y 900000108 | Dispositivo compartido y nueva información de ubicación |
+| 900000109 | Coordenadas fuera de Argentina; no se asigna jurisdicción automáticamente |
 
-## Contenido
+Los libros de demostración pueden incorporar vínculos manuales, incluso para un par que las reglas automáticas descartaron. El visor identifica el origen humano de ese vínculo.
 
-| Archivo | Origen | Para qué está |
-|---|---|---|
-| `255553607.json` | **Real, anonimizado.** Es el reporte que estaba en la carpeta. | Caso base |
-| `900000101.json` | Sintético | Misma cuenta y mismo dispositivo que el anterior, pero la IP coincide fuera de la ventana temporal del prestador |
-| `900000102.json` | Sintético | Archivado por IP bajo NAT no atribuible; solo aporta un teléfono |
-| `900000103.json` | Sintético | Trae el mismo teléfono que el 102, escrito en otro formato. Verifica la normalización y dispara la alerta de reapertura |
-| `900000104.json` | Sintético | Comparte únicamente el nombre visible y la ciudad. **No debe generar vinculación**: es el control negativo |
-| `900000105.json` | Sintético | Mismo dispositivo que el caso base, con una cuenta distinta y en otra zona |
-| `900000106.json` | Sintético | Casi idéntico al caso base: prueba la detección de duplicados. Además incluye dos conexiones geográficamente incompatibles en media hora |
-| `900000107.json` | Sintético | Archivado por falta de datos de ubicación; solo aporta un dispositivo |
-| `900000108.json` | Sintético | Comparte el dispositivo con el 107 y sí tiene ubicación: reactiva aquel antecedente |
-| `900000109.json` | Sintético | Geolocalización fuera de la Argentina |
-| `estado_institucional.json` | Sintético | Estado, motivo de archivo, fecha y operador de cada reporte. Simula lo que en producción vive en SIPAR, no en el grafo |
+El conjunto verifica casos concretos. No permite estimar precisión, calibración ni desempeño sobre reportes nuevos. Los números de legajo pueden cambiar al aplicar decisiones: no son identificadores persistentes.
 
-## Advertencias
-
-- El contenido de los chats sintéticos es un marcador de posición. Solo se
-  conservan los identificadores de perfil, que es lo único que lee el extractor.
-- `255553607.json` **no está realmente anonimizado**: conserva la dirección IP,
-  el identificador de dispositivo, el nombre de perfil y los datos de contacto
-  de las personas que intervinieron en el trámite. Antes de compartirlo fuera
-  del equipo conviene seudonimizarlo.
-- Los identificadores sintéticos empiezan en `9000001xx` para que nunca puedan
-  confundirse con un número de reporte real.
-
-## Cómo se usan
-
-El módulo de grafos los lee desde acá:
-
-```bash
-python grafo/construir.py
-```
-
-Para regenerar los sintéticos (el reporte real no se toca):
-
-```bash
-python grafo/generar_sinteticos.py
-```
+`python grafo/generar_sinteticos.py` vuelve a escribir los reportes sintéticos y sus estados. No hace falta ejecutarlo para instalar ni para actualizar la aplicación.

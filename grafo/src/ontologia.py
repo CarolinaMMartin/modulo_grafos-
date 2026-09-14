@@ -2,7 +2,7 @@
 """
 Ontologia controlada del grafo - Boveda CIJ.
 
-Fuente: contexto.md secciones 10.1 a 10.4 y 11.1.
+Contrato vigente: DOCUMENTACION_TECNICA.md y grafo/MODELO_DATOS.md.
 Este modulo no infiere culpabilidad ni fusiona identidades: solo define el
 vocabulario, los origenes epistemologicos y los pesos de reglas deterministas.
 
@@ -14,18 +14,13 @@ producida, para que el grafo sea reconstruible y comparable entre corridas.
 ONTOLOGIA_VERSION = "0.4.0"
 
 # ---------------------------------------------------------------------------
-# 1. SEPARACION EPISTEMOLOGICA (contexto.md 10.1) - nunca se mezclan
+# 1. SEPARACION EPISTEMOLOGICA - nunca se mezclan
 # ---------------------------------------------------------------------------
 OBSERVADA = "observada"   # surge directamente de un campo de la fuente
 DERIVADA = "derivada"     # regla determinista reproducible sobre datos observados
 INFERIDA = "inferida"     # similitud / modelo / LLM / GNN -> hipotesis
-# Cuarta categoria, que no produce el sistema sino una persona. contexto.md 10.1
-# enumera tres porque describe lo que el sistema deriva de la evidencia; una
-# vinculacion que un operador establece por su propio criterio no es ninguna de
-# esas tres, y meterla dentro de cualquiera de ellas seria mezclar lo que el
-# proyecto pide no mezclar: no consta en la fuente, no sale de una regla, y no
-# es una hipotesis del sistema a la espera de validacion -ya es la decision-.
-# Queda pendiente de validar con los especialistas (ver TRASPASO 9).
+# La afirmacion registra una decision humana con autor y fundamento.
+# El vocabulario sigue siendo operativo; no implica aprobacion institucional.
 AFIRMADA = "afirmada"     # la establecio una persona, bajo su responsabilidad
 
 ORIGENES = (OBSERVADA, DERIVADA, INFERIDA, AFIRMADA)
@@ -50,13 +45,12 @@ ESTADO_INICIAL = {
 }
 
 # ---------------------------------------------------------------------------
-# 2. TIPOS DE NODO (contexto.md 10.2)
+# 2. TIPOS DE NODO
 # ---------------------------------------------------------------------------
 # Los colores son de identificacion, no de valoracion. Ningun tipo de
 # entidad se pinta de rojo: el rojo queda reservado para la contra-evidencia
-# (contexto.md 13: el color no debe leerse como equivalente de culpabilidad).
 # identificador : el valor es un dato objetivo apto para sostener un vinculo
-#                 entre reportes (regla 3.5 del relevamiento).
+#                 entre reportes, segun las reglas declaradas abajo.
 # fusionable    : dos menciones del mismo valor son el mismo objeto (una IP es
 #                 una IP). Las PERSONAS no son fusionables: se relacionan con
 #                 POSIBLE_MISMA_IDENTIDAD, no se unifican automaticamente.
@@ -74,7 +68,7 @@ TIPOS_NODO = {
                    desc="Cuenta de plataforma: ESP + espUserId"),
     "ALIAS": dict(color="#f4b183", identificador=True, fusionable=True,
                   desc="Nombre visible / screen name (identificador debil)"),
-    # ADICION PENDIENTE DE VALIDACION: no figura en contexto.md 10.1. Un alias
+    # Un alias
     # de pago no es un nombre visible: no lo eligio nadie para mostrarse sino
     # para cobrar, y dos cuentas que cobran por la misma via comparten algo
     # bastante mas concreto que un apodo. Se separo del ALIAS porque meterlo
@@ -116,7 +110,7 @@ TIPOS_NODO = {
 }
 
 # ---------------------------------------------------------------------------
-# 3. VOCABULARIO DE RELACIONES (contexto.md 10.3)
+# 3. VOCABULARIO DE RELACIONES
 # ---------------------------------------------------------------------------
 # Se evitan aristas genericas cuando existe una relacion especifica.
 RELACIONES = {
@@ -158,7 +152,7 @@ RELACIONES = {
     "RESPONDE_A": dict(origen=DERIVADA, desc="Respuesta de prestador -> oficio"),
     "IDENTIFICADO_COMO": dict(origen=DERIVADA,
                               desc="Mencion -> identidad unificada por decision humana"),
-    # ADICION PENDIENTE DE VALIDACION: no figuran en contexto.md 10.3. Un
+    # Un
     # identificador leido de una conversacion o de una biografia no es
     # observado -no hay campo que lo declare- sino derivado por una regla a
     # partir de un texto observado. Se separan de ASOCIADO_A_* a proposito: el
@@ -197,7 +191,7 @@ RELACIONES = {
 }
 
 # ---------------------------------------------------------------------------
-# 4. REGLAS DETERMINISTAS DE VINCULACION (contexto.md 11.1)
+# 4. REGLAS DETERMINISTAS DE VINCULACION
 # ---------------------------------------------------------------------------
 # peso_base           : puntaje no calibrado que aporta la coincidencia.
 # corrobora_solamente : True -> nunca sostiene sola un vinculo; solo refuerza
@@ -269,7 +263,7 @@ REGLAS = {
 }
 
 # ---------------------------------------------------------------------------
-# 5. POLITICA DE IP (relevamiento 3.2, 4.2 y 4.5)
+# 5. POLITICA DE IP
 # ---------------------------------------------------------------------------
 # La ventana temporal no es una constante universal: depende del prestador y
 # del tipo de asignacion. Se declara por prestador con un default explicito, y
@@ -286,7 +280,7 @@ VENTANA_IP_HORAS = {
 
 # Rango CGNAT (RFC 6598: 100.64.0.0/10). Con CGNAT el PUERTO DE ORIGEN es
 # imprescindible: sin puerto y timestamp exacto el prestador no puede
-# identificar al abonado (relevamiento 4.5, IP NAT).
+# identificar al abonado.
 CGNAT_RED = "100.64.0.0/10"
 
 # Factor aplicado a R06 cuando la IP es NAT/CGNAT/proxy y no hay puerto.

@@ -1,427 +1,224 @@
-<!-- Generado por grafo/src/docs_tecnicos.py en cada corrida.
-     No editar a mano: los numeros se leen del codigo. -->
+# Documentación técnica · Módulo de grafos y vinculaciones
 
-# Documentación técnica — módulo de grafos, Bóveda CIJ
+Este documento describe la implementación del repositorio. Las constantes se consultan en [Parámetros](docs/PARAMETROS.md) y el vocabulario completo en [Modelo de datos](grafo/MODELO_DATOS.md). La [etapa siguiente](ETAPA2_VINCULACION_CONTEXTUAL.md) contiene trabajo pendiente; sus componentes no son dependencias ni capacidades instaladas.
 
-Referencia completa de las tecnologías que se usan, de cómo está configurado cada algoritmo y de cada peso, umbral y constante que interviene en una decisión del sistema.
+## 1. Objetivos y alcance
 
-**Este archivo se genera solo, en cada construcción, leyendo los valores de los módulos que los definen.** No es una transcripción: si mañana alguien cambia un peso en `src/ontologia.py`, este documento cambia con él. Por eso no se edita a mano.
+El módulo transforma reportes CyberTipline en un grafo con procedencia, identifica coincidencias entre reportes, explica sus reglas y permite que una persona revise los resultados. Conserva las menciones originales y las decisiones, y reconstruye los cálculos a partir de ambos insumos. Produce un visor navegable, archivos de intercambio e informes por caso.
 
-Complementa a los otros tres, sin repetirlos:
+El funcionamiento actual es local, por archivos y en memoria. No incorpora autenticación institucional, persistencia transaccional multiusuario, clasificación automática de jurisdicciones, búsqueda vectorial, LLM ni GNN. Un legajo lógico es una agrupación calculada, no un expediente institucional creado en SIPAR. Los estados institucionales se leen de un JSON lateral; no existe una conexión activa con SIPAR.
 
-- `TRASPASO.md` — por qué cada cosa es como es, y qué se descartó.
-- `grafo/ESTADO.md` — qué está implementado, simplificado o ausente.
-- `grafo/MODELO_DATOS.md` — la ontología: tipos de nodo y vocabulario.
+## 2. Tecnologías y razones de uso
 
-Versión de ontología documentada: **0.4.0**.
-
----
-
-## 1. Base de ejecución
-
-Todo corre local, sin servicios de red y sin llamadas a terceros. Es un requisito del proyecto, no una preferencia: la evidencia sensible no sale del entorno.
-
-| Componente | Versión verificada | Para qué |
+| Tecnología | Uso concreto | Razón técnica de la elección en esta implementación |
 |---|---|---|
-| Python | 3.12.14 | todo el procesamiento; mínimo requerido 3.8 |
-| networkx | 3.6.1 | estructura del grafo y algoritmos clásicos |
-| Biblioteca estándar | — | servidor HTTP, hashes, JSON, fechas, expresiones regulares |
+| Python 3.12–3.14 de 64 bits, excepto 3.14.1 | Extracción, reglas, servidor y generación de archivos | Permite un proceso local reproducible con biblioteca estándar y acceso directo a NetworkX |
+| NetworkX 3.6.1 | `MultiDiGraph`, proyecciones, componentes, comunidades, centralidades y puentes | Representa relaciones paralelas con atributos y ofrece algoritmos inspeccionables sobre grafos en memoria |
+| NumPy 2.5.3 y SciPy 1.18.1 | Soporte numérico y matrices dispersas que utiliza PageRank de NetworkX | Son necesarias para esa ruta de ejecución; omitirlas puede permitir iniciar y fallar al calcular |
+| `http.server.ThreadingHTTPServer` | Servir el visor y recibir operaciones JSON en loopback | Evita un servicio adicional en la aplicación local; no constituye un servidor institucional de producción |
+| HTML, CSS, JavaScript y SVG | Interfaz, tarjetas, conectores, temas, filtros e historial | El navegador dibuja y permite interacción sin framework ni descargas de recursos externos |
+| JSON y JSONL | Fuentes, resultados y libros de decisiones | Permiten inspección, reconstrucción y exportación; los libros sobreviven a cada regeneración del grafo |
+| GraphML y Markdown | Intercambio del grafo e informes | Permiten usar los resultados fuera del visor sin depender de su implementación |
+| `venv`, `pip` y un iniciador BAT | Entorno aislado en Windows y otras plataformas | Evitan depender de paquetes globales y comprueban las versiones fijadas |
+| Node.js 24, solo desarrollo | Ejecutar pruebas JavaScript con DOM simulado | Verifica lógica del visor sin añadir Node.js al inicio de la aplicación |
 
-Corrida de verificación: `3.12.14` sobre `Linux-6.18.44-x86_64-with-glibc2.39`.
+Las versiones externas están fijadas con `==` en [requisitos.txt](requisitos.txt). Sus requisitos se verificaron en las publicaciones oficiales de [NetworkX](https://pypi.org/project/networkx/3.6.1/), [NumPy](https://pypi.org/project/numpy/2.5.3/) y [SciPy](https://pypi.org/project/scipy/1.18.1/). Python 3.12 es el mínimo común de esta combinación. El iniciador comprueba las versiones instaladas, además de poder importarlas, y ejecuta `pip check`.
 
-**Una sola dependencia externa, y es deliberado.** El servidor, el visor, los informes, la seudonimización y los libros de decisiones usan únicamente la biblioteca estándar. Agregar infraestructura pesada antes de justificarla con requisitos medidos está expresamente desaconsejado en el contexto del proyecto.
+## 3. Arquitectura y secuencia de construcción
 
-## 2. Módulos y sus versiones
+[grafo/construir.py](grafo/construir.py) es el punto único de orquestación. [grafo/servidor.py](grafo/servidor.py) lo invoca al iniciar y después de las operaciones persistidas.
 
-Cada módulo que produce relaciones declara un método y una versión, y ambos quedan grabados en **cada arista que crea**. Es lo que permite, meses después, saber con qué versión de qué regla se produjo un vínculo determinado.
-
-| Módulo | Método que graba | Versión | Responsabilidad |
-|---|---|---|---|
-| `src/resolucion.py` | `resolucion_determinista` | 1.3 | vinculación entre reportes, identidades, contra-evidencia |
-| `src/analisis.py` | `analisis_clasico` | 1.2 | legajos, comunidades, centralidades, baseline de enlaces |
-| `src/multimedia.py` | `analisis_multimedia` | 1.0 | manifiestos, pHash por Hamming y huellas de audio |
-| `src/contexto_lugar.py` | `contexto_lugar_controlado` | 1.0 | categorías controladas y similitud contextual de lugares |
-| `src/alertas.py` | `alertas_reapertura` | 2.0 | alertas de reapertura tipadas por motivo de archivo |
-| `src/normalizacion.py` | — | 1.0 | teléfonos, correos, IP, alias, marcas temporales |
-| `src/validacion.py` | `vinculacion_manual` | 1.0 | libros de decisiones humanas y vinculación manual |
-| `src/ontologia.py` | — | 0.4.0 | tipos, vocabulario, reglas, pesos y umbrales |
-
-Los módulos sin versión propia no crean aristas: transforman valores (`normalizacion`) o declaran vocabulario (`ontologia`), y su versión viaja igual en cada arista como `ontologia_version`.
-
-## 3. Clases de relación
-
-Toda arista pertenece a **una** de estas clases y nunca se mezclan, ni en la base ni en la pantalla. Es la separación epistemológica que ordena todo el sistema.
-
-| Clase | Qué significa | Estado inicial | ¿Lleva peso? |
-|---|---|---|---|
-| `observada` | El dato figura textualmente en un campo del reporte de origen. No fue calculado ni supuesto por el sistema. | `validada` | no |
-| `derivada` | Resulta de aplicar una regla determinista y reproducible sobre datos que constan en la fuente. Puede volver a calcularse y debe ser revisada por una persona. | `pendiente` | sí, obligatorio |
-| `inferida` | Es una hipótesis producida por similitud o por un modelo. No acredita nada por sí sola y requiere validación humana. | `pendiente` | sí, obligatorio |
-| `afirmada` | La estableció una persona por su propio criterio, no el sistema. No surge de la fuente ni de una regla: queda registrada con quién la dispuso, cuándo y con qué fundamento, y puede revertirse. | `validada` | no |
-
-Dos consecuencias que conviene tener presentes:
-
-- Una **observada** no lleva peso porque no hay nada que ponderar: consta textualmente en un campo de la fuente. Nace validada, pero puede impugnarse.
-- Una **afirmada** tampoco lleva peso, y por el motivo contrario: no hay cálculo alguno detrás. La dispuso una persona. Ponerle un número sería inventar una precisión que nadie calculó.
-
-> La clase `afirmada` **no está en el documento rector** (`contexto.md` §10.1, que enumera tres). Se agregó porque una vinculación que dispone una persona no entra en ninguna de las tres sin desdibujarlas. Está fundada en `TRASPASO.md` §4.13 y **pendiente de validar con los especialistas**. No presentarla como ontología aprobada.
-
-### Estados de validación
-
-`pendiente`, `en_revision`, `validada`, `rechazada`
-
-Una arista rechazada **no se borra**: se marca `vigente = false` y queda con su historial. La historia de la decisión se conserva.
-
-## 4. Reglas de vinculación y sus pesos
-
-Estas son las 13 reglas que pueden aportar a la vinculación de dos reportes. Su ejecución es reproducible: mismos datos y versiones, mismo resultado.
-
-Cada regla declara cuatro cosas.
-
-- **Peso base** — cuánto aporta si el identificador es plenamente discriminante. Nunca es 1: ninguna coincidencia sola acredita nada.
-- **¿Sostiene?** — si puede fundar el vínculo por sí sola, o si únicamente refuerza uno que ya se apoya en un dato objetivo.
-- **¿Pondera por rareza?** — si su peso decae cuando el identificador aparece en muchos reportes.
-- **Versión** — graba en cada arista que produce.
-
-| Regla | Tipo de dato | Peso base | ¿Sostiene? | ¿Pondera por rareza? | Ver. |
-|---|---|---|---|---|---|
-| `R01_CUENTA` | `CUENTA` | 0,98 | sí | no | 1.0 |
-| `R02_DISPOSITIVO` | `DISPOSITIVO` | 0,92 | sí | sí | 1.0 |
-| `R03_TELEFONO` | `TELEFONO` | 0,90 | sí | sí | 1.1 |
-| `R04_EMAIL` | `EMAIL` | 0,90 | sí | sí | 1.1 |
-| `R05_EVIDENCIA` | `EVIDENCIA` | 0,88 | sí | sí | 1.0 |
-| `R06_IP_VENTANA` | `IP` | 0,72 | sí | sí | 1.0 |
-| `R07_IP_SUELTA` | `IP` | 0,28 | **no, solo refuerza** | sí | 1.0 |
-| `R08_ALIAS` | `ALIAS` | 0,22 | **no, solo refuerza** | sí | 1.1 |
-| `R09_UBICACION` | `UBICACION` | 0,08 | **no, solo refuerza** | sí | 1.0 |
-| `R10_ALIAS_PAGO` | `ALIAS_PAGO` | 0,62 | sí | sí | 1.1 |
-| `R11_PHASH_SIMILAR` | `HASH_PERCEPTUAL` | 0,82 | sí | no | 1.0 |
-| `R12_HUELLA_AUDIO` | `HUELLA_AUDIO` | 0,86 | sí | sí | 1.0 |
-| `R13_CONTEXTO_LUGAR` | `LUGAR_MENCION` | 0,12 | **no, solo refuerza** | no | 1.0 |
-
-### Qué detecta cada una
-
-- **`R01_CUENTA`** — Misma cuenta: mismo ESP y mismo espUserId.
-- **`R02_DISPOSITIVO`** — Mismo identificador de dispositivo.
-- **`R03_TELEFONO`** — Mismo telefono normalizado a E.164.
-- **`R04_EMAIL`** — Mismo correo normalizado.
-- **`R05_EVIDENCIA`** — Mismo hash de archivo.
-- **`R06_IP_VENTANA`** — Misma IP dentro de la ventana temporal del prestador. La IP se valora siempre junto con su fecha y hora.
-- **`R07_IP_SUELTA`** — Misma IP fuera de la ventana temporal: indicio, no atribucion.
-- **`R08_ALIAS`** — Mismo nombre visible: refuerza, nunca sostiene solo.
-- **`R09_UBICACION`** — Misma ciudad estimada: contexto, nunca sostiene solo.
-- **`R10_ALIAS_PAGO`** — Misma via de cobro: mismo alias de pago normalizado.
-- **`R11_PHASH_SIMILAR`** — Hashes perceptuales de imagen a distancia Hamming menor o igual al umbral; indica similitud visual, no archivo identico.
-- **`R12_HUELLA_AUDIO`** — Misma huella algoritmica de audio declarada.
-- **`R13_CONTEXTO_LUGAR`** — Descripciones de lugar comparten al menos dos dimensiones de un vocabulario controlado; solo corrobora.
-
-### Multimedia y contexto de lugar
-
-- **pHash:** la primera versión acepta huellas hexadecimales de 64 bits declaradas por el manifiesto. Genera candidatos con 9 bloques exactos y luego calcula la distancia de Hamming real. Solo conserva pares a distancia ≤ 8. El bloqueo evita comparar cada imagen contra todas las demás; la explicación deja claro que no se abrieron los binarios.
-- **Huella de audio:** exige igualdad exacta del valor algorítmico declarado. No lo presenta como SHA-256 ni como prueba de autoría.
-- **Lugar:** usa el vocabulario controlado versión `1.0`, publicado en `src/contexto_lugar.py`. Exige al menos dos dimensiones comunes, una de ellas de anclaje, y un solapamiento ponderado ≥ 0,45. Solo toma las líneas atribuibles a `Reported User`, no copia la frase al grafo, nunca fusiona lugares y la regla R13 solo corrobora.
-
-### Por qué esos pesos y no otros
-
-El orden no es arbitrario: sigue **cuánto individualiza cada dato**.
-
-La cuenta de plataforma encabeza con **0,98** porque el par `ESP + espUserId` identifica a un titular concreto dentro de una plataforma. El dispositivo la sigue con **0,92**: individualiza casi tan bien, pero un aparato puede prestarse o venderse. Teléfono y correo comparten **0,90**. El hash de archivo baja a **0,88** porque prueba que dos reportes traen el mismo contenido, no que provengan de la misma persona: un material que circula lo comparten muchos.
-
-Debajo del umbral quedan las **4 reglas que solo refuerzan** (`R07_IP_SUELTA`, `R08_ALIAS`, `R09_UBICACION`, `R13_CONTEXTO_LUGAR`). Su peso —entre 0,08 y 0,28— está deliberadamente por debajo del umbral de propuesta: aunque dispararan todas juntas, no alcanzan para crear un vínculo. Es la traducción de la regla del relevamiento: *una relación debe apoyarse en datos objetivos coincidentes, no en semejanza contextual*.
-
-Ninguna regla que sostiene baja de **0,62** ni llega a **0,99**.
-
-## 5. Cómo se combinan los pesos
-
-Cuando dos reportes comparten varios datos, cada regla que dispara aporta su peso y se combinan con **noisy-OR** para producir un puntaje interno de priorización:
-
-```
-puntaje = 1 - Π (1 - peso_efectivo_i)
+```mermaid
+flowchart TD
+    A["Reportes y manifiestos"] --> B["Extracción y procedencia"]
+    B --> C["Reglas y propuestas"]
+    L["Libros de decisiones"] --> B
+    L --> C
+    C --> D["Revisión aplicada e identidades"]
+    L --> D
+    D --> E["Análisis e informes"]
+    E --> F["Visor local"]
+    F --> L
 ```
 
-El valor sirve para ordenar y aplicar umbrales: nunca baja al sumar evidencia y nunca supera 1. **No es una probabilidad.** Los pesos todavía no están calibrados con casos revisados por especialistas y las señales no pueden suponerse estadísticamente independientes. El JSON conserva el nombre histórico `confidence` por compatibilidad, pero debe leerse como puntaje.
+La secuencia ejecutada es:
 
-**La condición que lo gobierna todo:** el producto solo se acumula si *al menos una* regla que sostiene disparó. Si únicamente dispararon reglas corroborantes, el resultado es `0.0` y el par se descarta, por muchas que sean.
+1. Seleccionar los reportes por su `reportId`, leer estados y conservar el hash y la ruta de cada fuente. Ante el mismo ID exacto en carpetas sucesivas, prevalece la última carpeta; duplicados dentro de una carpeta y diferencias ambiguas de mayúsculas se rechazan.
+2. Extraer menciones, identificadores, observaciones y texto con ubicación de origen. Incorporar manifiestos multimedia, si fueron pasados explícitamente, y analizar descripciones de lugar.
+3. Reaplicar las decisiones sobre las relaciones fuente **antes** de calcular coincidencias. Una observación rechazada no debe volver a alimentar reglas o hipótesis.
+4. Calcular vinculaciones, indicios de duplicado, contradicciones e hipótesis de identidad. Incorporar vínculos establecidos por operadores.
+5. Reaplicar revisiones sobre las relaciones calculadas, separar los resultados rechazados y consolidar únicamente las hipótesis de identidad validadas por personas.
+6. Calcular alertas, legajos, comunidades, centralidades, candidatos y cobertura sobre el estado revisado.
+7. Escribir salidas, dossier e informes. Regenerar los informes por caso y retirar los archivos de casos que dejaron de existir.
 
-### Umbrales
+Las decisiones tienen dos aplicaciones porque las relaciones calculadas todavía no existen durante la primera. La documentación del repositorio se genera mediante otro comando y no participa en esta secuencia.
 
-| Constante | Valor | Qué decide |
-|---|---|---|
-| `UMBRAL_PROPONER` | 0,55 | por debajo, el vínculo no se propone y queda como descartado con su motivo |
-| `UMBRAL_CLUSTER` | 0,70 | peso mínimo para que un vínculo agrupe dos reportes en un mismo legajo |
-| `UMBRAL_PROBABLE` | 0,70 | desde acá el puntaje se informa como «medio» |
-| `UMBRAL_ALTA` | 0,90 | desde acá el puntaje se informa como «alto» |
-| `CONFIANZA_MAXIMA` | 0,99 | techo absoluto: ninguna arista puede llegar a 1 |
+## 4. Modelo y procedencia
 
-El techo de 0,99 no es cosmético. Un 1,00 en pantalla se leería como certeza, y el sistema no produce certezas: produce propuestas que una persona tiene que revisar.
+[nucleo.py](grafo/src/nucleo.py) mantiene un `networkx.MultiDiGraph`: dirigido, con múltiples relaciones entre los mismos nodos. `ontologia.nid` forma una clave normalizada a partir de tipo y valor. Una IP o cuenta compartida puede reutilizar su nodo; una mención de persona conserva su identidad dentro del reporte. Las variantes de atributos se conservan en `_variantes`.
 
-### Ejemplo trabajado, calculado sobre esta corrida
+Cada relación declara `relation_type`, `origin`, fuente, locator, método y versión, versión de ontología, explicación, fechas, estado de revisión y vigencia. El modo estricto rechaza relaciones sin procedencia requerida. Las fuentes incorporan hashes; los textos completos se conservan por separado en `textos_restringidos.json`.
 
-Reportes **255553607** y **900000101**. Dispararon 5 reglas:
-
-| Regla | Valor coincidente | Peso base | × rareza | × texto | × similitud | = peso efectivo | Rol |
-|---|---|---|---|---|---|---|---|
-| `R01_CUENTA` | grindr/888658825 | 0,98 | 1,0000 | 1,0000 | 1,0000 | 0,9800 | **sostiene** |
-| `R02_DISPOSITIVO` | b534375433e0e502 | 0,92 | 1,0000 | 1,0000 | 1,0000 | 0,9200 | **sostiene** |
-| `R07_IP_SUELTA` | 181.46.66.242 | 0,28 | 1,0000 | 1,0000 | 1,0000 | 0,2800 | refuerza |
-| `R08_ALIAS` | lechero | 0,22 | 1,0000 | 1,0000 | 1,0000 | 0,2200 | refuerza |
-| `R09_UBICACION` | Monte Grande, B, AR | 0,08 | 1,0000 | 1,0000 | 1,0000 | 0,0800 | refuerza |
-
-Como al menos una regla sostiene, se acumula:
-
-```
-puntaje = 1 - (1 - 0,9800) × (1 - 0,9200) × (1 - 0,2800) × (1 - 0,2200) × (1 - 0,0800)
-        = 1 - 0,0008
-        = 0,9900
-```
-
-Puntaje registrado en el campo técnico `confidence`: **0,9900** — franja «alta», por el techo de 0,99. No es una probabilidad.
-
-## 6. Ponderación por rareza (discriminancia)
-
-Un identificador que aparece en muchos reportes individualiza menos. El peso base de cada regla se multiplica por un factor que decae con `df` — la cantidad de reportes distintos en que aparece ese identificador.
-
-```
-si df <= 10           factor = 1,00
-si df >  10           factor = log(1 + 10) / log(1 + df),  acotado a [0,15 ; 1,00]
-```
-
-Curva efectiva, calculada al generar este documento:
-
-| df (reportes en que aparece) | Factor | Peso conservado |
-|---|---|---|
-| 1 | 1,0000 | 100,0 % |
-| 5 | 1,0000 | 100,0 % |
-| 10 | 1,0000 | 100,0 % |
-| 15 | 0,8649 | 86,5 % |
-| 25 | 0,7360 | 73,6 % |
-| 50 | 0,6099 | 61,0 % |
-| 100 | 0,5196 | 52,0 % |
-| 500 | 0,3857 | 38,6 % |
-| 5000 | 0,2815 | 28,2 % |
-
-### Cuándo un identificador deja de sostener
-
-Además del decaimiento, hay un corte probatorio: pasado cierto punto el identificador se degrada a *solo refuerza*. El límite computacional se expresa aparte como cantidad máxima de pares por tipo.
-
-| Constante | Valor | Efecto |
-|---|---|---|
-| `DF_PLENA_DISCRIMINANCIA` | 10 | hasta acá el identificador conserva todo su peso |
-| `DF_HUB_ABSOLUTO` | 50 | desde acá deja de sostener por sí solo, con cualquier corpus |
-| `CORPUS_MINIMO_PARA_FRACCION` | 200 | recién con este volumen se aplica también el criterio de fracción |
-| `FRACCION_BAJA_DISCRIMINANCIA` | 0,20 | con corpus grande, aparecer en más de esta fracción degrada |
-
-Límites de expansión antes de conservar el identificador como grupo compacto (la señal no se oculta):
-
-| Tipo | Máximo de pares |
+| Origen | Significado y estado inicial |
 |---|---|
-| `ALIAS` | 1500 |
-| `ALIAS_PAGO` | 4000 |
-| `CUENTA` | 10000 |
-| `DISPOSITIVO` | 5000 |
-| `EMAIL` | 5000 |
-| `EVIDENCIA` | 7500 |
-| `HASH_PERCEPTUAL` | 5000 |
-| `HUELLA_AUDIO` | 5000 |
-| `IP` | 2500 |
-| `TELEFONO` | 5000 |
-| `UBICACION` | 1000 |
-| `_default` | 1000 |
+| `observada` | Consta en la fuente. Nace con estado `validada` por convención del modelo; esto **no prueba una revisión humana** |
+| `derivada` | Resultado reproducible de reglas. Nace pendiente |
+| `inferida` | Hipótesis que requiere revisión. Nace pendiente |
+| `afirmada` | Vínculo que una persona establece con fundamento. Nace validado y no lleva puntaje de confianza calculado |
 
-Hay un segundo descuento, independiente del anterior. Por cada lado de la coincidencia que dependa exclusivamente de texto libre —conversación o biografía—, el peso se multiplica por `FACTOR_TEXTO_LIBRE` = 0,85. Campo↔texto se descuenta una vez y texto↔texto dos veces. No es que la extracción falle: cambia lo que el dato significa. Que el prestador informe un teléfono es un dato de la cuenta; que alguien lo escriba en un chat es una mención que puede corresponder a un tercero o ser falsa.
+`confidence` se conserva por compatibilidad. Para reglas e hipótesis expresa un puntaje **no calibrado**, no una probabilidad. Una revisión cambia el estado y la vigencia; no cambia el origen de una relación.
 
-> **La rareza es una propiedad del identificador, no del tamaño de la base.** El primer diseño medía la fracción del corpus, y con diez reportes un dispositivo compartido por cuatro daba 40 % y quedaba degradado, perdiendo un vínculo legítimo. Ese mismo dispositivo en cien mil reportes es altamente discriminante. Por eso el umbral principal es **absoluto** sobre `df`, y la fracción solo entra a partir de 200 reportes. Hay invariantes que verifican que `discriminancia(4)` da lo mismo con 10 y con 100.000 reportes.
+El ID de arista deriva de extremos, relación, método, locator y fuente mediante un hash determinista. La versión del método y la fecha de corrida se guardan como atributos, pero no cambian por sí solas ese ID. Esto permite reaplicar decisiones; también obliga a revisar su pertinencia si cambia sustancialmente la regla o la evidencia. Una decisión sin arista correspondiente se informa como huérfana, no se elimina del libro.
 
-La regla `R01_CUENTA` es la única exceptuada del corte probatorio por baja discriminancia. Si la cantidad de pares supera su límite computacional, la cuenta se conserva como grupo compacto con la lista completa de reportes: se evita la explosión sin ocultarla.
+El vocabulario admite tipos y relaciones de intercambio que el constructor no emite actualmente. Su presencia en la tabla de ontología no acredita una función activa. `case_scope` es metadato y no implementa permisos.
 
-## 7. Política de dirección IP
+## 5. Inventario de algoritmos de grafos
 
-Una IP aislada no identifica a nadie. Solo vale junto con fecha, hora, prestador y —cuando hay NAT— puerto de origen.
+Todos los algoritmos de esta tabla tienen una llamada en el flujo actual o en la construcción del visor. No se deduce su uso solo de una dependencia instalada.
 
-### Ventana temporal por prestador
+| Algoritmo u operación | Implementación y grafo de entrada | Para qué se utiliza y qué produce |
+|---|---|---|
+| Índice invertido y enumeración de pares por vecino común | `resolucion.indexar` y `vincular_reportes`, sobre relaciones vigentes | Identificar qué reportes comparten un dato y evaluar solamente los pares candidatos; conserva grupos masivos sin expandirlos |
+| Proyección ponderada reporte–reporte | `analisis.proyeccion_reportes` | Colapsar vínculos suficientes en un grafo simple no dirigido para análisis; preserva todos los reportes, incluidos aislados |
+| Componentes conexas | `nx.connected_components`, en `legajos_logicos` | Formar legajos lógicos con dos o más reportes conectados, también por cadenas indirectas |
+| Louvain ponderado | `nx.community.louvain_communities`, en `comunidades` | Buscar grupos de reportes con conexiones internas mediante optimización de modularidad; usa `peso` y semilla 7 |
+| Modularidad codiciosa, alternativa | `nx.community.greedy_modularity_communities` | Ejecutar una alternativa si Louvain falla; el resultado registra el método usado y el error que motivó la sustitución |
+| Centralidad de grado | `nx.degree_centrality`, en `centralidades` | Medir la proporción de otros reportes vecinos directos. Usa el número de vecinos, no la suma de los pesos |
+| Intermediación ponderada | `nx.betweenness_centrality` | Medir cuánto participa un reporte en caminos mínimos; emplea `distancia = 1 / peso`, con cálculo exacto hasta 3.000 nodos |
+| PageRank ponderado | `nx.pagerank` | Ordenar reportes por conectividad recursiva usando el puntaje de los enlaces como afinidad; se calcula hasta 20.000 nodos |
+| Puentes | `nx.bridges` | Identificar enlaces cuya eliminación desconecta una componente; la salida conserva hasta diez, sin ranking de importancia |
+| Adamic–Adar sobre incidencia reporte–identificador | `analisis.candidatos_de_enlace`, implementación propia | Ordenar pares por identificadores investigativos compartidos, dando mayor aporte a los menos frecuentes. Devuelve candidatos explicados, sin crear aristas |
+| Unión de conjuntos con compresión de caminos | `identidades.consolidar` y `_raiz` | Obtener la clausura transitiva de hipótesis de identidad validadas y crear nodos `IDENTIDAD`, sin borrar las menciones |
+| Búsqueda en anchura, BFS | `render_html._camino` | Recuperar una cadena corta de procedencia entre reporte y dato dentro de la fuente del reporte; se muestra en el detalle del vínculo |
+| Disposición jerárquica del lienzo | JavaScript `dibujar` y funciones de disposición en `render_html.py` | Ordenar el reporte o dato central, reportes relacionados y tarjetas desplegadas; es presentación, no una inferencia de relaciones |
 
-Dos capturas de la misma IP corresponden probablemente al mismo abonado solo si están dentro de la ventana de reasignación del prestador. Fuera de ella, la regla degrada de `R06_IP_VENTANA` (0,72, sostiene) a `R07_IP_SUELTA` (0,28, solo refuerza).
+### Proyección y métricas
 
-| Prestador | Ventana asumida |
+La proyección admite `COINCIDE_CON` y `POSIBLE_DUPLICADO_DE` vigentes, no rechazadas y con puntaje suficiente para `UMBRAL_CLUSTER`. Si hay más de una arista, conserva la de mayor peso. `VINCULADO_POR_OPERADOR` entra directamente y tiene prioridad sobre una calculada. Su peso interno de proyección permite agrupar; no se presenta como certeza del sistema.
+
+Las componentes conectan por transitividad: A–B y B–C pueden incluir A y C en el mismo legajo sin que exista una coincidencia directa A–C. Louvain puede subdividir una componente; una comunidad no demuestra autoría común.
+
+Grado, intermediación y PageRank devuelven los diez primeros resultados. Cuando el tamaño impide calcular intermediación o PageRank, `centralidades.omitidas` explica la omisión. No existe un valor cero equivalente a «no calculada». Las centralidades describen estructura del corpus disponible, no responsabilidad, jerarquía o peligrosidad.
+
+### Candidatos Adamic–Adar
+
+Para dos reportes `a` y `b`, el puntaje implementado es:
+
+`AA(a,b) = suma de 1 / ln(df(x)) para cada identificador x compartido`
+
+`df(x)` cuenta reportes distintos con ese identificador. No se ejecuta `nx.adamic_adar_index` sobre la proyección de vínculos: se construye un índice bipartito lógico desde la procedencia. Se excluyen nodos administrativos, pares con una relación de vinculación ya materializada —incluidas las rechazadas— y grupos que exceden la política de expansión. Un par descartado por las reglas puede aparecer como candidato estructural si no tuvo arista materializada. Los quince primeros candidatos conservan sus vecinos comunes y soportes para cada lado.
+
+## 6. Reglas y comparaciones complementarias
+
+Estas operaciones participan en la resolución, pero no deben confundirse con los algoritmos clásicos de la tabla anterior.
+
+| Operación | Funcionamiento actual y límite |
 |---|---|
-| *(cualquier otro)* | 24 h |
-| claro | 12 h |
-| movistar | 12 h |
-| personal | 12 h |
-| telecentro | 24 h |
-| telecom argentina | 24 h |
-| telefonica de argentina | 24 h |
+| Normalización | `normalizacion.py`: alias, email, teléfono, IP, fechas y cuenta con plataforma. Reduce diferencias de representación sin atribuir identidad de persona |
+| Extracción de texto | `mineria_texto.py`: patrones y contexto controlado para identificadores; conserva el fragmento y locator. No hay un modelo lingüístico |
+| Reglas deterministas | Trece reglas declaradas en `ontologia.REGLAS`; evalúan igualdad o similitud y aplican factores de frecuencia, fuente textual y condiciones de IP |
+| Noisy-OR condicionado | `resolucion.combinar`: combina pesos efectivos solo si al menos una regla puede sostener el vínculo. Las corroborantes no crean una propuesta por acumulación |
+| Indicios de duplicado | Coincidencia de cuenta y plataforma con proximidad temporal según la regla. Crea `POSIBLE_DUPLICADO_DE`; no elimina ni fusiona reportes |
+| Hipótesis de identidad | Menciones que usan una misma cuenta reciben `POSIBLE_MISMA_IDENTIDAD`. Solo una validación humana permite consolidarlas |
+| Contradicción geotemporal | Haversine entre ubicaciones de IP y velocidad implícita entre observaciones consecutivas de una misma ancla; genera `CONTRADICE`, sin invalidar por sí sola otras relaciones |
+| pHash | Distancia Hamming entre huellas declaradas de 64 bits, con índice por bloques para reducir pares; conserva la comparación y el soporte. No calcula huellas desde imágenes |
+| Huella de audio | Igualdad de huellas declaradas compatibles; no identifica hablantes ni analiza audio binario |
+| Contexto de lugar | Léxico controlado por dimensiones, Jaccard ponderado, mínimo de dimensiones comunes y anclaje. Solo corrobora, no fusiona ubicaciones |
+| Alertas | Reglas por estado, motivo de archivo, vínculo suficiente y nueva información pertinente. Propone revisar el antecedente; no reabre una actuación |
 
-> **Estos valores son estimados y no están verificados con los prestadores.** El supuesto viaja escrito en la explicación de cada arista que produce, de modo que quien lee el informe sabe sobre qué base se afirmó. Confirmarlos es una tarea pendiente.
+La combinación de señales es `min(0,99; 1 − producto(1 − peso_efectivo))`, redondeada a cuatro decimales, y vale cero si todas las señales son corroborantes. La forma matemática no acredita independencia entre señales ni calibración probabilística. Los valores de las trece reglas y sus factores están en [Parámetros](docs/PARAMETROS.md).
 
-### CGNAT
+Para IP se consideran tiempo y condiciones declaradas de prestador, NAT/proxy y puerto. Las ventanas por prestador son parámetros estimados; no verifican la duración de una asignación. El prestador mostrado en la tarjeta procede de `ASIGNADA_A`, no significa titularidad de la IP.
 
-Bajo *Carrier-Grade NAT* (`100.64.0.0/10`, RFC 6598) muchos abonados comparten una misma IP pública, y sin el puerto de origen el prestador no puede decir cuál.
+El índice de pHash divide los 64 bits en `distancia_máxima + 1` bloques. Un par dentro de la distancia admitida debe compartir al menos un bloque; los candidatos se verifican después con Hamming exacto. No hay comparación exhaustiva obligatoria de todos los archivos.
 
-| Situación | Factor sobre el peso | Efecto |
-|---|---|---|
-| IP normal, dentro de ventana | 1,00 | `R06_IP_VENTANA` con su peso pleno, **sostiene** |
-| CGNAT **con** puerto en ambas capturas | × 0,85 | sigue sosteniendo: el prestador puede identificar al abonado |
-| CGNAT **sin** puerto | × 0,35 | **se degrada a solo refuerza**: no permite atribuir a nadie |
-| Fuera de ventana | — | pasa a `R07_IP_SUELTA`, que nunca sostiene |
-| Sin fecha ni hora en alguna captura | — | pasa a `R07_IP_SUELTA` |
+Para texto de chat, el contexto de lugar solo incorpora líneas que puede atribuir al usuario reportado. Las descripciones semejantes conservan su procedencia, método y léxico. La redacción de informes usa plantillas deterministas en `redaccion.py`; no llama a un servicio de IA.
 
-El reporte real del dataset trae `port: 19096`, un campo que suele ignorarse y que acá cambia el resultado.
+## 7. Entrada, salidas y contratos
 
-### Zona horaria
+### Entrada
 
-NCMEC informa en UTC; los prestadores argentinos responden en hora local. Tres horas de corrimiento alcanzan para atribuir una conexión al abonado equivocado. Toda fecha sin zona horaria explícita se marca como supuesto en la explicación de la arista.
+- Reportes: objeto JSON con `reportId` y estructura compatible con `extractor_ncmec.py`. ID de 1 a 60 caracteres `[A-Za-z0-9_-]`, sin nombres reservados de Windows. Las estructuras opcionales pueden faltar; si están presentes deben ser válidas.
+- Estados: `estado_institucional.json` en la carpeta de datos, según el lector del constructor.
+- Multimedia: manifiestos JSON con `fileDetails`, asociados por `reportId` a reportes ya ingeridos. Se pasan mediante `--multimedia`; el botón de importación del visor recibe reportes, no manifiestos. El servidor habitual no incorpora manifiestos automáticamente.
+- Decisiones: los dos libros en `grafo/estado/`.
 
-## 8. Normalización de identificadores
+El constructor puede recibir varias carpetas con `--datos`. El servidor local usa el dataset de demostración más `grafo/entrada/`. Para una corrida únicamente con otro corpus se ejecuta el constructor con esa carpeta explícita.
 
-Antes de comparar, cada identificador se lleva a una forma canónica. Sin esto, `011 15 6888-9999` y `+54 9 11 6888 9999` serían dos teléfonos distintos. Versión: **1.0**.
+### Salidas reconstruibles
 
-| Tipo | Regla | Entrada | Resultado |
-|---|---|---|---|
-| Teléfono | E.164 argentino: se saca el `9` de móvil, se descartan longitudes inverosímiles (fuera de 8 a 11 dígitos nacionales) | `011 15 6888 9999` | `+541168889999` |
-| Teléfono | misma entrada en formato internacional | `+54 9 11 6888-9999` | `+541168889999` |
-| Correo | minúsculas, sin espacios, con validación de forma | `  Lechero@Example.COM ` | `lechero@example.com` |
-| Alias | minúsculas y espacios colapsados; identificador **débil** | `  El  Lechero ` | `el lechero` |
-| IP | validación de forma y marcado de rasgos | `181.46.66.242` | `181.46.66.242` |
-| IP | CGNAT detectada | `100.66.12.45` | `100.66.12.45` |
-
-Cada IP normalizada arrastra los rasgos que condicionan su valor probatorio. Para `100.66.12.45`: `atribuible_sin_dato_extra = False`, `cgnat = True`, `privada = False`, `version = 4`.
-
-Cuando una normalización descarta un valor, deja una nota que explica por qué. Nada se descarta en silencio.
-
-## 9. Hipótesis de identidad
-
-Cada reporte aporta su propia `PERSONA_MENCION`. Dos menciones que comparten cuenta generan una relación `POSIBLE_MISMA_IDENTIDAD` con confianza fija **0,85** (`CONFIANZA_MISMA_IDENTIDAD`), clase `inferida`, estado `pendiente` — **nunca una fusión**.
-
-Una cuenta puede estar compartida, vendida o comprometida. La unificación existe, pero **la aprueba una persona**, y entonces:
-
-- no borra las menciones: cada reporte conserva la suya con su fuente;
-- es transitiva, por conjuntos disjuntos (*union-find*): aprobar A=B y B=C agrupa las tres;
-- es reversible: revertir la validación deshace la identidad sola en la próxima construcción.
-
-## 10. Contra-evidencia
-
-Un grafo que solo acumula coincidencias tiende a confirmar la hipótesis inicial. Por eso existen aristas que **debilitan**.
-
-`CONTRADICE` se produce cuando la misma cuenta aparece observada desde dos IP geolocalizadas a una distancia que exige una velocidad imposible.
-
-| Parámetro | Valor | Qué hace |
-|---|---|---|
-| `VELOCIDAD_IMPOSIBLE_KMH` | 900 | por encima de esta velocidad implícita se marca la contradicción |
-| `DISTANCIA_MINIMA_KM` | 50 km | por debajo no se evalúa: la geolocalización por IP no tiene esa precisión |
-| Distancia | Haversine | sobre las coordenadas informadas por la geolocalización |
-| `CONFIANZA_CONTRADICCION` | 0,70 | es un indicio de inconsistencia, no una refutación |
-
-**No invalida nada.** Puede ser una VPN, una cuenta compartida o una geolocalización errónea. Debilita la atribución, y por eso conviene tenerla a la vista.
-
-## 11. Alertas de reapertura
-
-Un archivado **no se reabre porque apareció una conexión**. Se reabre porque apareció *el dato que le faltaba*. Por eso el motivo de archivo es un campo de primera clase y cada motivo declara qué aporte lo reactiva.
-
-| Motivo del archivo | Qué lo reactiva | Prioridad |
-|---|---|---|
-| `sin_datos_de_usuario` | un identificador que permite individualizar | alta |
-| `no_atribuible_nat` | un identificador que permite individualizar; una dirección IP atribuible, con fecha y hora | alta |
-| `sin_archivos` | un archivo identificado por su hash | alta |
-| `sin_ubicacion` | un dato de ubicación utilizable; una dirección IP atribuible, con fecha y hora | media |
-| `material_sin_relevancia` | su condición de actuación con mérito para avanzar; un archivo identificado por su hash | media |
-| *(cualquier otro motivo)* | un identificador que permite individualizar; un archivo identificado por su hash; una dirección IP atribuible, con fecha y hora; su condición de actuación con mérito para avanzar | media |
-
-### Las dos condiciones
-
-Una alerta exige **ambas**, no una:
-
-1. que el vínculo entre los dos reportes esté sostenido por una regla fuerte —no solo por reglas que refuerzan—;
-2. que el reporte disparador aporte efectivamente aquello que le faltaba al archivado.
-
-Los vínculos que no califican se registran como **silenciados**, con su motivo. No se descartan en silencio.
-
-### Estados institucionales
-
-| Grupo | Estados |
+| Archivo en la carpeta de salida | Contenido |
 |---|---|
-| Se consideran archivados | `archivado`, `archivado_latente`, `pendiente` |
-| Se consideran activos (pueden disparar) | `derivado`, `en_analisis`, `en_investigacion`, `judicializado` |
-| Relaciones de campo que permiten atribuir un identificador | `ASOCIADO_A_EMAIL`, `ASOCIADO_A_TELEFONO`, `USA_CUENTA`, `USA_DISPOSITIVO` |
+| `grafo.json` | Nodos, aristas y fuentes con procedencia y revisión |
+| `grafo.graphml` | Exportación GraphML; estructuras compuestas convertidas a atributos de texto |
+| `analisis.json` | Resultados de reglas, revisión, algoritmos, alertas y cobertura |
+| `textos_restringidos.json` | Textos completos retenidos con procedencia; no es una carpeta protegida por permisos de la app |
+| `informe_crudo.json` | Dossier estructurado que alimenta la redacción |
+| `informe.md` | Resumen técnico de la corrida y análisis |
+| `informe_vinculaciones.md` | Informe discursivo general |
+| `informes_por_caso/informe_<id>.md` | Informe discursivo recortado por caso |
+| `grafo.html` | Visor autocontenido con datos e informes embebidos |
 
-Las relaciones `MENCIONA_*` quedan expresamente fuera: una conversación puede nombrar un teléfono o correo de un tercero y esa mención no resuelve por sí sola la falta de atribución.
+Las salidas no son los libros de decisiones y se pueden regenerar. Los IDs de legajo pueden cambiar con las componentes: no deben usarse como clave duradera para un sistema externo.
 
-> Toda esta lógica depende de que el motivo de archivo se registre de forma **estructurada**. Hoy se simula con `reportes_sinteticos/estado_institucional.json`. Si en SIPAR es texto libre, ese es el primer cambio a pedir.
+## 8. API local
 
-## 12. Algoritmos clásicos de grafos
+La API usa JSON. Las escrituras se serializan con un candado dentro de un único proceso. `Host` y `Origin`, si este último está presente, deben corresponder al servidor local; los POST requieren `application/json`. No se exponen rutas arbitrarias del sistema de archivos.
 
-Corren sobre la **proyección reporte–reporte**: un grafo no dirigido donde cada nodo es un reporte y cada arista un vínculo que superó `UMBRAL_CLUSTER` (0,70), más las vinculaciones manuales, que entran sin umbral.
+| Método y ruta | Entrada o función |
+|---|---|
+| GET/HEAD `/`, `/index.html`, `/grafo.html` | Visor generado |
+| GET/HEAD `/api/estado` | Disponibilidad: `ok` y `app` |
+| POST `/api/importar` | `archivos`: lista de objetos con `nombre` y `contenido` JSON textual; validación previa y resultado por archivo |
+| POST `/api/quitar` | `reporte`: ID de una importación que se quiere retirar |
+| POST `/api/vincular` | `reporte_a`, `reporte_b`, `usuario`, `motivo` |
+| POST `/api/desvincular` | `reporte_a`, `reporte_b`, `usuario`, `motivo` |
+| POST `/api/decidir` | `arista`, `decision`, `usuario`, `observacion`; requiere motivo al rechazar |
 
-| Qué | Algoritmo | Configuración | Para qué sirve |
-|---|---|---|---|
-| Legajos | componentes conexas | — | qué reportes conviene mirar juntos |
-| Comunidades | Louvain | `weight="peso"`, `seed=7` | subgrupos dentro de un legajo grande; con pocos reportes coincide con las componentes |
-| Centralidad de grado | `degree_centrality` | top 10 | con cuántos se conecta cada reporte |
-| Intermediación | `betweenness_centrality` | top 10, `weight=1/peso`, solo si el grafo tiene ≤ 3.000 reportes | qué reporte actúa de puente entre grupos |
-| PageRank | `pagerank` | top 10, `weight=peso`, solo si ≤ 20.000 reportes | importancia estructural |
-| Puentes | `nx.bridges` | top 10 | aristas cuya caída parte el legajo en dos |
-| Enlaces probables | Adamic–Adar | proyección reporte–identificador, top 15, **no materializa aristas** | baseline determinista contra el cual comparar una futura GNN |
+`decision` admite `validada`, `rechazada` y `en_revision`. Los extremos de un vínculo deben existir. No se revisan directamente las relaciones afirmadas ni la identidad consolidada: se actúa sobre su decisión de origen.
 
-El `seed=7` de Louvain no es decorativo: sin él dos corridas sobre los mismos datos pueden dar comunidades distintas, y un informe que cambia solo porque se volvió a ejecutar no es reproducible. Si Louvain falla y se usa `greedy_modularity`, la salida declara el algoritmo efectivo y el error que activó el fallback.
+El límite de cuerpo es 64 KiB, o 12 MiB en importación. Un lote puede tener éxito parcial, informado por archivo. La importación valida en un grafo temporal y reemplaza el archivo mediante una escritura temporal; las salidas de toda la reconstrucción no forman una transacción atómica de múltiples archivos.
 
-Adamic–Adar **calcula y ordena, pero no escribe nada en el grafo**. Es un ranking de pares que merecerían revisión, no un conjunto de relaciones. Materializarlo convertiría una sugerencia estadística en algo que se ve igual que un hecho. Los pares nacen de vecinos investigativos compartidos; no se combinan todos los reportes y se excluyen plataforma y otros nodos administrativos. Cada vecino conserva el locator de ambos lados.
+Códigos: 200 operación respondida, 400 entrada inválida, 403 origen local no admitido, 404 ruta inexistente, 415 tipo de contenido incorrecto, 500 error interno. Si se guardó la operación y falló la reconstrucción, el 500 incluye `operacion_guardada: true` y una indicación de no repetirla. Al reiniciar se reconstruye desde los insumos persistidos.
 
-> **Una centralidad alta no significa culpabilidad, liderazgo ni peligrosidad.** Describe una posición estructural en el grafo que se pudo construir con los datos disponibles. Un reporte puede ser central solo porque su plataforma informa más campos que las demás. La advertencia viaja en la salida del propio módulo.
+## 9. Persistencia, revisión y etiquetas
 
-## 13. Registro de las decisiones humanas
+[validacion.py](grafo/src/validacion.py) implementa dos libros JSONL de anexado:
 
-El grafo es una **proyección reconstruible**: se borra `salida/` y se regenera desde los reportes. Las decisiones de las personas no pueden vivir ahí, así que viven aparte y se re-aplican sobre el grafo reconstruido.
+- `validaciones.jsonl`: arista, decisión, operador, observación, fecha, secuencia y hashes.
+- `vinculos_manuales.jsonl`: par de reportes, acción de vincular o desvincular, operador, fundamento y hashes.
 
-| Libro | Qué registra | Clave |
-|---|---|---|
-| `estado/validaciones.jsonl` | validar, rechazar o poner en revisión una relación existente; aprobar una unificación de identidad | `arista_id` |
-| `estado/vinculos_manuales.jsonl` | vincular o desvincular dos reportes por decisión propia | el par de reportes |
+Cada registro referencia el hash anterior. La verificación detecta modificaciones que rompen la cadena, pero no impide una reescritura completa ni detecta por sí sola la eliminación de una cola válida sin un anclaje externo. El campo operador tampoco autentica a la persona. Los libros son independientes del grafo reconstruido; se conserva el historial y se aplica la última decisión pertinente.
 
-Ambos son **append-only y encadenados por hash**: cada registro lleva `prev_hash` y un `hash` SHA-256 de su propio contenido.
+La unificación de identidades usa unión de conjuntos sobre pares validados. Una cadena A=B y B=C consolida A, B y C; las menciones permanecen. Al revertir una validación, el siguiente cálculo recompone los grupos.
 
-Esto funciona porque **el identificador de arista es determinista**: se calcula con SHA-1 truncado sobre extremos, relación, método, locator y fuente, de modo que la misma evidencia con el mismo método produce el mismo `arista_id` en cada corrida. Es la propiedad que no se puede perder.
+**Estos eventos sirven como materia prima para un futuro conjunto etiquetado. No equivalen todavía a un dataset de entrenamiento.** Una relación observada puede figurar validada por defecto. Una validación humana debe identificarse por su evento en el libro. Además, aceptar una IP o un dato fuente no etiqueta automáticamente un par de reportes como «misma persona». El esquema de etiquetas pendiente debe conservar la pregunta revisada y el tipo de relación.
 
-> **Alcance real de la cadena de hashes:** detecta la modificación o el borrado de registros anteriores. **No** impide que alguien con acceso de escritura reescriba el archivo entero, ni sella el tiempo. Para eso hace falta almacenamiento append-only del lado del servidor o anclaje externo, que todavía no está definido.
+## 10. Visor e historial de navegación
 
-### Seudonimización
+[render_html.py](grafo/src/render_html.py) serializa datos y genera HTML con CSS y JavaScript embebidos. El lienzo usa SVG y disposición jerárquica, sin `spring_layout`. Los dos temas conservan el significado de colores con tonos adaptados; interfaz, informes embebidos y grafos usan fuentes sin serif.
 
-Antes de enviar el dossier a cualquier modelo de lenguaje, los identificadores de tipo `IP`, `CUENTA`, `TELEFONO`, `EMAIL`, `DISPOSITIVO`, `ALIAS`, `ALIAS_PAGO`, `EVIDENCIA`, `HASH_PERCEPTUAL`, `HUELLA_AUDIO` se reemplazan por etiquetas estables (`IP-1`, `CUENTA-2`). El modelo redacta sobre las etiquetas y los valores reales se restituyen después, localmente, sobre el texto devuelto. Hay invariantes que verifican que ningún identificador real sobrevive en el dossier seudonimizado.
+El estado contiene caso, raíz, dato central, reportes desplegados, filtros, selección, movimientos y encuadre. Las instantáneas de navegación guardan los campos que afectan el dibujo. Las fichas laterales conservan su posición y secciones abiertas. Volver/Adelante restaura la vista; la persistencia de decisiones se mantiene por separado.
 
-## 14. Formatos de salida
+La marca «en N reportes ›» cuenta reportes distintos del caso, no aristas. El puntero resalta las cajas de esos reportes sin redibujar y la marca centra el dato. Si el texto no cabe, un punto ofrece la misma acción y ayuda. Se admite clic y teclado sin seleccionar o arrastrar accidentalmente la tarjeta. El interruptor de cruces también se guarda en el historial.
 
-| Archivo | Formato | Para qué |
-|---|---|---|
-| `grafo.json` | JSON | grafo completo con la procedencia de cada arista |
-| `grafo.graphml` | GraphML | para Gephi, yEd o Cytoscape |
-| `analisis.json` | JSON | resultado estructurado de cada módulo de la corrida |
-| `grafo.html` | HTML autocontenido | el visor, sin dependencias externas |
-| `informes_por_caso/` | Markdown | un informe por caso, que es el que se firma |
-| `informe_vinculaciones.md` | Markdown | informe general de la corrida |
-| `informe.md` | Markdown | informe técnico con trazabilidad a la fuente |
-| `informe_crudo.json` | JSON | dossier con el peso de cada vínculo y el aporte de cada regla |
-| `informe_crudo_anonimo.json` | JSON | el mismo, seudonimizado: es lo único que ve un modelo |
-| `textos_restringidos.json` | JSON | texto sensible **fuera** del grafo, indexado por hash |
+Al recrear tarjetas, la función de medida debe escribir el texto incluso cuando reutiliza un ancho en caché. Las pruebas cubren este caso porque un fallo allí vuelve invisible el contador después del primer clic. Los motivos y flechas usan el color de su relación; el grosor representa peso salvo en vínculos manuales. El fondo invertido identifica la raíz.
 
-Todo lo de `salida/` se regenera en cada corrida y no se versiona. Lo único que no se recalcula es `estado/`.
+Las ubicaciones de origen se traducen a etiquetas legibles. Los locators originales permanecen en auditoría. El informe distingue las coincidencias que las reglas no sostienen de los vínculos establecidos por operadores.
 
-## 15. Límites de esta configuración
+## 11. Verificación y mantenimiento
 
-Lo que sigue no son defectos ocultos: son las condiciones bajo las cuales los números de arriba son válidos.
+[verificar.py](verificar.py) reúne las comprobaciones: integridad del entorno con `pip check`, compilación Python, invariantes en `grafo/pruebas.py`, pruebas HTTP y de persistencia mediante `unittest`, lógica JavaScript de navegación y lienzo, y vigencia de las referencias generadas. Comprueba también enlaces locales de los Markdown.
 
-1. **Los pesos no están calibrados contra un conjunto validado.** Salen del criterio del relevamiento —cuánto individualiza cada dato— y no de medir aciertos y errores sobre casos reales ya trabajados. Por eso `confidence` es un puntaje, no una probabilidad. Ese conjunto todavía no existe, y sin él no se puede informar precisión ni recall.
-2. **Las ventanas de IP por prestador son estimadas.** Hay que confirmarlas con cada uno.
-3. **El corpus de prueba tiene diez reportes.** Los umbrales que dependen del volumen —`CORPUS_MINIMO_PARA_FRACCION` = 200, `DF_HUB_ABSOLUTO` = 50— no se ejercitan con datos reales, solo con pruebas unitarias.
-4. **Todo corre en memoria con `networkx`.** No escala más allá de decenas de miles de nodos. Evaluar una base de grafos distribuida recién tiene sentido con volúmenes reales medidos.
-5. **El extractor está escrito contra el JSON de NCMEC.** PDF y XML no se procesan.
-6. **No hay control de acceso.** Quien corre el sistema ve todo.
+Las pruebas operan en carpetas temporales y no deben cambiar los libros ni los reportes del repositorio. Cubren rechazos y revalidación, reconstrucción, errores de importación, pérdida de contadores al redibujar, accesibilidad del botón de apariciones, colores, origen local de escrituras y fallos posteriores a persistir una operación. Las pruebas JavaScript emplean DOM simulado: no sustituyen una inspección visual ni pruebas de interacción en navegadores reales.
 
----
+La verificación de dependencias consulta versiones e incompatibilidades. Una auditoría con `pip-audit -r requisitos.txt` consulta vulnerabilidades conocidas; un resultado sin hallazgos no garantiza ausencia de vulnerabilidades desconocidas.
 
-## Cómo verificar todo esto
+Para actualizar referencias después de cambiar constantes:
 
 ```bash
-python grafo/construir.py   # regenera este documento y las salidas
-python grafo/pruebas.py     # invariantes sobre las reglas no negociables
+python grafo/documentar.py
+python verificar.py
 ```
 
-Los invariantes cubren, entre otras cosas: que ninguna arista exista sin fuente ni locator, que ninguna inferencia nazca validada, que una afirmación humana no lleve peso, que la discriminancia no dependa del tamaño del corpus, que una coincidencia de solo alias y ciudad no vincule, que el identificador de arista sea estable entre corridas y que el texto sensible no entre al grafo.
+La comprobación `python grafo/documentar.py --comprobar` falla si modelo o parámetros difieren del código. El documento arquitectónico se mantiene a mano y solo debe describir rutas ejecutadas. Los tiempos de cálculo y capacidad máxima requieren medición con el corpus real; esta implementación reconstruye todo en memoria y no ofrece un SLA de escalabilidad.

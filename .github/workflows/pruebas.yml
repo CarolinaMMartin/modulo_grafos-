@@ -1,0 +1,40 @@
+name: Verificar modulo de grafos
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  pruebas:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.12', '3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: python -m pip install --only-binary=:all: -r requisitos.txt
+      - run: python verificar.py
+      - name: Inicio Windows desde carpeta con espacios
+        if: runner.os == 'Windows' && matrix.python == '3.12'
+        shell: pwsh
+        run: |
+          $prueba = Join-Path $env:RUNNER_TEMP 'modulo con espacios'
+          New-Item -ItemType Directory -Force $prueba | Out-Null
+          Copy-Item iniciar.py, INICIAR_WINDOWS.bat, requisitos.txt $prueba
+          Copy-Item grafo, reportes_sinteticos $prueba -Recurse
+          Push-Location $prueba
+          cmd /c 'INICIAR_WINDOWS.bat --help < nul'
+          $resultado = $LASTEXITCODE
+          Pop-Location
+          exit $resultado

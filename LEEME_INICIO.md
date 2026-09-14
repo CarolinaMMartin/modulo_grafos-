@@ -1,24 +1,46 @@
-# Inicio en Windows
+# Inicio y actualización
 
-1. Extraé el ZIP completo en una carpeta local. No abras la aplicación desde el ZIP.
-2. Hacé doble clic en **INICIAR_WINDOWS.bat**. Usa tu Python instalado; se recomienda **Python 3.12**. Si falta Python, el iniciador te lo indica.
-3. La primera vez se prepara un entorno `.venv` y se descargan las dependencias: necesitás Internet para ese paso. Los siguientes inicios funcionan localmente, sin descargar otra vez mientras no cambien los requisitos.
-4. Se abre el navegador con la aplicación. Dejá la consola abierta mientras trabajás. Para detenerla, presioná **Ctrl+C** en esa consola. Cerrar solamente la pestaña no detiene el servidor.
+## Instalación
 
-La dirección local aparece en la consola; el puerto habitual es **8731**. Si el navegador no se abre, copiá esa dirección en Chrome o Edge. No se necesita ejecutar como administrador.
+Usar una carpeta local con permiso de escritura y extraer el ZIP completo antes de iniciar. Se requiere Python de **64 bits, 3.12, 3.13 o 3.14**; 3.14.1 está excluido por NetworkX. La opción recomendada es 3.12.
 
-## Conservar tu trabajo
+En Windows: instalar Python con el lanzador `py` o la opción de agregar Python al PATH, y abrir `INICIAR_WINDOWS.bat`. En Linux o macOS: `python3 iniciar.py`.
 
-Los reportes locales están en **grafo/entrada** y el historial de validaciones y vínculos manuales está en **grafo/estado**. El iniciador no borra ni reemplaza esas carpetas.
+El iniciador crea `.venv`, instala las tres dependencias fijadas en `requisitos.txt`, comprueba sus versiones y abre el navegador. No copiar `.venv` desde otra computadora. El navegador usa `http://127.0.0.1:8731/`. Mantener la consola abierta; detener con Ctrl+C.
 
-Si venís de otra copia de la aplicación, cerrala y guardá una copia de seguridad. Antes del primer inicio, copiá sus carpetas **grafo/entrada** y **grafo/estado** completas a las mismas ubicaciones de esta versión. Si ya usaste ambas copias, guardá las dos: reemplazar archivos del mismo nombre puede hacerte perder cambios.
+Si el puerto está ocupado:
 
-Si movés la aplicación a otra carpeta o equipo y Python deja de funcionar, eliminá únicamente **.venv** y volvé a abrir **INICIAR_WINDOWS.bat**. Esto reinstala las dependencias y requiere Internet; conservá **grafo/entrada** y **grafo/estado**.
+```bat
+INICIAR_WINDOWS.bat --puerto 8732
+```
 
-## Si aparece un error
+También se pueden pasar `--sin-navegador` y `--puerto` a `python iniciar.py`. La opción `--puerto 0` elige un puerto disponible y muestra la dirección real. No abrir dos procesos sobre la misma carpeta de trabajo.
 
-La consola queda abierta para que puedas leer o copiar el mensaje. Verificá que extrajiste todo el ZIP y que la carpeta permite guardar archivos. Si falla la instalación de dependencias, revisá la conexión y reintentá.
+## Actualizar sin perder el trabajo
 
-Para un inicio manual, desde una terminal situada en la carpeta de la aplicación: `py -3 iniciar.py`. Podés añadir `--sin-navegador` o `--puerto 8732`.
+Cerrar la aplicación y conservar una copia de `grafo/entrada/` y `grafo/estado/`.
 
-El lanzador está preparado para Windows. Las pruebas realizadas en el entorno de entrega no sustituyen una ejecución nativa en Windows.
+- **Copia con Git:** ejecutar `git pull --ff-only` y abrir el iniciador. Si Git informa cambios locales, conservarlos y resolver ese aviso antes de actualizar; no usar un reinicio forzado para descartarlos.
+- **Copia ZIP:** extraer la versión nueva en otra carpeta. Copiar allí los JSON de `grafo/entrada/` y los dos libros propios de `grafo/estado/`, reemplazando únicamente los libros de demostración de la carpeta nueva. No concatenar cadenas JSONL. Conservar además cualquier dataset o manifiesto propio.
+
+Si `.venv` proviene de un Python antiguo o de otra computadora, eliminar **solo `.venv`** y volver a iniciar con un Python admitido. El entorno se recrea; los reportes y las decisiones viven fuera de él. La reinstalación necesita Internet.
+
+## Reportes y decisiones
+
+En **Probar con otros reportes** se cargan JSON compatibles con el extractor. Se validan antes de guardarlos en `grafo/entrada/`. Un mismo `reportId` reemplaza su variante importada. Quitar una importación elimina esa variante; si había un reporte base con el mismo ID, vuelve a usarse el base.
+
+`grafo/estado/validaciones.jsonl` conserva revisiones y `grafo/estado/vinculos_manuales.jsonl` conserva vinculaciones y reversiones. **Volver** navega por las fichas; no deshace esos registros.
+
+Si aparece «La operación quedó guardada, pero no se pudo actualizar el visor», no repetir la decisión: cerrar y reiniciar para reconstruir. Si vuelve a fallar, conservar los archivos y el error de la consola.
+
+## Reconstrucción por consola
+
+Con el Python del entorno preparado:
+
+```bash
+python grafo/construir.py --datos reportes_sinteticos grafo/entrada --salida grafo/salida
+```
+
+Para trabajar solo con otro dataset, pasar únicamente esa carpeta a `--datos`. La ejecución directa del constructor genera salidas; abrir `grafo.html` como archivo permite consultar, pero para guardar decisiones hace falta el servidor local.
+
+La aplicación es local y de un solo puesto. No incorpora autenticación institucional, permisos por caso ni acceso multiusuario.

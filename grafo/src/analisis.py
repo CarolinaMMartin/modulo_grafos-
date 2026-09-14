@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Algoritmos clasicos de grafos (fase G3), explicables y sin modelos.
+Algoritmos clasicos de grafos, explicables y sin modelos entrenados.
 
 Advertencia que debe acompanar cualquier salida de este modulo, y que se
 incluye en el informe: una centralidad alta no indica culpabilidad ni
@@ -17,7 +17,12 @@ import networkx as nx
 import ontologia as ont
 
 METODO = "analisis_clasico"
-VERSION = "1.2"
+VERSION = "1.3"
+SEMILLA_COMUNIDADES = 7
+MAX_NODOS_INTERMEDIACION = 3000
+MAX_NODOS_PAGERANK = 20000
+TOP_CENTRALIDADES = 10
+TOP_CANDIDATOS = 15
 
 # Solo entidades con significado investigativo pueden originar candidatos.
 # Plataforma informante, organismo receptor y otros nodos administrativos se
@@ -109,7 +114,7 @@ def comunidades(g, umbral=None):
     algoritmo = "louvain"
     aviso = None
     try:
-        parts = nx.community.louvain_communities(P, weight="peso", seed=7)
+        parts = nx.community.louvain_communities(P, weight="peso", seed=SEMILLA_COMUNIDADES)
     except Exception as exc:
         algoritmo = "greedy_modularity_fallback"
         aviso = "%s: %s" % (type(exc).__name__, str(exc))
@@ -121,12 +126,12 @@ def comunidades(g, umbral=None):
         salida.append(dict(comunidad="C%03d" % (i + 1),
                            reportes=sorted(g.G.nodes[n]["valor"] for n in c),
                            tamano=len(c), algoritmo=algoritmo,
-                           peso="peso", semilla=7 if algoritmo == "louvain" else None,
+                           peso="peso", semilla=SEMILLA_COMUNIDADES if algoritmo == "louvain" else None,
                            aviso_fallback=aviso))
     return salida
 
 
-def centralidades(g, top=10):
+def centralidades(g, top=TOP_CENTRALIDADES):
     """Centralidades sobre la proyeccion reporte-reporte ya revisada.
 
     Plataforma, organismo receptor y otros nodos administrativos no compiten
@@ -141,9 +146,9 @@ def centralidades(g, top=10):
 
     grado = nx.degree_centrality(H)
     intermediacion = (nx.betweenness_centrality(H, weight="distancia")
-                      if H.number_of_nodes() <= 3000 else {})
+                      if H.number_of_nodes() <= MAX_NODOS_INTERMEDIACION else {})
     pagerank = (nx.pagerank(H, weight="peso")
-                if H.number_of_nodes() <= 20000 else {})
+                if H.number_of_nodes() <= MAX_NODOS_PAGERANK else {})
 
     def top_n(d, n):
         return [dict(nodo=k, etiqueta=g.G.nodes[k].get("etiqueta"),
@@ -163,10 +168,14 @@ def centralidades(g, top=10):
         intermediacion=top_n(intermediacion, top) if intermediacion else [],
         pagerank=top_n(pagerank, top) if pagerank else [],
         puentes=puentes[:top],
+        omitidas={nombre: "La proyeccion supera %d nodos" % limite
+                  for nombre, limite in (("intermediacion", MAX_NODOS_INTERMEDIACION),
+                                         ("pagerank", MAX_NODOS_PAGERANK))
+                  if H.number_of_nodes() > limite},
     )
 
 
-def candidatos_de_enlace(g, top=15):
+def candidatos_de_enlace(g, top=TOP_CANDIDATOS):
     """Baseline explicable de link prediction (fase previa a cualquier GNN).
 
     Adamic-Adar sobre una proyeccion bipartita reporte-identificador. NO se
@@ -194,7 +203,7 @@ def candidatos_de_enlace(g, top=15):
             if g.G.nodes[n].get("tipo") in TIPOS_VECINO_INVESTIGATIVO:
                 indice[n][sid].append(d)
 
-    # Un par ya evaluado no reaparece como una sugerencia estructural, incluso
+    # Un par con arista materializada no reaparece como sugerencia, incluso
     # si su vinculacion fue rechazada: la decision humana no puede volver por
     # una puerta lateral con otro nombre.
     ya = set()

@@ -18,8 +18,7 @@ Sin la segunda condicion, cualquier coincidencia genera ruido: un vinculo por
 dispositivo no resuelve un archivo por falta de datos de ubicacion, y un vinculo
 por telefono no resuelve un archivo por ausencia de archivos.
 
-El archivo describe insuficiencia actual de evidencia, no falsedad del hecho
-(contexto.md 3 y 14.14). El archivado nunca se trata como caso negativo.
+El archivo describe insuficiencia actual de evidencia, no falsedad del hecho. El archivado nunca se trata como caso negativo.
 """
 
 from collections import defaultdict

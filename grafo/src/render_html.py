@@ -1,32 +1,14 @@
 # -*- coding: utf-8 -*-
-"""
-Visualizador autocontenido del grafo (HTML + SVG, sin dependencias externas).
+"""Visor autocontenido por caso, HTML/CSS/JavaScript/SVG.
 
-Restricciones del proyecto que este visor respeta:
-
-- procesamiento local: no carga nada de internet, ni fuentes ni librerias;
-- el estilo de la arista distingue observada / derivada / inferida;
-- el color y el tamano no expresan sospecha: son de identificacion. El unico
-  color de alarma esta reservado para la contra-evidencia;
-- el detalle de cada relacion muestra su fundamento redactado, la fuente, el
-  locator, el metodo y el estado de validacion;
-- el texto sensible no se incluye: solo se referencia su hash y su locator;
-- al generar el informe con un modelo, se envia el dossier seudonimizado y los
-  identificadores se restituyen localmente sobre el texto devuelto.
-
-Vistas:
-
-- Solo vinculaciones : unicamente los reportes y las relaciones entre reportes.
-                       Es la vista por defecto, la que responde "que se conecta
-                       con que" sin la marana de entidades intermedias.
-- Entorno directo    : agrega las entidades que cuelgan del reporte elegido.
-- Todo               : el grafo completo.
-
-Disposiciones: fuerzas (organica), jerarquica (por tipo de entidad) y por
-legajo (agrupada por conjunto de reportes vinculados).
+Disposicion horizontal propia con expansion de reportes y foco en un dato.
+Incluye filtros, alcance por reporte, cruces opcionales, historial de la vista,
+revision de relaciones y exportacion del informe. No requiere recursos de red.
+Los detalles de fuente mantienen localizadores legibles y referencia tecnica.
 """
 
 import json
+from collections import deque
 
 
 import ontologia as ont
@@ -144,9 +126,9 @@ def _camino(g, n_rep, n_destino):
     def _preferencia(n):
         return (PREFERENCIA_CAMINO.get(g.G.nodes[n].get("tipo"), 2), n)
 
-    previo, cola, vistos = {n_rep: None}, [n_rep], {n_rep}
+    previo, cola, vistos = {n_rep: None}, deque([n_rep]), {n_rep}
     while cola:
-        actual = cola.pop(0)
+        actual = cola.popleft()
         if actual == n_destino:
             camino = []
             while actual is not None:
@@ -1372,9 +1354,11 @@ function pintarVP(){ document.getElementById("vista")
    la misma letra, del mismo tamaño, mide siempre lo mismo. */
 const MEDIDAS = new Map();
 function medir(el, texto){
+  // La medida se reutiliza, pero cada redibujado crea un elemento vacio.
+  // Siempre reponer el texto, incluso cuando el ancho ya esta en cache.
+  el.textContent = texto;
   const k = el.getAttribute("class")+"|"+texto;
   if(MEDIDAS.has(k)) return MEDIDAS.get(k);
-  el.textContent = texto;
   const w = el.getComputedTextLength();
   MEDIDAS.set(k, w);
   return w;
@@ -1637,6 +1621,8 @@ function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
       t.setAttribute("class","rotulo "+(esPeso ? "peso" : "vinculo")+
                               (apagado?" apagado":""));
       t.setAttribute("x",x2-95); t.setAttribute("y",base+i*alto);
+      // El motivo identifica la misma relacion que la linea y su flecha.
+      if(!esPeso) t.style.fill = colorPunta;
       t.textContent = ln; gRot.appendChild(t);
     });
   }
@@ -2023,7 +2009,7 @@ function fichaCaso(){
     '<div class="prosa"><p>'+
     (vinc.length
       ? 'Tiene <b>'+vinc.length+'</b> vinculación(es) con otros reportes del archivo. '+
-        'Es lo que habilita evaluar una reapertura.'
+        'Cada vinculación conserva sus datos de origen y su revisión.'
       : 'No quedó vinculado con ningún otro reporte.')+
     '</p></div>';
   if(vinc.length){
@@ -2351,6 +2337,8 @@ function fuentesVinculo(a){
       '<tr><td>Reporte '+esc(f.reporte)+'</td><td class="valor-evidencia">'+esc(ubicacionFuente(f.ruta))+
       '<br><button data-ir="relacion|'+esc(f.arista)+'">Revisar dato de origen</button></td></tr>').join("")+'</table>';
     if(p.locators.length) h += p.locators.map(l=>'<p class="nota-chica">'+esc(ubicacionFuente(l))+'</p>').join("");
+    if((p.camino_a||[]).length) h += '<p class="nota-chica">Recorrido en el primer reporte</p>'+cadena(p.camino_a,p.nodo);
+    if((p.camino_b||[]).length) h += '<p class="nota-chica">Recorrido en el segundo reporte</p>'+cadena(p.camino_b,p.nodo);
     return h+'</div>';
   }).join(""));
 }
@@ -2517,11 +2505,10 @@ function pintarTipos(){
    dibujo y adivinar qué significa una línea, la línea no sirve. */
 function pintarLeyenda(){
   const origenes = [
-    ["var(--borde-fuerte)", "Consta en la fuente del reporte"],
-    ["var(--vinculo)", "Derivada por una regla del sistema"],
-    ["var(--duplicado)", "Posible duplicado del mismo hecho"],
-    ["var(--inferida)", "Hipótesis todavía sin validar"],
-    ["var(--afirmada)", "Establecida por un operador"],
+    ["var(--vinculo)", "Vinculación calculada por reglas", "solid"],
+    ["var(--duplicado)", "Posible duplicado del mismo hecho", "solid"],
+    ["var(--inferida)", "Hipótesis de identidad", "dashed"],
+    ["var(--afirmada)", "Vinculación establecida por un operador", "solid"],
   ];
   /* Muestra la escala con las lineas de verdad, no con una descripcion: el
      grosor se entiende viendolo. */
@@ -2537,12 +2524,14 @@ function pintarLeyenda(){
     '<div style="font-size:11.5px;color:var(--suave);line-height:1.6;margin-top:6px">'+
     'Cuanto más gruesa la línea, más pesa la vinculación. La escala es la misma '+
     'en todos los casos, así que dos líneas iguales pesan igual aunque estén en '+
-    'pantallas distintas.</div>'+
-    '<div class="rotuloGrupo">El color, cómo se obtuvo</div>'+
-    origenes.map(([c,t])=>
+    'pantallas distintas. Los vínculos manuales tienen grosor fijo: no llevan un puntaje calculado.</div>'+
+    '<div class="rotuloGrupo">Colores de las vinculaciones</div>'+
+    origenes.map(([c,t,trazo])=>
       '<div style="display:flex;align-items:center;font-size:11.5px;'+
       'color:var(--suave);margin:6px 0"><span class="trazo" style="border-top-style:'+
-      'solid;border-top-color:'+c+'"></span>'+esc(t)+'</div>').join("")+
+      trazo+';border-top-color:'+c+'"></span>'+esc(t)+'</div>').join("")+
+    '<div class="nota-chica">El texto y la flecha usan el color de su línea. '+
+    'La tarjeta con fondo invertido es el centro del análisis; no indica una vinculación más fuerte.</div>'+
     '<div class="rotuloGrupo">En cuántos reportes consta cada dato</div>'+
     '<div style="font-size:11.5px;color:var(--suave);line-height:1.6">'+
     'Cada tipo de dato tiene su color. La marca «en N reportes ›» cuenta los reportes '+

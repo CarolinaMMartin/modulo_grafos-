@@ -2,7 +2,7 @@
 """
 Generador de reportes sinteticos con la estructura del JSON de NCMEC.
 
-Sirven para validar la logica del grafo sin usar datos reales (contexto.md 14.13).
+Sirven para validar la logica del grafo sin usar datos reales.
 El contenido de los chats es un marcador de posicion: solo se conservan los
 identificadores estructurados de perfil, que son lo unico que el extractor lee.
 

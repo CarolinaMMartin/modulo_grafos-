@@ -175,9 +175,7 @@ def distancia_hamming(a, b):
     """Cantidad exacta de bits diferentes entre dos hashes hexadecimales."""
     if len(a) != len(b):
         raise ValueError("los pHash deben tener la misma longitud")
-    # ``int.bit_count`` no existe en todas las versiones de Python admitidas
-    # por el proyecto. La representacion binaria mantiene compatibilidad 3.8.
-    return bin(int(a, 16) ^ int(b, 16)).count("1")
+    return (int(a, 16) ^ int(b, 16)).bit_count()
 
 
 def _disparo_phash(a, b, distancia, similitud, arista_soporte):

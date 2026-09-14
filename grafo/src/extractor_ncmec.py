@@ -8,7 +8,7 @@ vinculo. Nada de lo que produce este extractor es una inferencia.
 
 El texto libre sensible (transcripciones de chat, bios de perfil) NO se guarda
 en el grafo. Queda en un almacen aparte, referenciado por hash, para respetar
-minimizacion y exportacion controlada (contexto.md 14.9 y 14.10).
+minimizacion y exportacion controlada.
 """
 
 import json
@@ -17,10 +17,9 @@ import re
 import mineria_texto as mt
 import normalizacion as nz
 import nucleo
-import ontologia as ont
 
 METODO = "extractor_ncmec"
-VERSION = "1.3"
+VERSION = "1.4"
 
 # Los identificadores que se leen de un texto libre no salen del mismo metodo
 # que los que se leen de un campo: llevan el suyo, con su version, para que una
@@ -50,6 +49,19 @@ LISTAS_INCIDENTE = [
     ("internetIncident", "internet"),
     ("nonInternetIncident", "no_internet"),
 ]
+
+
+def validar_report_id(valor):
+    """Identificador portable y sin transformaciones que puedan colisionar."""
+    reservados = {"CON", "PRN", "AUX", "NUL"} | {
+        p + str(i) for p in ("COM", "LPT") for i in range(1, 10)}
+    if isinstance(valor, bool) or not isinstance(valor, (str, int)):
+        raise ValueError("reportId debe ser texto o un numero entero")
+    valor = str(valor)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,60}", valor) or valor.upper() in reservados:
+        raise ValueError("reportId debe tener de 1 a 60 letras ASCII, numeros, "
+                         "guiones o guiones bajos y no ser un nombre reservado de Windows")
+    return valor
 
 
 def _g(dic, *claves):
@@ -86,7 +98,9 @@ class ExtractorNCMEC(object):
         with open(ruta_json, "r", encoding="utf-8") as fh:
             r = json.load(fh)
 
-        report_id = str(r.get("reportId"))
+        if not isinstance(r, dict):
+            raise ValueError("el reporte debe ser un objeto JSON")
+        report_id = validar_report_id(r.get("reportId"))
         sid = "ncmec:%s" % report_id
         self.g.registrar_fuente(sid, ruta=ruta_json, tipo="reporte_ncmec_json",
                                 extra=dict(report_id=report_id))
@@ -214,7 +228,7 @@ class ExtractorNCMEC(object):
 
     def _persona(self, p, base, rol, n_rep, sid, report_id, idx):
         # El nodo de mencion es local al reporte: no se fusionan personas
-        # entre reportes por cuenta propia (contexto.md 11.2).
+        # entre reportes por cuenta propia.
         mencion_id = "%s/%s" % (report_id, p.get("id") or "%s%d" % (rol, idx))
         n_per = self.g.nodo(
             "PERSONA_MENCION", mencion_id,

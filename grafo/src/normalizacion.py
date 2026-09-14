@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Normalizacion de identificadores (contexto.md 11.1, primer nivel determinista).
+Normalizacion de identificadores.
 
 Toda normalizacion devuelve (valor_normalizado, notas). Las notas explican que
 transformacion se aplico y quedan en la explicacion de la arista, para que un

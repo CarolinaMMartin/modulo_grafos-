@@ -43,6 +43,20 @@ for(const titulo of ['cuenta breve','nombre de cuenta demasiado largo que requie
   assert.equal(m.tag,titulo==='cuenta breve'?'text':'circle');
 }
 const reps=['R1','R2','R3','R4'].map(r=>{const e=new Element('g');e.setAttribute('data-reporte',r);gCaj.appendChild(e);return e;});
+// Un clic o Volver destruye las cajas y las vuelve a crear; MEDIDAS persiste.
+// Antes, el ancho cacheado evitaba reponer textContent y borraba el contador.
+for(let i=0;i<6;i++){
+  const el=caja(gCaj,0,0,{titulo:'888658825@Grindr',sub:'Cuenta de plataforma',
+    marca:'en 3 reportes ›',alClicMarca:()=>{},ayudaMarca:'Ver los 3 reportes'});
+  const marca=el.children.find(n=>n.tag==='text'&&n.classList.contains('marca'));
+  assert(marca,'El contador debe seguir siendo texto visible');
+  assert.equal(marca.textContent,'en 3 reportes ›','Contador tras redibujado '+i);
+  marca.emit('click');
+}
+for(let i=0;i<3;i++){
+  const el=caja(gCaj,0,0,{titulo:'888658825@Grindr',sub:'Cuenta · en el centro',marca:'en 3 reportes'});
+  assert.equal(el.children.find(n=>n.classList.contains('marca')).textContent,'en 3 reportes');
+}
 marcarAlcance({reportes:['R1','R2','R3','R5']},true);
 assert(reps.slice(0,3).every(e=>e.classList.contains('alcance')));assert(reps[3].classList.contains('fuera'));
 marcarAlcance({reportes:['R1','R2','R3']},false);assert(reps.every(e=>!e.classList.contains('alcance')&&!e.classList.contains('fuera')));
@@ -58,4 +72,24 @@ centrarEn('CUENTA1');assert.equal(HIST.pos,1);
 estado.verCruces=false;anotarVista();centrarEn('CUENTA2');assert.equal(HIST.pos,2);
 atras();assert.equal(estado.centro,'CUENTA1');assert.equal(estado.verCruces,false);assert.equal(document.getElementById('verCruces').checked,false);
 console.log('OK: marca textual y punto, clic y teclado, sin drag/selección, alcance y limpieza, proveedor vigente sin duplicados, Volver/Adelante con misma entidad y cruces.');
+`,ctx);
+
+// El motivo y la punta de flecha conservan el color de la relacion,
+// incluso para duplicados y decisiones de operador (en ambos temas CSS).
+vm.runInContext(`
+const gCon=new Element('g'),gRot=new Element('g');
+const PESO_MINIMO_ESCALA=.5,GRUESO_MIN=1.3,GRUESO_MAX=4.4;
+function ruta(){return 'M0,0 L10,10';}
+function marcador(color){return color;}
+function num(n){return String(n);}
+`,ctx);
+for(const name of ['envolver','grosorPorPeso','conector'])vm.runInContext(fn(name),ctx);
+vm.runInContext(`
+for(const [clase,color] of [['vinculo','var(--vinculo)'],['vinculo duplicado','var(--duplicado)'],['afirmada','var(--afirmada)'],['inferida','var(--inferida)']]){
+  const inicio=gRot.children.length;
+  const p=conector({x:0,y:0},{x:300,y:100},{clase,rotulo:'Motivo de prueba'});
+  assert.equal(p.getAttribute('marker-end'),color);
+  assert(gRot.children.slice(inicio).every(t=>t.style.fill===color),clase);
+}
+console.log('OK: motivo y flecha con el color de cada relacion.');
 `,ctx);

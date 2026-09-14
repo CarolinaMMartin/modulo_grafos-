@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Orquestador del corte vertical de grafos (contexto.md 21).
+Orquestador del modulo de grafos. Contrato en DOCUMENTACION_TECNICA.md.
 
   1. ingesta de reportes con preservacion y hash de la fuente
   2. extraccion de entidades y relaciones OBSERVADAS con locator
@@ -11,10 +11,6 @@ Orquestador del corte vertical de grafos (contexto.md 21).
   7. aplicacion final de decisiones e invalidacion de consecuencias rechazadas
   8. alertas y algoritmos clasicos sobre el grafo ya revisado
   9. salidas: grafo.json, grafo.graphml, grafo.html, informe.md, dossier
-
-La clasificacion jurisdiccional y la derivacion territorial quedan FUERA de esta
-etapa por decision del proyecto. El modulo src/jurisdiccion.py se conserva sin
-conectar, para cuando se retome la Etapa 2.
 
 Uso:
     python construir.py
@@ -34,8 +30,6 @@ if SRC not in sys.path:
 import alertas as mod_alertas          # noqa: E402
 import analisis                        # noqa: E402
 import contexto_lugar                  # noqa: E402
-import docs_modelo                     # noqa: E402
-import docs_tecnicos                   # noqa: E402
 import dossier as mod_dossier          # noqa: E402
 import redaccion                       # noqa: E402
 import extractor_ncmec                 # noqa: E402
@@ -138,6 +132,8 @@ def construir(dir_datos, dir_salida, ts_corrida=None,
         os.makedirs(dir_salida)
 
     dirs = carpetas(dir_datos)
+    if not dirs:
+        raise ValueError("no existe ninguna carpeta de reportes para procesar")
     estados = {}
     for d in dirs:
         estado_path = os.path.join(d, "estado_institucional.json")
@@ -151,11 +147,25 @@ def construir(dir_datos, dir_salida, ts_corrida=None,
     # Un reporte que aparece en dos carpetas se ingiere una sola vez: gana el
     # de la ultima, que es la de entrada.
     por_reporte = {}
+    ids_normalizados = {}
     for d in dirs:
+        ids_carpeta = set()
         for r in sorted(glob.glob(os.path.join(d, "*.json"))):
             if os.path.basename(r) == "estado_institucional.json":
                 continue
-            por_reporte[os.path.splitext(os.path.basename(r))[0]] = r
+            with open(r, encoding="utf-8") as fh:
+                contenido = json.load(fh)
+            if not isinstance(contenido, dict):
+                raise ValueError("%s: el reporte debe ser un objeto JSON" % r)
+            rid = extractor_ncmec.validar_report_id(contenido.get("reportId"))
+            if rid.casefold() in ids_carpeta:
+                raise ValueError("reporte duplicado en la misma carpeta: %s" % rid)
+            ids_carpeta.add(rid.casefold())
+            anterior = ids_normalizados.get(rid.casefold())
+            if anterior is not None and anterior != rid:
+                raise ValueError("reportId ambiguo por mayusculas/minusculas: %s" % rid)
+            ids_normalizados[rid.casefold()] = rid
+            por_reporte[rid] = r
     rutas = [por_reporte[k] for k in sorted(por_reporte)]
     # Cuales vinieron del banco de pruebas: el visor los distingue del dataset
     # del proyecto, para que nadie confunda un reporte que trajo alguien a
@@ -163,8 +173,8 @@ def construir(dir_datos, dir_salida, ts_corrida=None,
     raiz_entrada = os.path.abspath(DIR_ENTRADA)
     importados = sorted(rid for rid, r in por_reporte.items()
                         if os.path.abspath(os.path.dirname(r)) == raiz_entrada)
-    for ruta in rutas:
-        rid = os.path.splitext(os.path.basename(ruta))[0]
+    for rid in sorted(por_reporte):
+        ruta = por_reporte[rid]
         ext.ingerir(ruta, estados.get(rid))
 
     # Los adjuntos llegan por un flujo separado del JSON principal. Se leen
@@ -292,21 +302,8 @@ def construir(dir_datos, dir_salida, ts_corrida=None,
                   encoding="utf-8") as fh:
             fh.write(texto)
 
-    # MODELO_DATOS.md y DOCUMENTACION_TECNICA.md estan versionados y publican
-    # numeros de la ultima corrida. Si la corrida incluyo reportes del banco de
-    # pruebas no se regeneran: esos reportes no estan en el repositorio, asi
-    # que nadie podria reproducir esos numeros clonandolo, y ademas cada
-    # importacion dejaria el arbol de trabajo sucio sin que nadie haya tocado
-    # nada. El grafo, el visor y los informes si se regeneran siempre.
-    importados = resultado.get("importados") or []
-    if importados:
-        print("Documentacion generada: sin cambios, porque la corrida incluye "
-              "%d reporte(s) del banco de pruebas (%s)."
-              % (len(importados), ", ".join(importados)))
-    else:
-        docs_modelo.generar(os.path.join(BASE, "MODELO_DATOS.md"), g.resumen())
-        docs_tecnicos.generar(os.path.join(os.path.dirname(BASE),
-                                           "DOCUMENTACION_TECNICA.md"), g, resultado)
+    # La documentacion del repositorio se genera solo con grafo/documentar.py.
+    # Una corrida con datos locales escribe exclusivamente en dir_salida.
     render_html.render(g, resultado, os.path.join(dir_salida, "grafo.html"),
                        dossier=dossier, texto_informe=texto_informe,
                        informes_por_caso=informes_por_caso)

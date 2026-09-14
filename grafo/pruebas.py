@@ -64,7 +64,7 @@ def main():
         check("toda relacion declara un origen valido",
               all(m["origen"] in ont.ORIGENES for m in ont.RELACIONES.values()))
 
-        print("\n== Procedencia (contexto.md 14.3) ==")
+        print("\n== Procedencia ==")
         sin_fuente = [d["arista_id"] for _, _, _, d in g.aristas(vigentes=False)
                       if not d.get("source_evidence_id") or not d.get("source_locator")]
         check("ninguna arista sin fuente ni locator", not sin_fuente, str(sin_fuente[:3]))
@@ -77,7 +77,7 @@ def main():
         check("no hay incumplimientos registrados", not g.incumplimientos,
               str(g.incumplimientos[:2]))
 
-        print("\n== Separacion epistemologica (contexto.md 10.1) ==")
+        print("\n== Separacion epistemologica ==")
         inferidas_validadas = [d["arista_id"] for _, _, _, d in g.aristas(vigentes=False)
                                if d["origin"] == ont.INFERIDA
                                and d["validation_status"] == "validada"
@@ -121,7 +121,7 @@ def main():
                       % (v["reporte_a"], v["reporte_b"]),
                       any(not x["corrobora_solamente"] for x in detalle))
 
-        print("\n== Identidades: nunca fusion automatica (contexto.md 11.2) ==")
+        print("\n== Identidades: nunca fusion automatica ==")
         menciones = g.nodos_tipo("PERSONA_MENCION")
         check("cada mencion de persona es local a su reporte",
               len(menciones) == len({g.G.nodes[n]["reporte"] + "/" + n for n in menciones}))
@@ -289,8 +289,6 @@ def main():
         # de validacion incluidos en el repositorio.
         tmp_dec = tempfile.mkdtemp(prefix="grafo_decision_")
         base_anterior = construir.BASE
-        gen_modelo = construir.docs_modelo.generar
-        gen_tecnicos = construir.docs_tecnicos.generar
         try:
             datos_dec = os.path.join(tmp_dec, "datos")
             estado_dec = os.path.join(tmp_dec, "estado")
@@ -320,8 +318,6 @@ def main():
                 }, fh)
 
             construir.BASE = tmp_dec
-            construir.docs_modelo.generar = lambda *args, **kwargs: None
-            construir.docs_tecnicos.generar = lambda *args, **kwargs: None
             _, antes = construir.construir(
                 datos_dec, os.path.join(tmp_dec, "salida_antes"),
                 ts_corrida="2026-01-01T00:00:00+00:00")
@@ -351,8 +347,6 @@ def main():
                   not despues["candidatos_enlace"])
         finally:
             construir.BASE = base_anterior
-            construir.docs_modelo.generar = gen_modelo
-            construir.docs_tecnicos.generar = gen_tecnicos
             shutil.rmtree(tmp_dec, ignore_errors=True)
 
         print("\n== Minimizacion: el texto sensible no entra al grafo ==")
