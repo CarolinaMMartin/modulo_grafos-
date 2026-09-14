@@ -3,19 +3,20 @@
 
 # Modelo de datos del grafo — Bóveda CIJ
 
-Versión de ontología: **`0.3.0`**
+Versión de ontología: **`0.4.0`**
 
 Ontología preliminar. Debe validarse con los equipos jurídicos e institucionales antes de considerarse estable (contexto.md 10.2).
 
 ## 1. Clases de relación
 
-Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.
+Las 4 clases nunca se mezclan, ni en la persistencia ni en la interfaz.
 
 | Clase | Qué significa | Estado inicial de validación |
 |---|---|---|
-| `observada` | Surge directamente de un campo de la fuente | `validada` |
-| `derivada` | Producto de una regla determinista y reproducible | `pendiente` |
-| `inferida` | Hipótesis por similitud, modelo, LLM o GNN | `pendiente` |
+| `observada` | El dato figura textualmente en un campo del reporte de origen. No fue calculado ni supuesto por el sistema. | `validada` |
+| `derivada` | Resulta de aplicar una regla determinista y reproducible sobre datos que constan en la fuente. Puede volver a calcularse y debe ser revisada por una persona. | `pendiente` |
+| `inferida` | Es una hipótesis producida por similitud o por un modelo. No acredita nada por sí sola y requiere validación humana. | `pendiente` |
+| `afirmada` | La estableció una persona por su propio criterio, no el sistema. No surge de la fuente ni de una regla: queda registrada con quién la dispuso, cuándo y con qué fundamento, y puede revertirse. | `validada` |
 
 ## 2. Tipos de nodo
 
@@ -35,7 +36,10 @@ Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.
 | `IP` | sí | sí | Direccion IP. Solo tiene valor junto a fecha, hora, prestador y puerto cuando exista |
 | `DISPOSITIVO` | sí | sí | Device ID / IDFA / GAID |
 | `EVIDENCIA` | sí | sí | Archivo reportado, identificado por hash |
+| `HASH_PERCEPTUAL` | sí | sí | Huella perceptual de imagen; similitud, no igualdad criptografica |
+| `HUELLA_AUDIO` | sí | sí | Huella algoritmica de audio declarada en el manifiesto multimedia |
 | `SEGMENTO` | no | sí | Fragmento de una evidencia: frame, clip, pagina |
+| `LUGAR_MENCION` | no | **no** | Descripcion de lugar extraida de texto; conserva categorias y locator, no el texto sensible |
 | `UBICACION` | no | sí | Ciudad / region estimada o declarada |
 | `JURISDICCION` | no | sí | Jurisdiccion competente propuesta |
 | `ORGANIZACION` | no | sí | ESP, prestador de internet, organismo, fiscalia |
@@ -59,6 +63,8 @@ Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.
 | `USA_DISPOSITIVO` | Cuenta -> dispositivo |
 | `PARTICIPA_EN` | Cuenta -> evento |
 | `ADJUNTA` | Reporte o evento -> evidencia |
+| `TIENE_HASH_PERCEPTUAL` | Evidencia -> hash perceptual informado por el flujo multimedia |
+| `TIENE_HUELLA_AUDIO` | Evidencia -> huella de audio informada por el flujo multimedia |
 | `UBICADO_EN` | Entidad -> ubicacion declarada por la fuente |
 | `PUESTO_A_DISPOSICION_DE` | Reporte -> organismo al que NCMEC lo puso a disposicion |
 
@@ -78,6 +84,9 @@ Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.
 | `MENCIONA_EMAIL` | Evento o cuenta -> correo escrito en texto libre |
 | `MENCIONA_ALIAS` | Evento o cuenta -> alias escrito en texto libre |
 | `MENCIONA_ALIAS_PAGO` | Evento o cuenta -> alias de cobro escrito en texto libre |
+| `MENCIONA_LUGAR` | Reporte -> descripcion de lugar categorizada desde texto libre |
+| `SIMILITUD_PERCEPTUAL` | Dos imagenes tienen hashes perceptuales cercanos por Hamming |
+| `COINCIDE_HUELLA_AUDIO` | Dos audios comparten la misma huella algoritmica declarada |
 
 ### Inferidas
 
@@ -85,6 +94,12 @@ Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.
 |---|---|
 | `POSIBLE_MISMA_IDENTIDAD` | Dos menciones podrian ser la misma persona |
 | `SIMILAR_A` | Similitud textual, semantica o multimodal |
+
+### Afirmadas por una persona
+
+| Relación | Descripción |
+|---|---|
+| `VINCULADO_POR_OPERADOR` | Reporte -> reporte. Vinculacion que un operador establece por su propio criterio, con fundamento registrado. No la propuso el sistema y no se recalcula: se conserva hasta que se revierta |
 
 ## 4. Metadatos obligatorios de cada arista
 
@@ -94,12 +109,13 @@ Si falta la fuente, el locator o la explicación, la arista **no se crea**: se r
 |---|---|
 | `arista_id` | identificador determinista: (extremos, relación, método, locator, fuente) |
 | `relation_type` | relación del vocabulario controlado |
-| `origin` | observada / derivada / inferida |
+| `origin` | una de las clases declaradas en `ORIGENES` |
 | `source_evidence_id` | qué evidencia la sostiene |
 | `source_locator` | ubicación exacta dentro de esa evidencia: campo JSON, página, timestamp, frame |
 | `method` / `method_version` | qué produjo la arista y con qué versión |
 | `ontologia_version` | con qué vocabulario y pesos se calculó |
-| `confidence` | confianza; obligatoria para derivadas e inferidas |
+| `confidence` | nombre técnico heredado del puntaje no calibrado; obligatorio para derivadas e inferidas, no equivale a una probabilidad |
+| `confidence_calibrated` | `false` para todo puntaje calculado en esta demo |
 | `observed_at` | cuándo ocurrió el hecho, distinto de cuándo se calculó |
 | `created_at` | cuándo se produjo la arista |
 | `validation_status` / `validated_by` / `validated_at` | revisión humana |
@@ -115,18 +131,21 @@ Si falta la fuente, el locator o la explicación, la arista **no se crea**: se r
 |---|---|---|---|---|---|---|
 | `R01_CUENTA` | 1.0 | `CUENTA` | 0.98 | no | no | Misma cuenta: mismo ESP y mismo espUserId |
 | `R02_DISPOSITIVO` | 1.0 | `DISPOSITIVO` | 0.92 | no | sí | Mismo identificador de dispositivo |
-| `R03_TELEFONO` | 1.0 | `TELEFONO` | 0.90 | no | sí | Mismo telefono normalizado a E.164 |
-| `R04_EMAIL` | 1.0 | `EMAIL` | 0.90 | no | sí | Mismo correo normalizado |
+| `R03_TELEFONO` | 1.1 | `TELEFONO` | 0.90 | no | sí | Mismo telefono normalizado a E.164 |
+| `R04_EMAIL` | 1.1 | `EMAIL` | 0.90 | no | sí | Mismo correo normalizado |
 | `R05_EVIDENCIA` | 1.0 | `EVIDENCIA` | 0.88 | no | sí | Mismo hash de archivo |
 | `R06_IP_VENTANA` | 1.0 | `IP` | 0.72 | no | sí | Misma IP dentro de la ventana temporal del prestador. La IP se valora siempre junto con su fecha y hora |
 | `R07_IP_SUELTA` | 1.0 | `IP` | 0.28 | sí | sí | Misma IP fuera de la ventana temporal: indicio, no atribucion |
-| `R08_ALIAS` | 1.0 | `ALIAS` | 0.22 | sí | sí | Mismo nombre visible: refuerza, nunca sostiene solo |
-| `R10_ALIAS_PAGO` | 1.0 | `ALIAS_PAGO` | 0.62 | no | sí | Misma via de cobro: mismo alias de pago normalizado |
+| `R08_ALIAS` | 1.1 | `ALIAS` | 0.22 | sí | sí | Mismo nombre visible: refuerza, nunca sostiene solo |
+| `R10_ALIAS_PAGO` | 1.1 | `ALIAS_PAGO` | 0.62 | no | sí | Misma via de cobro: mismo alias de pago normalizado |
 | `R09_UBICACION` | 1.0 | `UBICACION` | 0.08 | sí | sí | Misma ciudad estimada: contexto, nunca sostiene solo |
+| `R11_PHASH_SIMILAR` | 1.0 | `HASH_PERCEPTUAL` | 0.82 | no | no | Hashes perceptuales de imagen a distancia Hamming menor o igual al umbral; indica similitud visual, no archivo identico |
+| `R12_HUELLA_AUDIO` | 1.0 | `HUELLA_AUDIO` | 0.86 | no | sí | Misma huella algoritmica de audio declarada |
+| `R13_CONTEXTO_LUGAR` | 1.0 | `LUGAR_MENCION` | 0.12 | sí | no | Descripciones de lugar comparten al menos dos dimensiones de un vocabulario controlado; solo corrobora |
 
 ### Combinación
 
-Noisy-OR sobre las reglas que disparan, **solo si al menos una sostiene el vínculo por sí sola**. Confianza máxima `0.99`: ninguna regla determinista produce certeza absoluta.
+Noisy-OR sobre las reglas que disparan, **solo si al menos una sostiene el vínculo por sí sola**. El resultado es un puntaje de priorización no calibrado, aunque por compatibilidad el campo se llame `confidence`; no es una probabilidad. Puntaje máximo `0.99`.
 
 
 ### Discriminancia
@@ -134,8 +153,23 @@ Noisy-OR sobre las reglas que disparan, **solo si al menos una sostiene el vínc
 - Hasta `df = 10` reportes, el identificador conserva su peso completo.
 - Por encima, el peso decae logarítmicamente.
 - Desde `df = 50` deja de poder sostener un vínculo solo.
-- Desde `df = 100` ni siquiera genera pares candidatos (se informa como *hub*).
+- La expansión combinatoria se limita por cantidad de pares y por tipo; si supera el límite, se conserva como grupo compacto con todos sus reportes.
 - La fracción sobre el corpus (`20 %`) recién se aplica con al menos 200 reportes: con un corpus chico engaña.
+
+| Tipo | Máximo de pares antes de compactar |
+|---|---:|
+| `ALIAS` | 1500 |
+| `ALIAS_PAGO` | 4000 |
+| `CUENTA` | 10000 |
+| `DISPOSITIVO` | 5000 |
+| `EMAIL` | 5000 |
+| `EVIDENCIA` | 7500 |
+| `HASH_PERCEPTUAL` | 5000 |
+| `HUELLA_AUDIO` | 5000 |
+| `IP` | 2500 |
+| `TELEFONO` | 5000 |
+| `UBICACION` | 1000 |
+| `_default` | 1000 |
 
 ## 6. Política de IP
 
@@ -161,8 +195,8 @@ Una IP aislada no identifica a una persona. Se valora junto con fecha, hora, pre
 | Umbral | Valor | Qué controla |
 |---|---|---|
 | `UMBRAL_PROPONER` | 0.55 | debajo de esto no se materializa la arista |
-| `UMBRAL_PROBABLE` | 0.70 | franja de confianza media |
-| `UMBRAL_ALTA` | 0.90 | franja de confianza alta |
+| `UMBRAL_PROBABLE` | 0.70 | franja media del puntaje interno |
+| `UMBRAL_ALTA` | 0.90 | franja alta del puntaje interno |
 | `UMBRAL_CLUSTER` | 0.70 | mínimo para agrupar en un legajo lógico y para emitir alertas |
 
 ## 8. Estado de la última construcción

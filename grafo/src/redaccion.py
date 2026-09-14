@@ -122,8 +122,8 @@ def redactar(d, caso=None):
           % (p["cantidad"], n(p["peso_promedio"]), n(p["peso_maximo"]),
              n(p["peso_minimo"]), n(p["umbral_para_proponer"]),
              n(p["peso_maximo_posible"])))
-        a(u"Por franja de confianza: %s.\n"
-          % u", ".join(u"%d de confianza %s" % (c, f)
+        a(u"Por franja de puntaje: %s.\n"
+          % u", ".join(u"%d con puntaje %s" % (c, f)
                        for f, c in p["por_franja"].items() if c))
         a(u"El aporte de cada regla al conjunto fue el siguiente:\n")
         a(u"| Regla | Qué detecta | Veces que operó | Aporte promedio |")

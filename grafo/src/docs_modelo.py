@@ -20,15 +20,14 @@ def generar(ruta, resumen=None):
       "institucionales antes de considerarse estable (contexto.md 10.2).\n")
 
     a("## 1. Clases de relación\n")
-    a("Las tres clases nunca se mezclan, ni en la persistencia ni en la interfaz.\n")
+    a("Las %d clases nunca se mezclan, ni en la persistencia ni en la interfaz.\n"
+      % len(ont.ORIGENES))
     a("| Clase | Qué significa | Estado inicial de validación |")
     a("|---|---|---|")
-    a("| `observada` | Surge directamente de un campo de la fuente | `%s` |"
-      % ont.ESTADO_INICIAL[ont.OBSERVADA])
-    a("| `derivada` | Producto de una regla determinista y reproducible | `%s` |"
-      % ont.ESTADO_INICIAL[ont.DERIVADA])
-    a("| `inferida` | Hipótesis por similitud, modelo, LLM o GNN | `%s` |"
-      % ont.ESTADO_INICIAL[ont.INFERIDA])
+    for origen in ont.ORIGENES:
+        a("| `%s` | %s | `%s` |"
+          % (origen, ont.DESCRIPCION_ORIGEN[origen],
+             ont.ESTADO_INICIAL[origen]))
 
     a("\n## 2. Tipos de nodo\n")
     a("`identificador`: el valor es un dato objetivo apto para sostener un vínculo "
@@ -42,9 +41,14 @@ def generar(ruta, resumen=None):
              "sí" if m["fusionable"] else "**no**", m["desc"]))
 
     a("\n## 3. Vocabulario de relaciones\n")
-    for clase, titulo in ((ont.OBSERVADA, "Observadas"),
-                          (ont.DERIVADA, "Derivadas"),
-                          (ont.INFERIDA, "Inferidas")):
+    titulos = {
+        ont.OBSERVADA: "Observadas",
+        ont.DERIVADA: "Derivadas",
+        ont.INFERIDA: "Inferidas",
+        ont.AFIRMADA: "Afirmadas por una persona",
+    }
+    for clase in ont.ORIGENES:
+        titulo = titulos[clase]
         a("\n### %s\n" % titulo)
         a("| Relación | Descripción |")
         a("|---|---|")
@@ -61,12 +65,13 @@ def generar(ruta, resumen=None):
     for campo, para in [
         ("`arista_id`", "identificador determinista: (extremos, relación, método, locator, fuente)"),
         ("`relation_type`", "relación del vocabulario controlado"),
-        ("`origin`", "observada / derivada / inferida"),
+        ("`origin`", "una de las clases declaradas en `ORIGENES`"),
         ("`source_evidence_id`", "qué evidencia la sostiene"),
         ("`source_locator`", "ubicación exacta dentro de esa evidencia: campo JSON, página, timestamp, frame"),
         ("`method` / `method_version`", "qué produjo la arista y con qué versión"),
         ("`ontologia_version`", "con qué vocabulario y pesos se calculó"),
-        ("`confidence`", "confianza; obligatoria para derivadas e inferidas"),
+        ("`confidence`", "nombre técnico heredado del puntaje no calibrado; obligatorio para derivadas e inferidas, no equivale a una probabilidad"),
+        ("`confidence_calibrated`", "`false` para todo puntaje calculado en esta demo"),
         ("`observed_at`", "cuándo ocurrió el hecho, distinto de cuándo se calculó"),
         ("`created_at`", "cuándo se produjo la arista"),
         ("`validation_status` / `validated_by` / `validated_at`", "revisión humana"),
@@ -90,18 +95,24 @@ def generar(ruta, resumen=None):
 
     a("\n### Combinación\n")
     a("Noisy-OR sobre las reglas que disparan, **solo si al menos una sostiene el "
-      "vínculo por sí sola**. Confianza máxima `%.2f`: ninguna regla determinista "
-      "produce certeza absoluta.\n" % ont.CONFIANZA_MAXIMA)
+      "vínculo por sí sola**. El resultado es un puntaje de priorización no "
+      "calibrado, aunque por compatibilidad el campo se llame `confidence`; no "
+      "es una probabilidad. Puntaje máximo `%.2f`.\n" % ont.CONFIANZA_MAXIMA)
 
     a("\n### Discriminancia\n")
     a("- Hasta `df = %d` reportes, el identificador conserva su peso completo.\n"
       "- Por encima, el peso decae logarítmicamente.\n"
       "- Desde `df = %d` deja de poder sostener un vínculo solo.\n"
-      "- Desde `df = %d` ni siquiera genera pares candidatos (se informa como *hub*).\n"
+      "- La expansión combinatoria se limita por cantidad de pares y por tipo; "
+      "si supera el límite, se conserva como grupo compacto con todos sus reportes.\n"
       "- La fracción sobre el corpus (`%.0f %%`) recién se aplica con al menos %d "
       "reportes: con un corpus chico engaña."
-      % (ont.DF_PLENA_DISCRIMINANCIA, ont.DF_HUB_ABSOLUTO, ont.DF_HUB_SIN_PARES,
+      % (ont.DF_PLENA_DISCRIMINANCIA, ont.DF_HUB_ABSOLUTO,
          ont.FRACCION_BAJA_DISCRIMINANCIA * 100, ont.CORPUS_MINIMO_PARA_FRACCION))
+    a("\n| Tipo | Máximo de pares antes de compactar |")
+    a("|---|---:|")
+    for tipo, limite in sorted(ont.MAX_PARES_POR_TIPO.items()):
+        a("| `%s` | %d |" % (tipo, limite))
 
     a("\n## 6. Política de IP\n")
     a("Una IP aislada no identifica a una persona. Se valora junto con fecha, hora, "
@@ -125,8 +136,8 @@ def generar(ruta, resumen=None):
     a("|---|---|---|")
     a("| `UMBRAL_PROPONER` | %.2f | debajo de esto no se materializa la arista |"
       % ont.UMBRAL_PROPONER)
-    a("| `UMBRAL_PROBABLE` | %.2f | franja de confianza media |" % ont.UMBRAL_PROBABLE)
-    a("| `UMBRAL_ALTA` | %.2f | franja de confianza alta |" % ont.UMBRAL_ALTA)
+    a("| `UMBRAL_PROBABLE` | %.2f | franja media del puntaje interno |" % ont.UMBRAL_PROBABLE)
+    a("| `UMBRAL_ALTA` | %.2f | franja alta del puntaje interno |" % ont.UMBRAL_ALTA)
     a("| `UMBRAL_CLUSTER` | %.2f | mínimo para agrupar en un legajo lógico y para "
       "emitir alertas |" % ont.UMBRAL_CLUSTER)
 

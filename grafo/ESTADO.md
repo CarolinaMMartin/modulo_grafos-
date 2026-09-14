@@ -44,6 +44,10 @@ Clasificación de cada capacidad, según pide `contexto.md` §20.7.
 | Servidor local que registra la decisión, reconstruye el grafo y devuelve al operador a donde estaba | **implementada** | `servidor.py` |
 | Banco de pruebas: importar reportes desde la pantalla y procesarlos con las mismas reglas, sin tocar el dataset | **implementada** | `servidor._importar` / `_quitar`, `construir.DIR_ENTRADA` |
 | Identificadores escritos en texto libre —teléfono, alias, alias de cobro— extraídos y normalizados, como derivados y con menos peso que un campo declarado | **implementada** | `src/mineria_texto.py`, relaciones `MENCIONA_*` |
+| Ingesta opcional del manifiesto `fileDetails`, conservando su propia procedencia | **implementada** | `src/multimedia.py`, `construir.py --multimedia` |
+| Similitud de pHash por distancia Hamming con bloqueo por segmentos | **implementada** | `multimedia._bloques_phash`, `distancia_hamming` |
+| Coincidencia de huellas algorítmicas de audio declaradas | **implementada** | `multimedia.analizar`, regla `R12_HUELLA_AUDIO` |
+| Comparación contextual de lugares con vocabulario controlado, sin copiar texto ni fusionar lugares | **implementada como baseline** | `src/contexto_lugar.py`, regla corroborante `R13_CONTEXTO_LUGAR` |
 | Re-aplicación de decisiones humanas tras reconstruir | **implementada** | `validacion.aplicar` |
 | Visor interactivo con filtros y foco progresivo | **implementada** | `src/render_html.py` |
 | Informe con trazabilidad a la fuente | **implementada** | `src/informe.py` |
@@ -64,6 +68,7 @@ Clasificación de cada capacidad, según pide `contexto.md` §20.7.
 | Visor propio en SVG, con disposición en árbol calculada a mano | Alcanza y se lee bien para un caso. Los reportes vinculados van todos en una fila: con más de siete u ocho el lienzo se vuelve tan ancho que deja de leerse | Un algoritmo de dibujo por capas con ruteo de aristas, o una librería especializada |
 | La legibilidad del lienzo se verifica midiendo rectángulos en pantalla desde la consola | Es una auditoría manual, no una prueba automática | Llevarla a `pruebas.py` con un navegador headless |
 | Ventanas temporales de IP por prestador, estimadas | El supuesto viaja en la explicación de cada arista, pero no está verificado | Confirmar tiempos de lease con cada prestador |
+| Pesos heurísticos sin calibración | El campo técnico `confidence` sirve para ordenar, pero **no es una probabilidad**; cada arista calculada declara `confidence_calibrated: false` | Casos revisados por especialistas, medición de precisión/recall y calibración posterior |
 
 ### Apartamiento del documento rector
 
@@ -83,14 +88,13 @@ marcadas como tales en el código y documentadas en `TRASPASO.md` §4.16.
 ## 3. Qué está ausente
 
 - Extracción desde el PDF estandarizado y desde XML (hoy solo JSON).
-- Cualquier procesamiento multimodal: imagen, audio, video, OCR, transcripción.
-  Falta, en concreto, ingerir el manifiesto de `fileDetails` y comparar hashes
-  perceptuales y huellas de audio. Requiere además un mecanismo nuevo: hoy dos
-  reportes se vinculan porque comparten un nodo, y dos imágenes parecidas no son
-  el mismo nodo (`TRASPASO.md` §4.16).
-- Embeddings y búsqueda semántica. Falta, en concreto, reconocer que *«galpón
-  del mural azul cerca de la estación»* y *«depósito con mural celeste, entrada
-  lateral»* podrían ser el mismo lugar. Es trabajo para el modelo local.
+- Análisis real de binarios multimedia: decodificar imagen, audio o video, OCR y
+  transcripción. La demo ya ingiere y compara los hashes y huellas **declarados
+  por el manifiesto**, pero no abre los archivos y lo dice en cada relación.
+- Embeddings y búsqueda semántica general. Hay un baseline transparente para
+  descripciones de lugar mediante vocabulario controlado; reconoce el ejemplo
+  sintético del galpón/depósito y mural azul/celeste, pero no comprende lenguaje
+  abierto ni afirma que ambas frases designen el mismo sitio.
 - GNN. Existe el baseline determinista contra el cual compararla; el modelo no.
 - Vínculo entre oficios y respuestas de prestadores (`RESPONDE_A` está en el
   vocabulario, sin implementación: falta definir el formato de las respuestas).
@@ -98,9 +102,9 @@ marcadas como tales en el código y documentadas en `TRASPASO.md` §4.16.
 - Clasificación jurisdiccional y derivación territorial: se sacaron del
   circuito por decisión del proyecto. `src/jurisdiccion.py` quedó sin conectar.
 - Integración con SIPAR y con KIWI: fuera del alcance del piloto.
-- Métricas de evaluación contra un ground truth. Hoy hay invariantes, no
-  precisión ni recall: no existe todavía un conjunto de vínculos validados por
-  especialistas contra el cual medir.
+- Métricas de evaluación contra casos validados por especialistas. El lote
+  sintético 01–02 tiene una verdad de terreno y cubre seis rutas, pero no permite
+  estimar precisión ni recall institucionales.
 
 ## 4. Observaciones sobre la lógica previa
 

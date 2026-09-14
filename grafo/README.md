@@ -6,7 +6,7 @@ sin infraestructura. Implementa el primer objetivo recomendado en `contexto.md`
 archivado → hipótesis separada → visualización → validación humana → informe.
 
 Todo corre local, sin dependencias externas ni servicios de red.
-Única dependencia: `networkx`.
+Dependencias: `networkx`, `numpy` y `scipy` (declaradas en `../requisitos.txt`).
 
 ## Ejecutar
 
@@ -25,6 +25,16 @@ Para generar las salidas sin levantar nada:
 ```bash
 python construir.py
 ```
+
+Si los adjuntos llegan en un manifiesto `fileDetails` separado:
+
+```bash
+python construir.py --datos ../reportes_sinteticos \
+  --multimedia /ruta/manifest_multimedia.json
+```
+
+Esta opción lee **metadatos declarados** —SHA-256, pHash y huella de audio—;
+no abre ni analiza los binarios.
 
 Eso deja `salida/grafo.html`, que se abre con doble clic pero sirve solo para
 mirar: un archivo suelto no puede guardar nada. Si se toca un botón de decisión,
@@ -207,6 +217,24 @@ El alias de cobro se separó del nombre visible (`ALIAS_PAGO`, regla
 `R10_ALIAS_PAGO`, peso 0,62). Meterlo en `ALIAS` lo habría hecho valer 0,22
 —*refuerza, nunca sostiene solo*—, y dos cuentas que cobran por la misma vía
 comparten algo bastante más concreto que un apodo.
+
+### Multimedia y contexto de lugar
+
+`src/multimedia.py` incorpora manifiestos sin mezclarlos con el JSON principal.
+Una igualdad SHA-256 significa el mismo contenido binario; un pHash cercano se
+compara por distancia Hamming y significa similitud visual; una huella de audio
+igual significa coincidencia según el algoritmo que la produjo. La salida
+distingue expresamente las tres cosas y declara que no se inspeccionó el archivo.
+
+Para evitar una comparación global imagen contra imagen, el pHash de 64 bits se
+divide en nueve segmentos. Solo los pares que comparten al menos uno pasan al
+cálculo exacto; se aceptan hasta ocho bits diferentes.
+
+`src/contexto_lugar.py` ofrece un baseline auditable: categoriza descripciones
+con un vocabulario visible, exige dos dimensiones comunes y una característica
+de anclaje. Solo toma las líneas atribuibles a `Reported User`, no copia el texto
+sensible al grafo, no afirma que sea el mismo lugar y **nunca sostiene por sí
+solo** una vinculación.
 
 ### Lo que no se dibuja
 

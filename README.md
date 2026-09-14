@@ -1,11 +1,34 @@
+# Aplicación integrada — Grafos y vinculaciones CIJ
+
+**Windows:** extraé todo el ZIP y abrí **INICIAR_WINDOWS.bat**. La primera instalación necesita Internet para descargar las dependencias de Python; después se utiliza localmente. Instrucciones y conservación de trabajos anteriores en **LEEME_INICIO.md**.
+
+Esta entrega ya integra la aplicación base y la actualización de revisión. Incluye el diseño adaptado del archivo adjunto, modos claro y oscuro y tipografía sin serif. Las decisiones humanas y los datos incluidos se conservaron. No hay que aplicar otro parche.
+
+La barra lateral tiene **‹ Volver** y **Siguiente ›**, siempre visibles mientras
+el detalle está abierto. Volver recupera la ficha anterior, sus secciones abiertas,
+la posición de lectura y la vista del grafo. También funcionan **Alt + ←** y
+**Alt + →**. Navegar hacia atrás no deshace validaciones ni decisiones guardadas.
+
+Los cruces se activan desde «Qué se muestra». La marca «en N reportes ›» centra
+el análisis en el dato; al pasar el puntero se resaltan los reportes donde consta.
+El origen se explica con nombres legibles y el localizador exacto se conserva
+en el detalle técnico. Los vínculos manuales se distinguen de las coincidencias
+que no justificaron una propuesta automática.
+
+Ver [ACTUALIZACION.md](ACTUALIZACION.md) para las pruebas y los cambios integrados.
+
+La documentación original se conserva a continuación como referencia del proyecto.
+
+---
+
 # Módulo de grafos — Bóveda CIJ
 
 Grafo de conocimiento sobre reportes de NCMEC: detecta vinculaciones entre
 reportes, explica de dónde sale cada una y avisa cuándo un caso archivado
 recibió el dato que le faltaba.
 
-Corre entero en local, sin servicios de red. Python 3.8 o superior y una sola
-dependencia: `networkx`.
+Corre entero en local, sin servicios de red. Requiere Python y las dependencias
+de `requisitos.txt`: NetworkX, NumPy y SciPy. Se recomienda Python 3.12 o superior.
 
 ```bash
 pip install -r requisitos.txt
@@ -34,7 +57,7 @@ para mirar: un archivo suelto no puede guardar nada.
 python grafo/pruebas.py
 ```
 
-123 invariantes sobre las reglas que el proyecto declara no negociables.
+153 invariantes sobre las reglas que el proyecto declara no negociables.
 
 Para probarlo con otros reportes: el panel izquierdo del visor abre con **Probar
 con otros reportes**, que toma archivos `.json`, los procesa con las mismas
@@ -57,8 +80,11 @@ repositorio.
 
 Toma reportes, extrae entidades —cuentas, dispositivos, direcciones IP,
 teléfonos, nombres visibles, alias de cobro, ubicaciones— y busca cuáles
-comparten dos reportes. Cuando encuentra algo, propone una vinculación con un
-peso y explica en prosa qué la sostiene y qué solamente la refuerza.
+comparten dos reportes. Puede sumar un manifiesto separado con hashes
+criptográficos, pHash y huellas de audio, y comparar descripciones de lugar
+mediante un vocabulario controlado. Cuando encuentra algo, propone una
+vinculación con un puntaje no calibrado y explica en prosa qué la sostiene y
+qué solamente la refuerza.
 
 Las lee de los campos del reporte **y del texto libre**: hay reportes donde lo
 único que los conecta está escrito en la conversación o en la biografía del
@@ -101,8 +127,8 @@ una actuación en trámite.
 ## Estado
 
 Piloto. Es un corte vertical completo y funcionando, no un producto. Lo que
-falta —procesamiento multimodal, búsqueda semántica, GNN, integración con SIPAR
-y KIWI, control de acceso— está enumerado en
+falta —análisis de los binarios multimedia, búsqueda semántica general, GNN,
+integración con SIPAR y KIWI, control de acceso— está enumerado en
 [`grafo/ESTADO.md`](grafo/ESTADO.md), junto con lo que está simplificado a
 propósito y por qué.
 

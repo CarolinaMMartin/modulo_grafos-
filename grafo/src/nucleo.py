@@ -74,6 +74,20 @@ class Grafo(object):
         self.fuentes[source_evidence_id] = meta
         return meta
 
+    def reporte_de_fuente(self, source_evidence_id):
+        """Devuelve la clave canonica del reporte al que pertenece una fuente.
+
+        Los JSON principales usan ``ncmec:<id>``. Un manifiesto multimedia es
+        otra fuente y debe conservar su propio hash, pero cada entrada declara
+        a que reporte aporta evidencia. Esta resolucion evita falsificar la
+        procedencia solo para que los algoritmos puedan agruparla.
+        """
+        sid = str(source_evidence_id or "")
+        if sid.startswith("ncmec:"):
+            return sid
+        rid = (self.fuentes.get(sid) or {}).get("report_id")
+        return "ncmec:%s" % rid if rid is not None else None
+
     # -- nodos -------------------------------------------------------------
     def nodo(self, tipo, valor, etiqueta=None, **atributos):
         if tipo not in ont.TIPOS_NODO:
@@ -151,6 +165,12 @@ class Grafo(object):
             method_version=metodo_version,
             ontologia_version=ont.ONTOLOGIA_VERSION,
             confidence=confianza,
+            # El nombre ``confidence`` se conserva por compatibilidad con las
+            # salidas existentes. Ninguno de estos valores se entreno ni se
+            # calibro contra una muestra validada: son puntajes de reglas.
+            confidence_calibrated=(False if origen in (ont.DERIVADA,
+                                                        ont.INFERIDA)
+                                   else None),
             observed_at=observed_at,
             created_at=self.ts_corrida,
             validation_status=ont.ESTADO_INICIAL[origen],

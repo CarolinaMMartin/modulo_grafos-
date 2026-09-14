@@ -19,12 +19,13 @@ Tres propiedades que hacen que esto sea reversible y auditable:
    la proxima construccion. No hay estado que limpiar a mano.
 """
 
+import hashlib
 from collections import defaultdict
 
 import ontologia as ont
 
 METODO = "consolidacion_identidad"
-VERSION = "1.0"
+VERSION = "1.1"
 
 
 def _raiz(padre, x):
@@ -68,7 +69,13 @@ def consolidar(g):
 
         reportes = sorted({g.G.nodes[m].get("reporte") for m in menciones
                            if g.G.nodes[m].get("reporte")})
-        clave = "id-" + "-".join(reportes)
+        # Dos personas diferentes pueden aparecer en exactamente los mismos
+        # reportes. La clave anterior usaba solo esos numeros y colapsaba ambos
+        # grupos en un unico nodo IDENTIDAD. La composicion concreta de
+        # menciones es la identidad logica de este agrupamiento.
+        huella_menciones = hashlib.sha256(
+            "|".join(menciones).encode("utf-8")).hexdigest()
+        clave = "id-" + huella_menciones[:16]
         quienes = sorted({x.get("validated_by") for m in menciones
                           for x in decisiones[m] if x.get("validated_by")})
         cuando = sorted({x.get("validated_at") for m in menciones
@@ -78,6 +85,7 @@ def consolidar(g):
             "IDENTIDAD", clave,
             etiqueta=u"Identidad unificada (%s)" % u", ".join(reportes),
             reportes=", ".join(reportes),
+            huella_menciones="sha256:" + huella_menciones,
             menciones_unificadas=len(menciones),
             validada_por=", ".join(quienes) or None,
             validada_en=cuando[-1] if cuando else None)

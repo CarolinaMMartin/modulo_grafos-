@@ -32,7 +32,16 @@ VERSION = "2.0"
 ESTADOS_ARCHIVADOS = {"archivado", "archivado_latente", "pendiente"}
 ESTADOS_ACTIVOS = {"en_analisis", "en_investigacion", "derivado", "judicializado"}
 
-TIPOS_ATRIBUIBLES = {"CUENTA", "DISPOSITIVO", "TELEFONO", "EMAIL"}
+# Un tipo de nodo no alcanza para afirmar atribucion: importa tambien COMO
+# llego el dato al reporte. Una mencion en una conversacion puede ser correcta,
+# falsa o referirse a un tercero. Solo estas relaciones de campos estructurados
+# cuentan como identificadores atribuibles para una alerta de reapertura.
+RELACIONES_ATRIBUIBLES = {
+    "USA_CUENTA": "CUENTA",
+    "USA_DISPOSITIVO": "DISPOSITIVO",
+    "ASOCIADO_A_TELEFONO": "TELEFONO",
+    "ASOCIADO_A_EMAIL": "EMAIL",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -45,12 +54,13 @@ def _aportes_de(g, n_rep):
     aportes = defaultdict(list)
 
     for u, v, k, d in g.aristas():
-        if d.get("source_evidence_id") != sid:
+        if g.reporte_de_fuente(d.get("source_evidence_id")) != sid:
             continue
+        tipo_atribuible = RELACIONES_ATRIBUIBLES.get(d.get("relation_type"))
         for n in (u, v):
             nodo = g.G.nodes[n]
             tipo = nodo.get("tipo")
-            if tipo in TIPOS_ATRIBUIBLES:
+            if tipo_atribuible and tipo == tipo_atribuible:
                 aportes["identificador_atribuible"].append(
                     dict(tipo=tipo, valor=nodo.get("etiqueta"), locator=d["source_locator"]))
             elif tipo == "EVIDENCIA":
@@ -69,7 +79,7 @@ def _aportes_de(g, n_rep):
     # evalua ahora es si el reporte aporta una ubicacion utilizable, que es el
     # dato en si; que se haga con el es una decision posterior.
     for u, v, k, d in g.aristas():
-        if d.get("source_evidence_id") != sid:
+        if g.reporte_de_fuente(d.get("source_evidence_id")) != sid:
             continue
         if g.G.nodes[v].get("tipo") != "UBICACION":
             continue
@@ -242,8 +252,9 @@ def generar(g, umbral=None):
                     u"El reporte %s fue archivado%s %s.\n\n"
                     u"El reporte %s, %s, aporta precisamente aquello que faltaba: "
                     u"%s.\n\n"
-                    u"La vinculación entre ambos se apoya en que %s, con una "
-                    u"confianza de %s.\n\n"
+                    u"La vinculación entre ambos se apoya en que %s, con un "
+                    u"puntaje interno no calibrado de %s. Ese valor ordena las "
+                    u"propuestas y no equivale a una probabilidad.\n\n"
                     u"Corresponde evaluar si procede reabrir la actuación. La "
                     u"decisión es del operador: el sistema no reabre nada por sí "
                     u"mismo."

@@ -19,6 +19,8 @@ import networkx as nx
 
 import alertas as mod_alertas
 import analisis
+import contexto_lugar
+import multimedia
 import normalizacion as nz
 import ontologia as ont
 import resolucion
@@ -130,6 +132,12 @@ def _modulos(a):
           u"vinculación entre reportes, identidades, contra-evidencia"],
          [u"`src/analisis.py`", u"`%s`" % analisis.METODO, analisis.VERSION,
           u"legajos, comunidades, centralidades, baseline de enlaces"],
+         [u"`src/multimedia.py`", u"`%s`" % multimedia.METODO,
+          multimedia.VERSION,
+          u"manifiestos, pHash por Hamming y huellas de audio"],
+         [u"`src/contexto_lugar.py`", u"`%s`" % contexto_lugar.METODO,
+          contexto_lugar.VERSION,
+          u"categorías controladas y similitud contextual de lugares"],
          [u"`src/alertas.py`", u"`%s`" % mod_alertas.METODO, mod_alertas.VERSION,
           u"alertas de reapertura tipadas por motivo de archivo"],
          [u"`src/normalizacion.py`", u"—", nz.NORMALIZACION_VERSION,
@@ -190,8 +198,9 @@ def _ontologia(a):
 def _reglas(a):
     a.append(u"## 4. Reglas de vinculación y sus pesos")
     a.append(u"")
-    a.append(u"Estas son las nueve reglas que pueden vincular dos reportes. Todas "
-             u"son deterministas: mismos datos, mismo resultado, siempre.")
+    a.append(u"Estas son las %d reglas que pueden aportar a la vinculación de "
+             u"dos reportes. Su ejecución es reproducible: mismos datos y "
+             u"versiones, mismo resultado." % len(ont.REGLAS))
     a.append(u"")
     a.append(u"Cada regla declara cuatro cosas.")
     a.append(u"")
@@ -221,6 +230,28 @@ def _reglas(a):
     a.append(u"")
     for rid in sorted(ont.REGLAS):
         a.append(u"- **`%s`** — %s." % (rid, ont.REGLAS[rid]["desc"]))
+    a.append(u"")
+    a.append(u"### Multimedia y contexto de lugar")
+    a.append(u"")
+    a.append(
+        u"- **pHash:** la primera versión acepta huellas hexadecimales de 64 "
+        u"bits declaradas por el manifiesto. Genera candidatos con %d bloques "
+        u"exactos y luego calcula la distancia de Hamming real. Solo conserva "
+        u"pares a distancia ≤ %d. El bloqueo evita comparar cada imagen contra "
+        u"todas las demás; la explicación deja claro que no se abrieron los "
+        u"binarios." % (multimedia.MAX_DISTANCIA_HAMMING + 1,
+                         multimedia.MAX_DISTANCIA_HAMMING))
+    a.append(
+        u"- **Huella de audio:** exige igualdad exacta del valor algorítmico "
+        u"declarado. No lo presenta como SHA-256 ni como prueba de autoría.")
+    a.append(
+        u"- **Lugar:** usa el vocabulario controlado versión `%s`, publicado "
+        u"en `src/contexto_lugar.py`. Exige al menos dos dimensiones comunes, "
+        u"una de ellas de anclaje, y un solapamiento ponderado ≥ %s. Solo toma "
+        u"las líneas atribuibles a `Reported User`, no copia la frase al grafo, "
+        u"nunca fusiona lugares y la regla R13 solo corrobora."
+        % (contexto_lugar.LEXICO_VERSION,
+           _n(contexto_lugar.UMBRAL_SIMILITUD)))
     a.append(u"")
     a.append(u"### Por qué esos pesos y no otros")
     a.append(u"")
@@ -263,16 +294,19 @@ def _combinacion(a, g, res):
     a.append(u"## 5. Cómo se combinan los pesos")
     a.append(u"")
     a.append(u"Cuando dos reportes comparten varios datos, cada regla que dispara "
-             u"aporta su peso y se combinan con **noisy-OR**:")
+             u"aporta su peso y se combinan con **noisy-OR** para producir un "
+             u"puntaje interno de priorización:")
     a.append(u"")
     a.append(u"```")
-    a.append(u"confianza = 1 - Π (1 - peso_efectivo_i)")
+    a.append(u"puntaje = 1 - Π (1 - peso_efectivo_i)")
     a.append(u"```")
     a.append(u"")
-    a.append(u"La lectura es directa: cada coincidencia es una razón "
-             u"independiente para creer que los reportes están relacionados, y la "
-             u"confianza es la probabilidad de que **al menos una** sea válida. "
-             u"Nunca baja al sumar evidencia y nunca supera 1.")
+    a.append(u"El valor sirve para ordenar y aplicar umbrales: nunca baja al "
+             u"sumar evidencia y nunca supera 1. **No es una probabilidad.** Los "
+             u"pesos todavía no están calibrados con casos revisados por "
+             u"especialistas y las señales no pueden suponerse estadísticamente "
+             u"independientes. El JSON conserva el nombre histórico `confidence` "
+             u"por compatibilidad, pero debe leerse como puntaje.")
     a.append(u"")
     a.append(u"**La condición que lo gobierna todo:** el producto solo se acumula "
              u"si *al menos una* regla que sostiene disparó. Si únicamente "
@@ -288,13 +322,13 @@ def _combinacion(a, g, res):
          [u"`UMBRAL_CLUSTER`", _n(ont.UMBRAL_CLUSTER),
           u"peso mínimo para que un vínculo agrupe dos reportes en un mismo legajo"],
          [u"`UMBRAL_PROBABLE`", _n(ont.UMBRAL_PROBABLE),
-          u"desde acá la confianza se informa como «media»"],
+          u"desde acá el puntaje se informa como «medio»"],
          [u"`UMBRAL_ALTA`", _n(ont.UMBRAL_ALTA),
-          u"desde acá se informa como «alta»"],
+          u"desde acá el puntaje se informa como «alto»"],
          [u"`CONFIANZA_MAXIMA`", _n(ont.CONFIANZA_MAXIMA),
           u"techo absoluto: ninguna arista puede llegar a 1"]]))
     a.append(u"")
-    a.append(u"El techo de %s no es cosmético. Un 1,00 en pantalla se lee como "
+    a.append(u"El techo de %s no es cosmético. Un 1,00 en pantalla se leería como "
              u"certeza, y el sistema no produce certezas: produce propuestas que "
              u"una persona tiene que revisar." % _n(ont.CONFIANZA_MAXIMA))
     a.append(u"")
@@ -325,11 +359,14 @@ def _ejemplo(a, g, res):
             x.get("valor") or u"—",
             _n(x.get("peso_base")),
             _n(x.get("factor_discriminancia"), 4),
+            _n(x.get("factor_texto_libre", 1.0), 4),
+            _n(x.get("factor_similitud", 1.0), 4),
             _n(x.get("peso_efectivo"), 4),
             u"refuerza" if x.get("corrobora_solamente") else u"**sostiene**",
         ])
     a.extend(_tabla([u"Regla", u"Valor coincidente", u"Peso base",
-                     u"× rareza", u"= peso efectivo", u"Rol"], filas))
+                     u"× rareza", u"× texto", u"× similitud",
+                     u"= peso efectivo", u"Rol"], filas))
     a.append(u"")
     a.append(u"Como al menos una regla sostiene, se acumula:")
     a.append(u"")
@@ -339,13 +376,13 @@ def _ejemplo(a, g, res):
     prod = 1.0
     for x in det:
         prod *= (1.0 - min(x.get("peso_efectivo") or 0.0, ont.CONFIANZA_MAXIMA))
-    a.append(u"confianza = 1 - " + u" × ".join(partes))
-    a.append(u"          = 1 - %s" % _n(prod, 4))
-    a.append(u"          = %s" % _n(min(1.0 - prod, ont.CONFIANZA_MAXIMA), 4))
+    a.append(u"puntaje = 1 - " + u" × ".join(partes))
+    a.append(u"        = 1 - %s" % _n(prod, 4))
+    a.append(u"        = %s" % _n(min(1.0 - prod, ont.CONFIANZA_MAXIMA), 4))
     a.append(u"```")
     a.append(u"")
-    a.append(u"Confianza registrada en la arista: **%s** — franja «%s», por el "
-             u"techo de %s."
+    a.append(u"Puntaje registrado en el campo técnico `confidence`: **%s** — "
+             u"franja «%s», por el techo de %s. No es una probabilidad."
              % (_n(d.get("confidence"), 4),
                 ont.franja_confianza(d.get("confidence") or 0),
                 _n(ont.CONFIANZA_MAXIMA)))
@@ -377,9 +414,10 @@ def _discriminancia(a):
     a.append(u"")
     a.append(u"### Cuándo un identificador deja de sostener")
     a.append(u"")
-    a.append(u"Además del decaimiento, hay un corte duro: pasado cierto punto el "
-             u"identificador se degrada a *solo refuerza*, sin importar qué regla "
-             u"sea.")
+    a.append(u"Además del decaimiento, hay un corte probatorio: pasado cierto "
+             u"punto el identificador se degrada a *solo refuerza*. El límite "
+             u"computacional se expresa aparte como cantidad máxima de pares "
+             u"por tipo.")
     a.append(u"")
     a.extend(_tabla(
         [u"Constante", u"Valor", u"Efecto"],
@@ -387,22 +425,26 @@ def _discriminancia(a):
           u"hasta acá el identificador conserva todo su peso"],
          [u"`DF_HUB_ABSOLUTO`", ont.DF_HUB_ABSOLUTO,
           u"desde acá deja de sostener por sí solo, con cualquier corpus"],
-         [u"`DF_HUB_SIN_PARES`", ont.DF_HUB_SIN_PARES,
-          u"desde acá no genera pares para comparar y se informa aparte como *hub*"],
          [u"`CORPUS_MINIMO_PARA_FRACCION`", ont.CORPUS_MINIMO_PARA_FRACCION,
           u"recién con este volumen se aplica también el criterio de fracción"],
          [u"`FRACCION_BAJA_DISCRIMINANCIA`", _n(ont.FRACCION_BAJA_DISCRIMINANCIA),
           u"con corpus grande, aparecer en más de esta fracción degrada"]]))
     a.append(u"")
-    a.append(u"Hay un segundo descuento, independiente del anterior. Cuando el "
-             u"identificador que comparten los dos reportes no está declarado en "
-             u"ningún campo sino escrito en un texto libre —la conversación, la "
-             u"biografía del perfil—, el peso se multiplica por "
-             u"`FACTOR_TEXTO_LIBRE` = %s. No es que la extracción falle: es que "
-             u"cambia lo que el dato significa. Que el prestador informe un "
-             u"teléfono es un dato de la cuenta; que alguien lo escriba en un "
-             u"chat es una afirmación de esa persona, que puede estar equivocada, "
-             u"ser de un tercero o ser mentira."
+    a.append(u"Límites de expansión antes de conservar el identificador como "
+             u"grupo compacto (la señal no se oculta):")
+    a.append(u"")
+    a.extend(_tabla([u"Tipo", u"Máximo de pares"],
+                    [[u"`%s`" % tipo, limite]
+                     for tipo, limite in sorted(ont.MAX_PARES_POR_TIPO.items())]))
+    a.append(u"")
+    a.append(u"Hay un segundo descuento, independiente del anterior. Por cada "
+             u"lado de la coincidencia que dependa exclusivamente de texto libre "
+             u"—conversación o biografía—, el peso se multiplica por "
+             u"`FACTOR_TEXTO_LIBRE` = %s. Campo↔texto se descuenta una vez y "
+             u"texto↔texto dos veces. No es que la extracción falle: cambia lo "
+             u"que el dato significa. Que el prestador informe un teléfono es "
+             u"un dato de la cuenta; que alguien lo escriba en un chat es una "
+             u"mención que puede corresponder a un tercero o ser falsa."
              % _n(resolucion.FACTOR_TEXTO_LIBRE))
     a.append(u"")
     a.append(u"> **La rareza es una propiedad del identificador, no del tamaño de "
@@ -415,9 +457,10 @@ def _discriminancia(a):
              u"que `discriminancia(4)` da lo mismo con 10 y con 100.000 reportes."
              % ont.CORPUS_MINIMO_PARA_FRACCION)
     a.append(u"")
-    a.append(u"La regla `R01_CUENTA` es la única exceptuada del corte por *hub*: "
-             u"si un `espUserId` se repite en decenas de reportes, el problema es "
-             u"de los datos y conviene verlo, no ocultarlo.")
+    a.append(u"La regla `R01_CUENTA` es la única exceptuada del corte probatorio "
+             u"por baja discriminancia. Si la cantidad de pares supera su límite "
+             u"computacional, la cuenta se conserva como grupo compacto con la "
+             u"lista completa de reportes: se evita la explosión sin ocultarla.")
     a.append(u"")
 
 
@@ -601,8 +644,12 @@ def _alertas(a):
           u"`" + u"`, `".join(sorted(mod_alertas.ESTADOS_ARCHIVADOS)) + u"`"],
          [u"Se consideran activos (pueden disparar)",
           u"`" + u"`, `".join(sorted(mod_alertas.ESTADOS_ACTIVOS)) + u"`"],
-         [u"Tipos de dato que individualizan",
-          u"`" + u"`, `".join(sorted(mod_alertas.TIPOS_ATRIBUIBLES)) + u"`"]]))
+         [u"Relaciones de campo que permiten atribuir un identificador",
+          u"`" + u"`, `".join(sorted(mod_alertas.RELACIONES_ATRIBUIBLES)) + u"`"]]))
+    a.append(u"")
+    a.append(u"Las relaciones `MENCIONA_*` quedan expresamente fuera: una "
+             u"conversación puede nombrar un teléfono o correo de un tercero y "
+             u"esa mención no resuelve por sí sola la falta de atribución.")
     a.append(u"")
     a.append(u"> Toda esta lógica depende de que el motivo de archivo se registre "
              u"de forma **estructurada**. Hoy se simula con "
@@ -628,23 +675,29 @@ def _algoritmos(a, g):
          [u"Centralidad de grado", u"`degree_centrality`", u"top 10",
           u"con cuántos se conecta cada reporte"],
          [u"Intermediación", u"`betweenness_centrality`",
-          u"top 10, solo si el grafo tiene ≤ 3.000 nodos",
+          u"top 10, `weight=1/peso`, solo si el grafo tiene ≤ 3.000 reportes",
           u"qué reporte actúa de puente entre grupos"],
-         [u"PageRank", u"`pagerank`", u"top 10, solo si ≤ 20.000 nodos",
+         [u"PageRank", u"`pagerank`", u"top 10, `weight=peso`, solo si ≤ 20.000 reportes",
           u"importancia estructural"],
          [u"Puentes", u"`nx.bridges`", u"top 10",
           u"aristas cuya caída parte el legajo en dos"],
-         [u"Enlaces probables", u"Adamic–Adar", u"top 15, **no materializa aristas**",
+         [u"Enlaces probables", u"Adamic–Adar",
+          u"proyección reporte–identificador, top 15, **no materializa aristas**",
           u"baseline determinista contra el cual comparar una futura GNN"]]))
     a.append(u"")
     a.append(u"El `seed=7` de Louvain no es decorativo: sin él dos corridas sobre "
              u"los mismos datos pueden dar comunidades distintas, y un informe "
-             u"que cambia solo porque se volvió a ejecutar no es reproducible.")
+             u"que cambia solo porque se volvió a ejecutar no es reproducible. "
+             u"Si Louvain falla y se usa `greedy_modularity`, la salida declara "
+             u"el algoritmo efectivo y el error que activó el fallback.")
     a.append(u"")
     a.append(u"Adamic–Adar **calcula y ordena, pero no escribe nada en el grafo**. "
              u"Es un ranking de pares que merecerían revisión, no un conjunto de "
              u"relaciones. Materializarlo convertiría una sugerencia estadística "
-             u"en algo que se ve igual que un hecho.")
+             u"en algo que se ve igual que un hecho. Los pares nacen de vecinos "
+             u"investigativos compartidos; no se combinan todos los reportes y "
+             u"se excluyen plataforma y otros nodos administrativos. Cada vecino "
+             u"conserva el locator de ambos lados.")
     a.append(u"")
     a.append(u"> **Una centralidad alta no significa culpabilidad, liderazgo ni "
              u"peligrosidad.** Describe una posición estructural en el grafo que "
@@ -739,8 +792,9 @@ def _limites(a):
     a.append(u"1. **Los pesos no están calibrados contra un conjunto validado.** "
              u"Salen del criterio del relevamiento —cuánto individualiza cada "
              u"dato— y no de medir aciertos y errores sobre casos reales ya "
-             u"trabajados. Ese conjunto todavía no existe, y sin él no se puede "
-             u"informar precisión ni recall.")
+             u"trabajados. Por eso `confidence` es un puntaje, no una "
+             u"probabilidad. Ese conjunto todavía no existe, y sin él no se "
+             u"puede informar precisión ni recall.")
     a.append(u"2. **Las ventanas de IP por prestador son estimadas.** Hay que "
              u"confirmarlas con cada uno.")
     a.append(u"3. **El corpus de prueba tiene diez reportes.** Los umbrales que "

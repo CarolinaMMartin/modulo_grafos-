@@ -65,7 +65,7 @@ Cuantico/
     servidor.py              la aplicación: es lo que permite decidir en pantalla
     validar.py               CLI de validación humana (equivalente, para técnicos)
     informe_ia.py            informe vía modelo local (opcional)
-    pruebas.py               123 invariantes
+    pruebas.py               153 invariantes
     generar_sinteticos.py    generador del dataset
     README.md                cómo se usa
     ESTADO.md                qué está implementado, simplificado o ausente
@@ -76,6 +76,8 @@ Cuantico/
       normalizacion.py       teléfonos, correos, IP, alias, tiempo
       extractor_ncmec.py     JSON de NCMEC -> relaciones OBSERVADAS
       mineria_texto.py       identificadores escritos en texto libre -> DERIVADAS
+      multimedia.py          manifiestos, pHash y huellas de audio
+      contexto_lugar.py      vocabulario controlado para lugares -> INFERIDAS
       resolucion.py          vínculos DERIVADOS, identidades, contra-evidencia
       identidades.py         consolida las unificaciones aprobadas
       alertas.py             reapertura tipada por motivo de archivo
@@ -149,7 +151,7 @@ botón de decisión, el visor lo dice en lugar de fingir que anduvo.
 python grafo/pruebas.py
 ```
 
-123 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
+153 invariantes sobre las reglas no negociables. Si alguno falla, hay un problema
 de diseño, no de presentación.
 
 ### Probar con otros reportes
@@ -392,19 +394,27 @@ converjan. Las decisiones que importan:
 10.3**. Son adiciones a la ontología, marcadas como tales en el código y
 pendientes de validación, igual que el origen `afirmada`.
 
-Sobre el mismo lote quedaron sin resolver tres señales, y hacen falta piezas
-que hoy no existen:
+Sobre el mismo lote se implementaron tres señales adicionales sin incorporar
+infraestructura ni modelos opacos:
 
-1. **El lugar descrito con palabras** —*«galpón del mural azul cerca de la
-   estación»* contra *«depósito con mural celeste, entrada lateral»*— necesita
-   similitud semántica. Es trabajo para el modelo local, no para una regla.
-2. **La imagen casi duplicada** (pHash a distancia 1, SHA-256 distintos) y
-3. **la huella de audio compartida** necesitan ingerir el manifiesto de
-   `fileDetails`, que viene como archivo aparte, y además un mecanismo nuevo:
-   hoy dos reportes se vinculan porque **comparten un nodo**, y dos imágenes
-   parecidas no son el mismo nodo. La salida natural es indexar el pHash por
-   bandas (LSH) para que la coincidencia aproximada vuelva a ser un nodo
-   compartido, y verificar después la distancia de Hamming.
+1. **Lugar descrito con palabras.** `src/contexto_lugar.py` publica un
+   vocabulario controlado y pesos por dimensión. Exige al menos dos dimensiones
+   comunes y una de anclaje. Solo toma líneas atribuibles a `Reported User`, no
+   copia la frase al grafo y produce una hipótesis que **solo corrobora**: nunca
+   afirma que sea el mismo lugar ni vincula dos reportes por sí sola. Es un
+   baseline transparente, no reemplaza una futura búsqueda semántica general.
+2. **Imagen casi duplicada.** `src/multimedia.py` ingiere el manifiesto
+   `fileDetails`, separa SHA-256 de pHash y calcula la distancia de Hamming. El
+   pHash de 64 bits se bloquea en nueve segmentos: si dos huellas están a ocho
+   bits o menos, necesariamente comparten un segmento. Solo esos candidatos se
+   comparan exactamente; no se abre un producto cartesiano global.
+3. **Huella de audio compartida.** Se exige igualdad exacta del valor declarado
+   y se crea una relación distinta del hash criptográfico. La explicación aclara
+   que los binarios no fueron abiertos y que la coincidencia depende del
+   algoritmo que produjo la huella.
+
+El manifiesto es opcional y se pasa con `construir.py --multimedia <archivo>`.
+Su procedencia y hash se conservan separados del JSON principal del reporte.
 
 ### 4.12 El informe es del caso, y el archivo no se enumera
 
@@ -494,8 +504,11 @@ Comparar todos contra todos es `O(n²)`. Se construye un índice
 índice se arma sin recorrer el grafo, porque la procedencia de cada arista ya
 dice a qué reporte pertenece.
 
-Los identificadores presentes en demasiados reportes se tratan como *hub*: no
-generan pares y se informan aparte.
+El límite se calcula sobre la cantidad real de pares `n × (n−1) / 2` y cambia
+según el tipo de identificador. Mientras el costo sea manejable, los pares se
+evalúan aunque haya más de cien reportes. Si la expansión supera el límite, la
+señal se conserva como un grupo compacto con la lista completa de reportes; no
+se oculta ni se expande de forma cuadrática.
 
 ---
 
@@ -611,6 +624,50 @@ Los dos renglones de un motivo largo se tocaban por un pixel. El alto real de un
 renglón de 10 px —con acentos y colas— llega a 12. Pasó a 14. Lo detectó la
 auditoría de superposiciones, no la vista.
 
+### 5.13 Un rechazo seguía influyendo en el resultado
+
+Las validaciones se aplicaban después de calcular legajos y alertas. La arista
+quedaba marcada como rechazada, pero su consecuencia ya estaba incorporada. La
+construcción ahora aplica primero las decisiones sobre datos fuente, calcula,
+vuelve a aplicar las decisiones sobre relaciones nuevas y recién entonces
+agrupa, alerta y calcula centralidades. Lo rechazado queda auditable, no vigente.
+
+### 5.14 Dos identidades distintas colapsaban si tocaban los mismos reportes
+
+La clave de `IDENTIDAD` dependía del conjunto de reportes. Dos pares distintos
+de menciones dentro de esos mismos reportes producían la misma identidad. Ahora
+la clave depende de las **menciones concretas** aprobadas; los reportes son una
+propiedad del grupo, no su identidad técnica.
+
+### 5.15 Campo y texto libre no significan lo mismo
+
+El descuento anterior se aplicaba solo si ambos lados venían de texto. Ahora se
+calcula por lado: campo↔campo no descuenta, campo↔texto multiplica una vez por
+`FACTOR_TEXTO_LIBRE` y texto↔texto dos veces. Además, una relación `MENCIONA_*`
+no se presenta como identificador atribuible en una alerta de reapertura.
+
+### 5.16 Adamic–Adar sugería pares por compartir plataforma
+
+La proyección incluía nodos administrativos, de modo que dos reportes del mismo
+ESP podían aparecer como candidatos sin una conexión investigativa. Ahora el
+baseline se calcula sobre `reporte ↔ identificador investigativo`, excluye
+plataformas y conserva el locator de ambos lados. Tampoco forma primero todos
+los pares globales.
+
+### 5.17 El corte fijo en cien reportes ocultaba redes completas
+
+Una cuenta presente en 101 reportes desaparecía. El costo real es la cantidad
+de pares, no el número de reportes: el límite ahora es `n×(n−1)/2` y depende del
+tipo de dato. Mientras sea manejable se evalúa; si no, se conserva el grupo
+compacto completo con la política que impidió expandirlo.
+
+### 5.18 El valor llamado `confidence` no es una probabilidad
+
+Los pesos son heurísticos y no están calibrados con casos revisados por
+especialistas. El campo se conserva para no romper las salidas existentes, pero
+cada arista calculada declara `confidence_calibrated: false`, la documentación y
+los informes lo llaman **puntaje no calibrado**, y la fórmula queda registrada.
+
 ---
 
 ## 6. El visor: cómo llegó a ser lo que es
@@ -714,26 +771,6 @@ título manda: si la marca de la derecha no entra, se reduce a un punto de color
 y su texto queda en el globo de ayuda. Antes que recortar el número de reporte,
 se pierde la marca.
 
-### La letra
-
-Todo el visor estaba en monoespaciada: los títulos de las cajas, los rótulos de
-las líneas, los subtítulos, los chips, el pie. Una pantalla que lee un abogado
-parecía una terminal.
-
-Ahora hay dos familias y cada una tiene su motivo:
-
-- **La de lectura es la del sistema** (`Segoe UI Variable Text` y una cadena de
-  respaldo hasta Arial). El visor no carga nada de internet, así que no hay
-  fuente propia que valga: se toma la mejor que haya instalada.
-- **La monoespaciada quedó para lo que de verdad se lee carácter por carácter**:
-  un comando, un hash, un locator, y el valor exacto que el operador va a copiar
-  al expediente —la clase `.valor`—. Es lo único que la justifica: distinguir un
-  0 de una O, un 1 de una l.
-
-Lo único que se perdía al sacarla era la alineación de las cifras, y eso se
-resuelve con `font-variant-numeric: tabular-nums`, que alinea los números sin
-volver monoespaciado el texto que los rodea.
-
 ### Qué no se dibuja, y por qué
 
 - **Plataformas y prestadores.** Todos los reportes de Grindr comparten Grindr:
@@ -804,8 +841,10 @@ Surgieron de la conversación y conviene respetarlos.
   para cuando se retome. Hay tres invariantes que verifican que no queda rastro
   en el grafo. No reactivarlo sin que lo pidan.
 - **Integración con SIPAR y KIWI.** Fuera del alcance del piloto.
-- **Procesamiento multimodal** (imagen, audio, video, OCR, transcripción).
-- **Embeddings y búsqueda semántica.**
+- **Procesamiento real de los binarios multimedia** (decodificación de imagen,
+  audio, video, OCR y transcripción). La demo solo usa metadatos declarados.
+- **Embeddings y búsqueda semántica general.** El vocabulario controlado de
+  lugares es el baseline explicable contra el cual evaluarlos.
 - **GNN.** Existe el baseline determinista (Adamic-Adar) contra el cual
   compararla; el modelo no. `contexto.md` §11.5 enumera lo que hace falta antes.
 

@@ -11,7 +11,7 @@ ONTOLOGIA_VERSION. Cada arista persistida guarda la version con la que fue
 producida, para que el grafo sea reconstruible y comparable entre corridas.
 """
 
-ONTOLOGIA_VERSION = "0.3.0"
+ONTOLOGIA_VERSION = "0.4.0"
 
 # ---------------------------------------------------------------------------
 # 1. SEPARACION EPISTEMOLOGICA (contexto.md 10.1) - nunca se mezclan
@@ -94,8 +94,17 @@ TIPOS_NODO = {
                         desc="Device ID / IDFA / GAID"),
     "EVIDENCIA": dict(color="#7f7f7f", identificador=True, fusionable=True,
                       desc="Archivo reportado, identificado por hash"),
+    "HASH_PERCEPTUAL": dict(color="#64748b", identificador=True, fusionable=True,
+                            desc="Huella perceptual de imagen; similitud, no "
+                                 "igualdad criptografica"),
+    "HUELLA_AUDIO": dict(color="#475569", identificador=True, fusionable=True,
+                         desc="Huella algoritmica de audio declarada en el "
+                              "manifiesto multimedia"),
     "SEGMENTO": dict(color="#bfbfbf", identificador=False, fusionable=True,
                      desc="Fragmento de una evidencia: frame, clip, pagina"),
+    "LUGAR_MENCION": dict(color="#a16207", identificador=False, fusionable=False,
+                          desc="Descripcion de lugar extraida de texto; conserva "
+                               "categorias y locator, no el texto sensible"),
     "UBICACION": dict(color="#bf8f00", identificador=False, fusionable=True,
                       desc="Ciudad / region estimada o declarada"),
     "JURISDICCION": dict(color="#833c00", identificador=False, fusionable=True,
@@ -125,6 +134,12 @@ RELACIONES = {
     "USA_DISPOSITIVO": dict(origen=OBSERVADA, desc="Cuenta -> dispositivo"),
     "PARTICIPA_EN": dict(origen=OBSERVADA, desc="Cuenta -> evento"),
     "ADJUNTA": dict(origen=OBSERVADA, desc="Reporte o evento -> evidencia"),
+    "TIENE_HASH_PERCEPTUAL": dict(
+        origen=OBSERVADA,
+        desc="Evidencia -> hash perceptual informado por el flujo multimedia"),
+    "TIENE_HUELLA_AUDIO": dict(
+        origen=OBSERVADA,
+        desc="Evidencia -> huella de audio informada por el flujo multimedia"),
     "UBICADO_EN": dict(origen=OBSERVADA, desc="Entidad -> ubicacion declarada por la fuente"),
     "PUESTO_A_DISPOSICION_DE": dict(origen=OBSERVADA,
                                     desc="Reporte -> organismo al que NCMEC lo puso a disposicion"),
@@ -158,6 +173,15 @@ RELACIONES = {
                            desc="Evento o cuenta -> alias escrito en texto libre"),
     "MENCIONA_ALIAS_PAGO": dict(origen=DERIVADA,
                                 desc="Evento o cuenta -> alias de cobro escrito en texto libre"),
+    "MENCIONA_LUGAR": dict(
+        origen=DERIVADA,
+        desc="Reporte -> descripcion de lugar categorizada desde texto libre"),
+    "SIMILITUD_PERCEPTUAL": dict(
+        origen=DERIVADA,
+        desc="Dos imagenes tienen hashes perceptuales cercanos por Hamming"),
+    "COINCIDE_HUELLA_AUDIO": dict(
+        origen=DERIVADA,
+        desc="Dos audios comparten la misma huella algoritmica declarada"),
 
     # -- afirmadas: no las produce el sistema, las dispone una persona -------
     "VINCULADO_POR_OPERADOR": dict(
@@ -175,7 +199,7 @@ RELACIONES = {
 # ---------------------------------------------------------------------------
 # 4. REGLAS DETERMINISTAS DE VINCULACION (contexto.md 11.1)
 # ---------------------------------------------------------------------------
-# peso_base           : confianza maxima que aporta la coincidencia.
+# peso_base           : puntaje no calibrado que aporta la coincidencia.
 # corrobora_solamente : True -> nunca sostiene sola un vinculo; solo refuerza
 #                       otro sostenido por un dato objetivo fuerte (regla 3.5).
 # usa_discriminancia  : True -> el peso se pondera segun que tan raro sea el
@@ -191,11 +215,11 @@ REGLAS = {
         corrobora_solamente=False, usa_discriminancia=True,
         desc="Mismo identificador de dispositivo"),
     "R03_TELEFONO": dict(
-        version="1.0", tipo_nodo="TELEFONO", peso_base=0.90,
+        version="1.1", tipo_nodo="TELEFONO", peso_base=0.90,
         corrobora_solamente=False, usa_discriminancia=True,
         desc="Mismo telefono normalizado a E.164"),
     "R04_EMAIL": dict(
-        version="1.0", tipo_nodo="EMAIL", peso_base=0.90,
+        version="1.1", tipo_nodo="EMAIL", peso_base=0.90,
         corrobora_solamente=False, usa_discriminancia=True,
         desc="Mismo correo normalizado"),
     "R05_EVIDENCIA": dict(
@@ -212,7 +236,7 @@ REGLAS = {
         corrobora_solamente=True, usa_discriminancia=True,
         desc="Misma IP fuera de la ventana temporal: indicio, no atribucion"),
     "R08_ALIAS": dict(
-        version="1.0", tipo_nodo="ALIAS", peso_base=0.22,
+        version="1.1", tipo_nodo="ALIAS", peso_base=0.22,
         corrobora_solamente=True, usa_discriminancia=True,
         desc="Mismo nombre visible: refuerza, nunca sostiene solo"),
     # ADICION PENDIENTE DE VALIDACION, junto con el tipo de nodo ALIAS_PAGO.
@@ -221,13 +245,27 @@ REGLAS = {
     # y se tipea mal, asi que no llega a valer lo que un identificador que el
     # prestador declara. Como todos los pesos del sistema, esta sin calibrar.
     "R10_ALIAS_PAGO": dict(
-        version="1.0", tipo_nodo="ALIAS_PAGO", peso_base=0.62,
+        version="1.1", tipo_nodo="ALIAS_PAGO", peso_base=0.62,
         corrobora_solamente=False, usa_discriminancia=True,
         desc="Misma via de cobro: mismo alias de pago normalizado"),
     "R09_UBICACION": dict(
         version="1.0", tipo_nodo="UBICACION", peso_base=0.08,
         corrobora_solamente=True, usa_discriminancia=True,
         desc="Misma ciudad estimada: contexto, nunca sostiene solo"),
+    "R11_PHASH_SIMILAR": dict(
+        version="1.0", tipo_nodo="HASH_PERCEPTUAL", peso_base=0.82,
+        corrobora_solamente=False, usa_discriminancia=False,
+        desc="Hashes perceptuales de imagen a distancia Hamming menor o igual "
+             "al umbral; indica similitud visual, no archivo identico"),
+    "R12_HUELLA_AUDIO": dict(
+        version="1.0", tipo_nodo="HUELLA_AUDIO", peso_base=0.86,
+        corrobora_solamente=False, usa_discriminancia=True,
+        desc="Misma huella algoritmica de audio declarada"),
+    "R13_CONTEXTO_LUGAR": dict(
+        version="1.0", tipo_nodo="LUGAR_MENCION", peso_base=0.12,
+        corrobora_solamente=True, usa_discriminancia=False,
+        desc="Descripciones de lugar comparten al menos dos dimensiones de un "
+             "vocabulario controlado; solo corrobora"),
 }
 
 # ---------------------------------------------------------------------------
@@ -273,7 +311,28 @@ CONFIANZA_MAXIMA = 0.99   # ninguna regla determinista produce certeza absoluta
 # tamano de la base.
 DF_PLENA_DISCRIMINANCIA = 10    # hasta aca el identificador vale su peso completo
 DF_HUB_ABSOLUTO = 50            # desde aca deja de sostener solo y pasa a corroborar
-DF_HUB_SIN_PARES = 100          # desde aca ni siquiera se generan pares
+
+# Limite de trabajo por identificador, expresado como cantidad de PARES y no
+# como cantidad de reportes. El costo real de expandir un identificador es
+# n*(n-1)/2: un corte fijo en 100 reportes ocultaba una cuenta presente en 101,
+# aunque 5.050 pares siguen siendo manejables para la demo. La politica es por
+# tipo porque una cuenta exacta y una ubicacion generica no tienen el mismo
+# valor investigativo ni justifican el mismo costo. Si se supera el limite no
+# se pierde la señal: se devuelve como grupo compacto con todos sus reportes.
+MAX_PARES_POR_TIPO = {
+    "CUENTA": 10000,
+    "EVIDENCIA": 7500,
+    "HASH_PERCEPTUAL": 5000,
+    "HUELLA_AUDIO": 5000,
+    "DISPOSITIVO": 5000,
+    "TELEFONO": 5000,
+    "EMAIL": 5000,
+    "ALIAS_PAGO": 4000,
+    "IP": 2500,
+    "ALIAS": 1500,
+    "UBICACION": 1000,
+    "_default": 1000,
+}
 
 # La fraccion solo se aplica cuando el corpus ya es grande: recien ahi dice algo.
 FRACCION_BAJA_DISCRIMINANCIA = 0.20
@@ -302,7 +361,10 @@ ETIQUETA_TIPO = {
     "IP": u"Dirección IP",
     "DISPOSITIVO": u"Dispositivo",
     "EVIDENCIA": u"Archivo",
+    "HASH_PERCEPTUAL": u"Huella visual",
+    "HUELLA_AUDIO": u"Huella de audio",
     "SEGMENTO": u"Segmento de archivo",
+    "LUGAR_MENCION": u"Lugar mencionado",
     "UBICACION": u"Ubicación",
     "JURISDICCION": u"Jurisdicción",
     "ORGANIZACION": u"Organización",
@@ -320,11 +382,14 @@ ETIQUETA_RELACION = {
     "MENCIONA_EMAIL": u"menciona el correo",
     "MENCIONA_ALIAS": u"menciona el alias",
     "MENCIONA_ALIAS_PAGO": u"menciona el alias de cobro",
+    "MENCIONA_LUGAR": u"describe un posible lugar",
     "ASOCIADO_A_EMAIL": u"está asociada al correo",
     "OBSERVADO_DESDE_IP": u"fue observada desde la IP",
     "USA_DISPOSITIVO": u"se usó desde el dispositivo",
     "PARTICIPA_EN": u"interviene en",
     "ADJUNTA": u"adjunta el archivo",
+    "TIENE_HASH_PERCEPTUAL": u"tiene la huella visual",
+    "TIENE_HUELLA_AUDIO": u"tiene la huella de audio",
     "UBICADO_EN": u"se ubica en",
     "PUESTO_A_DISPOSICION_DE": u"fue puesto a disposición de",
     "GEOLOCALIZA_EN": u"geolocaliza, de modo aproximado, en",
@@ -337,6 +402,8 @@ ETIQUETA_RELACION = {
     "RESPONDE_A": u"responde a",
     "POSIBLE_MISMA_IDENTIDAD": u"podría ser la misma persona que",
     "SIMILAR_A": u"guarda similitud con",
+    "SIMILITUD_PERCEPTUAL": u"es visualmente similar a",
+    "COINCIDE_HUELLA_AUDIO": u"comparte huella de audio con",
     "IDENTIFICADO_COMO": u"fue unificada bajo la identidad",
 }
 

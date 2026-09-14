@@ -24,7 +24,8 @@ import ontologia as ont
 VERSION = "1.0"
 
 TIPOS_SENSIBLES = ("IP", "CUENTA", "TELEFONO", "EMAIL", "DISPOSITIVO",
-                   "ALIAS", "EVIDENCIA")
+                   "ALIAS", "ALIAS_PAGO", "EVIDENCIA", "HASH_PERCEPTUAL",
+                   "HUELLA_AUDIO")
 
 
 # ---------------------------------------------------------------------------
@@ -149,8 +150,8 @@ def _reportes_de(g, n):
     for u, v, k, d in g.aristas(vigentes=False):
         if u != n and v != n:
             continue
-        sid = d.get("source_evidence_id") or ""
-        if sid.startswith("ncmec:"):
+        sid = g.reporte_de_fuente(d.get("source_evidence_id")) or ""
+        if sid:
             rs.add(sid.split(":", 1)[1])
     return sorted(rs)
 
@@ -207,7 +208,7 @@ def _identificadores(g, n_rep):
     sid = "ncmec:%s" % g.G.nodes[n_rep]["valor"]
     por_tipo = defaultdict(set)
     for u, v, k, d in g.aristas():
-        if d.get("source_evidence_id") != sid:
+        if g.reporte_de_fuente(d.get("source_evidence_id")) != sid:
             continue
         for n in (u, v):
             t = g.G.nodes[n].get("tipo")

@@ -27,6 +27,7 @@ Lo que si hace bien, porque es lo que no se puede perder:
 import json
 import os
 import sys
+import tempfile
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -37,6 +38,8 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 import construir                        # noqa: E402
+import extractor_ncmec                  # noqa: E402
+import nucleo                           # noqa: E402
 import validacion                       # noqa: E402
 
 SALIDA = os.path.join(BASE, "salida")
@@ -160,6 +163,7 @@ class Handler(BaseHTTPRequestHandler):
         with _candado:
             try:
                 respuesta = acciones[ruta](datos)
+                reconstruir()
             except ValueError as e:
                 self._error(400, str(e))
                 return
@@ -167,13 +171,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.log_message("error interno: %s", e)
                 self._error(500, "no se pudo completar la operacion")
                 return
-            reconstruir()
         self._json(200, respuesta)
 
     # -- operaciones -------------------------------------------------------
     @staticmethod
     def _texto(datos, clave, obligatorio=True, maximo=2000):
-        valor = (datos.get(clave) or "").strip()
+        valor = datos.get(clave) or ""
+        if not isinstance(valor, str):
+            raise ValueError("%s debe ser texto" % clave)
+        valor = valor.strip()
         if obligatorio and not valor:
             raise ValueError("falta %s" % clave)
         if len(valor) > maximo:
@@ -192,10 +198,10 @@ class Handler(BaseHTTPRequestHandler):
     def _importar(self, datos):
         """Guarda reportes en la carpeta de entrada.
 
-        Valida lo minimo que el extractor necesita para no fallar despues: que
-        sea un JSON, que sea un objeto y que traiga numero de reporte. Lo que
-        falte adentro lo tolera el extractor, y el visor lo muestra como lo que
-        es -un reporte con pocos datos-, que tambien es un caso a probar.
+        Prueba el JSON con el extractor real en un grafo temporal antes de
+        reemplazar el archivo de entrada. Los campos opcionales ausentes
+        siguen siendo validos; un contenedor malformado no puede dejar un
+        archivo que impida reconstruir el grafo en las siguientes operaciones.
         """
         archivos = datos.get("archivos")
         if not isinstance(archivos, list) or not archivos:
@@ -207,9 +213,13 @@ class Handler(BaseHTTPRequestHandler):
 
         resultados = []
         for a in archivos:
-            nombre = str((a or {}).get("nombre") or "sin nombre")[:120]
+            if not isinstance(a, dict):
+                resultados.append(dict(nombre="sin nombre", ok=False,
+                                       motivo="el archivo debe ser un objeto"))
+                continue
+            nombre = str(a.get("nombre") or "sin nombre")[:120]
             try:
-                r = json.loads((a or {}).get("contenido") or "")
+                r = json.loads(a.get("contenido") or "")
             except (ValueError, TypeError):
                 resultados.append(dict(nombre=nombre, ok=False,
                                        motivo="no es un JSON valido"))
@@ -223,14 +233,40 @@ class Handler(BaseHTTPRequestHandler):
                 resultados.append(dict(nombre=nombre, ok=False,
                                        motivo="no trae reportId"))
                 continue
+            if isinstance(rid, bool) or not isinstance(rid, (str, int)):
+                resultados.append(dict(nombre=nombre, ok=False,
+                                       motivo="reportId debe ser texto o un numero entero"))
+                continue
+            if len(str(rid)) > 60:
+                resultados.append(dict(nombre=nombre, ok=False,
+                                       motivo="reportId supera los 60 caracteres"))
+                continue
             try:
                 destino = os.path.join(construir.DIR_ENTRADA, _nombre_seguro(rid))
             except ValueError as e:
                 resultados.append(dict(nombre=nombre, ok=False, motivo=str(e)))
                 continue
             reemplaza = os.path.exists(destino)
-            with open(destino, "w", encoding="utf-8") as fh:
-                json.dump(r, fh, ensure_ascii=False, indent=1)
+            # El temporal vive en el mismo volumen para que os.replace sea
+            # atomico. Se cierra antes de ingerirlo, tambien en Windows, y no
+            # termina en .json para no entrar en una reconstruccion normal.
+            descriptor, temporal = tempfile.mkstemp(
+                prefix=".validando_", suffix=".tmp", dir=construir.DIR_ENTRADA)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as fh:
+                    json.dump(r, fh, ensure_ascii=False, indent=1)
+                try:
+                    extractor_ncmec.ExtractorNCMEC(nucleo.Grafo()).ingerir(temporal)
+                except (AttributeError, TypeError, ValueError, KeyError, IndexError) as e:
+                    self.log_message("reporte rechazado por estructura: %s", e)
+                    resultados.append(dict(
+                        nombre=nombre, ok=False,
+                        motivo="la estructura de campos del reporte no es valida"))
+                    continue
+                os.replace(temporal, destino)
+            finally:
+                if os.path.exists(temporal):
+                    os.remove(temporal)
             resultados.append(dict(nombre=nombre, ok=True, reporte=str(rid),
                                    reemplaza=reemplaza))
         if not any(x["ok"] for x in resultados):
@@ -263,6 +299,16 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("decision invalida")
         usuario = self._texto(datos, "usuario")
         observacion = self._texto(datos, "observacion", obligatorio=False)
+        if decision == "rechazada" and not observacion:
+            raise ValueError("indique el motivo del rechazo")
+        with open(os.path.join(SALIDA, "grafo.json"), "r", encoding="utf-8") as fh:
+            snapshot = json.load(fh)
+        relacion = next((a for a in snapshot["aristas"]
+                         if a["arista_id"] == arista), None)
+        if relacion is None:
+            raise ValueError("la relacion ya no esta disponible; actualice la pantalla")
+        if relacion["origin"] == "afirmada" or relacion["relation_type"] == "IDENTIFICADO_COMO":
+            raise ValueError("revise la decision de origen de esta relacion")
         libro = validacion.LibroValidaciones(LIBRO_VALIDACIONES)
         reg = libro.registrar(arista, decision, usuario, observacion)
         return dict(ok=True, accion="decidir", registro=reg)

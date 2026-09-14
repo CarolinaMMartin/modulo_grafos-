@@ -55,15 +55,19 @@ def escribir(g, res, ruta):
     v = res["vinculacion"]
     a("\n## 2. Vínculos propuestos entre reportes\n")
     a("Pares evaluados por blocking: **%d** sobre %d reportes. "
-      "Vínculos materializados: **%d**. Descartados: **%d**.\n"
-      % (v["pares_evaluados"], v["reportes"], len(v["vinculos"]), len(v["descartados"])))
+      "Vínculos vigentes: **%d**. Rechazados por un operador: **%d**. "
+      "Descartados por las reglas: **%d**.\n"
+      % (v["pares_evaluados"], v["reportes"], len(v["vinculos"]),
+         len(v.get("rechazados_por_operador", [])), len(v["descartados"])))
     if v["hubs"]:
-        a("> Identificadores tipo *hub* que no generaron pares (requieren revisión "
-          "manual): %s\n"
-          % ", ".join("%s `%s` en %d reportes" % (h["tipo"], h["valor"], h["reportes"])
-                      for h in v["hubs"]))
+        a("> Grupos masivos conservados sin expandir todos sus pares: %s\n"
+          % ", ".join(
+              "%s `%s` en %d reportes (%d pares posibles; política `%s`)"
+              % (h["tipo"], h["valor"], h["reportes"],
+                 h.get("pares_posibles", 0), h.get("politica", "grupo_compacto"))
+              for h in v["hubs"]))
     if v["vinculos"]:
-        a("| A | B | Relación | Confianza | Reglas |")
+        a("| A | B | Relación | Puntaje no calibrado | Reglas |")
         a("|---|---|---|---|---|")
         for x in sorted(v["vinculos"], key=lambda y: -y["confianza"]):
             a("| %s | %s | %s | **%.2f** (%s) | %s |"
@@ -86,7 +90,7 @@ def escribir(g, res, ruta):
     if not v["descartados"]:
         a("_Ninguno._")
     else:
-        a("| A | B | Confianza | Motivo |")
+        a("| A | B | Puntaje no calibrado | Motivo |")
         a("|---|---|---|---|")
         for x in v["descartados"]:
             a("| %s | %s | %.2f | %s |"
@@ -109,7 +113,7 @@ def escribir(g, res, ruta):
     if not al["alertas"]:
         a("_Sin alertas._")
     else:
-        a("| Prioridad | Archivado | Motivo de archivo | Disparador | Confianza |")
+        a("| Prioridad | Archivado | Motivo de archivo | Disparador | Puntaje no calibrado |")
         a("|---|---|---|---|---|")
         for x in al["alertas"]:
             a("| **%s** | %s | %s | %s (%s) | %.2f |"
@@ -215,7 +219,7 @@ def escribir(g, res, ruta):
     cola = res["cola_revision"]
     a("Pendientes: **%d**\n" % len(cola))
     if cola:
-        a("| Origen | Relación | A | B | Confianza | Arista |")
+        a("| Origen | Relación | A | B | Puntaje no calibrado | Arista |")
         a("|---|---|---|---|---|---|")
         for x in cola[:40]:
             a("| %s | %s | %s | %s | %s | `%s` |"

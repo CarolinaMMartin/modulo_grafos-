@@ -31,11 +31,7 @@ import normalizacion as nz
 import ontologia as ont
 
 METODO = "resolucion_determinista"
-VERSION = "1.2"
-
-# Un identificador vinculado a mas reportes que esto se trata como hub: no
-# genera pares. Se informa siempre, nunca se descarta en silencio.
-MAX_REPORTES_POR_IDENTIFICADOR = ont.DF_HUB_SIN_PARES
+VERSION = "1.3"
 
 # Velocidad implausible entre dos observaciones geolocalizadas (km/h).
 VELOCIDAD_IMPOSIBLE_KMH = 900.0
@@ -67,17 +63,34 @@ def _solo_de_texto(aristas):
         str(a.get("relation_type", "")).startswith("MENCIONA_") for a in aristas)
 
 
+def _procedencia_lado(aristas):
+    """Procedencia semantica del dato en uno de los reportes.
+
+    Si el mismo valor aparece tanto en un campo como en texto, el campo basta
+    para sostener ese lado. Solo se lo considera dependiente de texto cuando
+    todas las aristas disponibles son menciones extraidas de texto libre.
+    """
+    if not aristas:
+        return "sin_evidencia"
+    if _solo_de_texto(aristas):
+        return "texto_libre"
+    if any(str(a.get("relation_type", "")).startswith("MENCIONA_")
+           for a in aristas):
+        return "campo_y_texto"
+    return "campo_estructurado"
+
+
 # ---------------------------------------------------------------------------
 # Indice invertido: identificador -> reportes (blocking)
 # ---------------------------------------------------------------------------
 def indexar(g):
-    """valor_de_nodo -> {source_evidence_id: [aristas observadas]}"""
+    """valor_de_nodo -> {reporte_canonico: [aristas de sus fuentes]}"""
     indice = defaultdict(lambda: defaultdict(list))
     for u, v, k, d in g.aristas():
         if d["origin"] not in (ont.OBSERVADA, ont.DERIVADA):
             continue
-        sid = d.get("source_evidence_id")
-        if not sid or not sid.startswith("ncmec:"):
+        sid = g.reporte_de_fuente(d.get("source_evidence_id"))
+        if not sid:
             continue
         for n in (u, v):
             tipo = g.G.nodes[n].get("tipo")
@@ -123,6 +136,8 @@ def es_baja_discriminancia(df, total_reportes):
 def _ventana_para_ip(g, n_ip):
     """Ventana temporal segun el prestador asignado a la IP."""
     for _, dst, _, d in g.G.edges(n_ip, keys=True, data=True):
+        if not d.get("vigente", True) or d.get("validation_status") == "rechazada":
+            continue
         if d.get("relation_type") == "ASIGNADA_A":
             isp = (g.G.nodes[dst].get("valor") or "").lower()
             for clave, horas in ont.VENTANA_IP_HORAS.items():
@@ -151,19 +166,29 @@ def evaluar_coincidencia(g, n_nodo, aristas_a, aristas_b, factor_disc):
     tipo = g.G.nodes[n_nodo].get("tipo")
     datos = g.G.nodes[n_nodo]
     disparos = []
-    desde_texto = _solo_de_texto(aristas_a) and _solo_de_texto(aristas_b)
+    procedencia_a = _procedencia_lado(aristas_a)
+    procedencia_b = _procedencia_lado(aristas_b)
+    lados_desde_texto = sum(
+        p == "texto_libre" for p in (procedencia_a, procedencia_b))
+    desde_texto = lados_desde_texto > 0
 
     def agregar(regla_id, peso, frase, corrobora=None):
         meta = ont.REGLAS[regla_id]
         fd = factor_disc if meta["usa_discriminancia"] else 1.0
-        ft = FACTOR_TEXTO_LIBRE if desde_texto else 1.0
+        # Cada lado que depende exclusivamente de texto introduce su propia
+        # salvedad. Campo↔texto se descuenta una vez; texto↔texto, dos veces.
+        ft = FACTOR_TEXTO_LIBRE ** lados_desde_texto
         disparos.append(dict(
             regla=regla_id, regla_version=meta["version"],
             nodo=n_nodo, tipo=tipo, valor=datos.get("valor"),
             peso_base=meta["peso_base"], peso_efectivo=round(peso * fd * ft, 4),
+            factor_contexto=round(peso / meta["peso_base"], 8),
             factor_discriminancia=round(fd, 4),
             factor_texto_libre=round(ft, 4),
             desde_texto=desde_texto,
+            lados_desde_texto=lados_desde_texto,
+            procedencia_lado_a=procedencia_a,
+            procedencia_lado_b=procedencia_b,
             corrobora_solamente=(meta["corrobora_solamente"] if corrobora is None
                                  else corrobora),
             nota=frase))
@@ -179,22 +204,47 @@ def evaluar_coincidencia(g, n_nodo, aristas_a, aristas_b, factor_disc):
                 % datos.get("valor"))
 
     elif tipo == "TELEFONO":
+        if lados_desde_texto == 0:
+            forma = u"en ambos se consigna"
+        elif lados_desde_texto == 1:
+            forma = (u"un reporte consigna en un campo y el otro menciona en "
+                     u"texto libre")
+        else:
+            forma = u"ambos mencionan en texto libre"
         agregar("R03_TELEFONO", ont.REGLAS["R03_TELEFONO"]["peso_base"],
-                u"en ambos %s el mismo número telefónico, que una vez "
+                u"%s el mismo número telefónico, que una vez "
                 u"normalizado resulta %s"
-                % (u"aparece escrito" if desde_texto else u"se consigna",
-                   datos.get("valor")))
+                % (forma, datos.get("valor")))
 
     elif tipo == "EMAIL":
+        if lados_desde_texto == 0:
+            forma = u"en ambos se consigna"
+        elif lados_desde_texto == 1:
+            forma = (u"un reporte consigna en un campo y el otro menciona en "
+                     u"texto libre")
+        else:
+            forma = u"ambos mencionan en texto libre"
         agregar("R04_EMAIL", ont.REGLAS["R04_EMAIL"]["peso_base"],
-                u"en ambos %s la misma dirección de correo (%s)"
-                % (u"aparece escrita" if desde_texto else u"se consigna",
-                   datos.get("valor")))
+                u"%s la misma dirección de correo (%s)"
+                % (forma, datos.get("valor")))
 
     elif tipo == "EVIDENCIA":
         agregar("R05_EVIDENCIA", ont.REGLAS["R05_EVIDENCIA"]["peso_base"],
                 u"ambos incluyen un archivo de idéntico hash, es decir, "
                 u"exactamente el mismo contenido y no uno parecido")
+
+    elif tipo == "HASH_PERCEPTUAL":
+        agregar("R11_PHASH_SIMILAR",
+                ont.REGLAS["R11_PHASH_SIMILAR"]["peso_base"],
+                u"ambas imágenes tienen la misma huella perceptual (%s); esto "
+                u"indica similitud visual, no igualdad criptográfica"
+                % datos.get("valor"))
+
+    elif tipo == "HUELLA_AUDIO":
+        agregar("R12_HUELLA_AUDIO",
+                ont.REGLAS["R12_HUELLA_AUDIO"]["peso_base"],
+                u"los dos archivos de audio comparten la misma huella "
+                u"algorítmica (%s)" % datos.get("valor"))
 
     elif tipo == "IP":
         horas, isp = _ventana_para_ip(g, n_nodo)
@@ -248,7 +298,7 @@ def evaluar_coincidencia(g, n_nodo, aristas_a, aristas_b, factor_disc):
     elif tipo == "ALIAS":
         agregar("R08_ALIAS", ont.REGLAS["R08_ALIAS"]["peso_base"],
                 u"en ambos figura el mismo %s, «%s»"
-                % (u"alias" if desde_texto else u"nombre visible",
+                % (u"alias mencionado" if desde_texto else u"nombre visible",
                    datos.get("valor")))
 
     elif tipo == "ALIAS_PAGO":
@@ -282,8 +332,14 @@ def combinar(disparos):
 # ---------------------------------------------------------------------------
 # Proceso principal
 # ---------------------------------------------------------------------------
-def vincular_reportes(g):
-    """Crea aristas COINCIDE_CON / POSIBLE_DUPLICADO_DE entre reportes."""
+def vincular_reportes(g, disparos_adicionales=None):
+    """Crea aristas COINCIDE_CON / POSIBLE_DUPLICADO_DE entre reportes.
+
+    ``disparos_adicionales`` permite sumar señales por par que no se expresan
+    como igualdad de un nodo: por ejemplo dos pHash cercanos o dos
+    descripciones de lugar semejantes. Deben traer la misma estructura
+    auditable que una regla normal y nunca eluden la corroboración obligatoria.
+    """
     indice = indexar(g)
     reportes = {("ncmec:%s" % g.G.nodes[n]["valor"]): n for n in g.nodos_tipo("REPORTE")}
     total = max(len(reportes), 1)
@@ -297,22 +353,52 @@ def vincular_reportes(g):
         df_por_nodo[n_nodo] = len(sids)
         if len(sids) < 2:
             continue
-        if len(sids) > MAX_REPORTES_POR_IDENTIFICADOR:
-            hubs.append(dict(nodo=n_nodo, tipo=g.G.nodes[n_nodo].get("tipo"),
-                             valor=g.G.nodes[n_nodo].get("valor"), reportes=len(sids),
-                             accion="no se generaron pares: identificador de tipo hub, "
-                                    "requiere revision manual o segmentacion temporal"))
+        tipo = g.G.nodes[n_nodo].get("tipo")
+        pares_posibles = len(sids) * (len(sids) - 1) // 2
+        limite_pares = ont.MAX_PARES_POR_TIPO.get(
+            tipo, ont.MAX_PARES_POR_TIPO["_default"])
+        if pares_posibles > limite_pares:
+            if tipo == "IP":
+                politica = "segmentar_temporalmente"
+                accion = ("grupo compacto conservado; requiere segmentacion por "
+                          "fecha, hora, puerto y prestador antes de abrir pares")
+            elif tipo in ("ALIAS", "UBICACION"):
+                politica = "contexto_masivo"
+                accion = ("grupo compacto conservado; no abre pares por si solo "
+                          "porque es una señal contextual de baja discriminancia")
+            else:
+                politica = "grupo_compacto"
+                accion = ("grupo compacto conservado; no se enumeran todos los "
+                          "pares para evitar expansion combinatoria")
+            hubs.append(dict(
+                nodo=n_nodo, tipo=tipo,
+                valor=g.G.nodes[n_nodo].get("valor"), reportes=len(sids),
+                ids_reportes=[sid.split(":", 1)[1] for sid in sids],
+                pares_posibles=pares_posibles, limite_pares=limite_pares,
+                politica=politica, oculto=False, accion=accion))
             continue
         for i in range(len(sids)):
             for j in range(i + 1, len(sids)):
                 pares[(sids[i], sids[j])][n_nodo] = (por_reporte[sids[i]],
                                                      por_reporte[sids[j]])
 
+    extras_por_par = defaultdict(list)
+    for original in (disparos_adicionales or []):
+        disp = dict(original)
+        rid_a = str(disp.pop("reporte_a", ""))
+        rid_b = str(disp.pop("reporte_b", ""))
+        sid_a, sid_b = sorted(("ncmec:%s" % rid_a, "ncmec:%s" % rid_b))
+        if not rid_a or not rid_b or sid_a == sid_b:
+            continue
+        par = (sid_a, sid_b)
+        extras_por_par[par].append(disp)
+        pares.setdefault(par, {})
+
     creadas, descartadas = [], []
     for (sid_a, sid_b), compartidos in sorted(pares.items()):
         if sid_a not in reportes or sid_b not in reportes:
             continue
-        disparos = []
+        disparos = list(extras_por_par.get((sid_a, sid_b), []))
         for n_nodo, (ar_a, ar_b) in compartidos.items():
             df = df_por_nodo[n_nodo]
             fd = discriminancia(df)
@@ -337,13 +423,16 @@ def vincular_reportes(g):
                 motivo=(u"Los reportes comparten elementos, pero ninguno de ellos "
                         u"individualiza lo suficiente como para sostener la "
                         u"vinculación por sí solo." if not sostenido
-                        else u"La confianza resultante no alcanza el umbral mínimo "
+                        else u"El puntaje resultante no alcanza el umbral mínimo "
                              u"para proponer la vinculación."),
                 disparos=disparos))
             continue
 
-        locators = sorted({d["source_locator"] for grupo in compartidos.values()
-                           for lista in grupo for d in lista})
+        locators = {d["source_locator"] for grupo in compartidos.values()
+                    for lista in grupo for d in lista}
+        for disp in disparos:
+            locators.update(x for x in (disp.get("source_locators") or []) if x)
+        locators = sorted(locators)
         sid_deriv = "derivacion:%s+%s" % (sid_a, sid_b)
         g.registrar_fuente(sid_deriv, tipo="vinculacion_derivada",
                            extra=dict(fuentes=[sid_a, sid_b], locators=locators))
@@ -362,12 +451,16 @@ def vincular_reportes(g):
                 reglas=[d["regla"] for d in disparos],
                 detalle_reglas=disparos,
                 franja=ont.franja_confianza(confianza),
+                formula_puntaje="noisy_or_pesos_efectivos",
+                puntaje_calibrado=False,
                 indicios_duplicado=dup or None,
             ))
         creadas.append(dict(arista_id=aid, relacion=relacion, confianza=confianza,
                             reporte_a=g.G.nodes[n_a]["valor"],
                             reporte_b=g.G.nodes[n_b]["valor"],
-                            reglas=[d["regla"] for d in disparos]))
+                            reglas=[d["regla"] for d in disparos],
+                            formula_puntaje="noisy_or_pesos_efectivos",
+                            puntaje_calibrado=False))
 
     return dict(vinculos=creadas, descartados=descartadas, hubs=hubs,
                 pares_evaluados=len(pares), reportes=len(reportes))
@@ -406,59 +499,114 @@ def _enumerar(frases, separador=u", ", conector=u" y "):
     return u"%s%s%s" % (separador.join(frases[:-1]), conector, frases[-1])
 
 
+RAZON_PESO = {
+    "R01_CUENTA": u"Coinciden la plataforma y el ID de usuario: es la misma cuenta registrada.",
+    "R02_DISPOSITIVO": u"La coincidencia exacta del ID de dispositivo vincula los reportes por ese identificador.",
+    "R03_TELEFONO": u"El número coincide después de unificar su formato.",
+    "R04_EMAIL": u"La dirección de correo coincide después de unificar su formato.",
+    "R05_EVIDENCIA": u"El hash coincide: los reportes referencian el mismo contenido de archivo.",
+    "R06_IP_VENTANA": u"La IP coincide dentro del intervalo de tiempo configurado para el prestador.",
+    "R07_IP_SUELTA": u"La IP coincide, pero falta proximidad temporal comprobable; solo refuerza otra coincidencia.",
+    "R08_ALIAS": u"Un nombre visible puede repetirse entre cuentas: solo refuerza otra coincidencia.",
+    "R09_UBICACION": u"Una zona puede ser compartida por muchas personas: solo refuerza otra coincidencia.",
+    "R10_ALIAS_PAGO": u"El alias de pago coincide y conecta los reportes por esa vía de cobro.",
+    "R11_PHASH_SIMILAR": u"Las huellas perceptuales indican semejanza visual; se comparan los metadatos declarados.",
+    "R12_HUELLA_AUDIO": u"Coinciden las huellas de audio declaradas en los metadatos.",
+    "R13_CONTEXTO_LUGAR": u"Coinciden rasgos de la descripción; solo refuerzan otras coincidencias.",
+}
+
+
+def calculo_legible(disparos, confianza):
+    """Explica los pesos efectivamente usados, sin cambiar la ponderacion.
+
+    Los numeros son parametros de trabajo, no porcentajes de acierto. El
+    desglose se muestra a pedido; el hallazgo ocupa el primer plano del visor.
+    """
+    pasos = []
+    for d in disparos:
+        base = d["peso_base"]
+        ajustes = []
+        factores = [base]
+        for clave, texto in (
+            ("factor_contexto", u"Ajuste por las condiciones de la conexión (NAT/proxy)"),
+            ("factor_discriminancia", u"Reducción porque el dato aparece en muchos reportes"),
+            ("factor_texto_libre", u"Reducción porque el dato se menciona en texto libre"),
+            ("factor_similitud", u"Ajuste por el grado de similitud"),
+        ):
+            factor = d.get(clave, 1.0)
+            if factor != 1.0:
+                factores.append(factor)
+                ajustes.append(u"%s: multiplicar por %s."
+                               % (texto, ont.numero(factor, 4)))
+        if not ajustes:
+            ajustes.append(u"Se usa el peso completo, sin reducciones.")
+        pasos.append(dict(
+            regla=d["regla"],
+            nombre=ont.ETIQUETA_TIPO.get(d.get("tipo"), d.get("tipo")),
+            valor=d.get("valor"),
+            peso_base=base, peso_final=d["peso_efectivo"],
+            motivo=RAZON_PESO.get(d["regla"], ont.REGLAS[d["regla"]]["desc"]),
+            ajustes=ajustes,
+            cuenta=u" × ".join(ont.numero(x, 4) for x in factores)
+                   + u" = " + ont.numero(d["peso_efectivo"], 4),
+        ))
+    if len(disparos) == 1:
+        combinacion = (u"Hay una sola coincidencia: el puntaje final es su peso, %s."
+                       % ont.numero(confianza, 2 if round(confianza, 2) == confianza else 4))
+    else:
+        combinacion = (u"Se combinan los aportes, no se suman directamente. "
+                       u"Cada coincidencia adicional aumenta el puntaje usando "
+                       u"la parte que falta para llegar a 1.")
+    formula = u"1 − (" + u" × ".join(
+        u"(1 − %s)" % ont.numero(min(d["peso_efectivo"], ont.CONFIANZA_MAXIMA), 4)
+        for d in disparos) + u")"
+    return dict(pasos=pasos, combinacion=combinacion, formula=formula,
+                puntaje=confianza, limite=ont.CONFIANZA_MAXIMA,
+                criterio=u"Los pesos están configurados según el tipo de coincidencia. "
+                u"Sirven para ordenar las vinculaciones; no son porcentajes de acierto.")
+
+
 def _explicar(g, n_a, n_b, disparos, confianza, dup):
     ra, rb = g.G.nodes[n_a]["valor"], g.G.nodes[n_b]["valor"]
-    franja = ont.franja_confianza(confianza)
     sostienen = sorted([d for d in disparos if not d["corrobora_solamente"]],
                        key=lambda x: -x["peso_efectivo"])
     corroboran = sorted([d for d in disparos if d["corrobora_solamente"]],
                         key=lambda x: -x["peso_efectivo"])
 
-    # Si algun elemento salio de un texto libre hay que decirlo, pero una sola
-    # vez: repetir la salvedad en cada frase vuelve la explicacion ilegible, y
-    # una explicacion que no se lee no protege a nadie.
-    de_texto = [d for d in disparos if d.get("desde_texto")]
-    if not de_texto:
-        salvedad = u""
-    elif len(de_texto) == len(disparos):
-        salvedad = (
-            u"Nada de lo anterior está declarado en un campo del reporte: está "
-            u"escrito en la conversación o en la biografía del perfil, y lo "
-            u"extrajo una regla del sistema. Consta que el texto lo menciona, no "
-            u"que pertenezca a la persona reportada; por eso pesa algo menos que "
-            u"un dato que informa el prestador y hay que confirmarlo contra el "
-            u"expediente.")
-    else:
-        salvedad = (
-            u"De lo anterior, %s no está declarado en un campo del reporte sino "
-            u"escrito en la conversación o en la biografía del perfil, y lo "
-            u"extrajo una regla del sistema. Consta que el texto lo menciona, no "
-            u"que pertenezca a la persona reportada; por eso pesa algo menos que "
-            u"un dato que informa el prestador y hay que confirmarlo contra el "
-            u"expediente."
-            % _enumerar([u"«%s»" % d["valor"] for d in de_texto]))
+    # La salvedad distingue campo↔texto de texto↔texto. En ambos casos consta
+    # la coincidencia del valor, pero no la atribucion de ese valor a la cuenta
+    # o persona mencionada. Repetirla dentro de cada regla volveria ilegible la
+    # explicacion, por eso se resume una sola vez y con los valores afectados.
+    un_lado_texto = [d for d in disparos if d.get("lados_desde_texto") == 1]
+    dos_lados_texto = [d for d in disparos if d.get("lados_desde_texto") == 2]
+    salvedades = []
+    if un_lado_texto:
+        salvedades.append(
+            u"En %s, uno de los reportes declara el dato en un campo y el otro "
+            u"solamente lo menciona en la conversación o en la biografía. La "
+            u"coincidencia del valor es verificable, pero esa mención no prueba "
+            u"que el dato pertenezca a la persona reportada; por eso se aplica "
+            u"un descuento explícito y debe revisarse en su contexto."
+            % _enumerar([u"«%s»" % d["valor"] for d in un_lado_texto]))
+    if dos_lados_texto:
+        salvedades.append(
+            u"En %s, ninguno de los dos reportes declara el dato en un campo: "
+            u"ambos solamente lo mencionan en texto libre. Que dos textos "
+            u"contengan el mismo valor permite proponer una pista, pero no "
+            u"atribuírselo a las personas reportadas; por eso el descuento se "
+            u"aplica en cada lado y la coincidencia requiere revisión."
+            % _enumerar([u"«%s»" % d["valor"] for d in dos_lados_texto]))
+    salvedad = u"\n\n".join(salvedades)
 
     parrafos = []
-    parrafos.append(
-        u"Los reportes %s y %s quedan vinculados con una confianza de %s, que el "
-        u"sistema califica como %s." % (ra, rb, ont.numero(confianza), franja))
-
     if sostienen:
-        cierre = (u"Se trata de datos objetivos que individualizan y que, por esa "
-                  u"razón, alcanzan para proponer la relación."
-                  if len(sostienen) > 1 else
-                  u"Se trata de un dato objetivo que individualiza y que, por esa "
-                  u"razón, alcanza para proponer la relación.")
         parrafos.append(
-            u"La vinculación se sostiene en que %s. %s"
-            % (_enumerar([d["nota"] for d in sostienen], separador=u"; "), cierre))
+            u"Los reportes %s y %s están vinculados porque %s."
+            % (ra, rb, _enumerar([d["nota"] for d in sostienen], separador=u"; ")))
 
     if corroboran:
         parrafos.append(
-            u"A ello se suman los siguientes elementos, que refuerzan la hipótesis "
-            u"pero no alcanzarían por sí solos para sostenerla: %s. Conforme al "
-            u"criterio de trabajo vigente, una relación no puede apoyarse "
-            u"únicamente en semejanzas de contexto."
+            u"También coinciden estos datos, que solo refuerzan la vinculación: %s."
             % _enumerar([d["nota"] for d in corroboran],
                         separador=u"; ", conector=u"; y, por último, "))
 
@@ -473,10 +621,13 @@ def _explicar(g, n_a, n_b, disparos, confianza, dup):
             u"una duplicación antes de tramitarlos como actuaciones independientes."
             % ont.numero(dup["horas_entre_hechos"]))
 
-    parrafos.append(
-        u"Lo anterior es una propuesta del sistema. No acredita autoría ni "
-        u"responsabilidad alguna, y requiere la validación de un operador antes de "
-        u"incorporarse a una actuación.")
+    calculo = calculo_legible(disparos, confianza)
+    parrafos.append(u"Puntaje: %s. %s" % (ont.numero(confianza), calculo["combinacion"]))
+    for paso in calculo["pasos"]:
+        parrafos.append(u"%s: peso configurado %s. %s %s Aporte final: %s."
+                        % (paso["nombre"], ont.numero(paso["peso_base"]),
+                           paso["motivo"], u" ".join(paso["ajustes"]),
+                           ont.numero(paso["peso_final"], 4)))
     return u"\n\n".join(parrafos)
 
 

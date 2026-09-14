@@ -21,10 +21,15 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 import alertas as mod_alertas          # noqa: E402
+import analisis                         # noqa: E402
 import construir                        # noqa: E402
+import contexto_lugar                   # noqa: E402
 import docs_tecnicos                    # noqa: E402
 import dossier as mod_dossier          # noqa: E402
+import identidades                      # noqa: E402
 import mineria_texto as mt              # noqa: E402
+import multimedia                       # noqa: E402
+import nucleo                            # noqa: E402
 import normalizacion as nz              # noqa: E402
 import redaccion                        # noqa: E402
 import render_html                      # noqa: E402
@@ -83,6 +88,10 @@ def main():
                               if d["origin"] in (ont.DERIVADA, ont.INFERIDA)
                               and d.get("confidence") is None]
         check("toda derivada e inferida tiene confianza", not derivadas_sin_conf)
+        check("todo puntaje calculado declara que no esta calibrado",
+              all(d.get("confidence_calibrated") is False
+                  for _, _, _, d in g.aristas(vigentes=False)
+                  if d["origin"] in (ont.DERIVADA, ont.INFERIDA)))
         # Una afirmacion humana no lleva confianza: no hay nada calculado que
         # ponderar, y un numero ahi seria precision inventada.
         check("ninguna afirmada lleva confianza",
@@ -126,6 +135,28 @@ def main():
               all(d["validation_status"] == "pendiente" or d.get("validated_by")
                   for _, _, _, d in g.aristas(relacion="POSIBLE_MISMA_IDENTIDAD",
                                               vigentes=False)))
+
+        # Dos personas distintas pueden aparecer en el mismo par de reportes.
+        # La identidad debe depender de las menciones concretas, no solamente
+        # de los numeros de reporte que comparten.
+        g_ids = nucleo.Grafo(ts_corrida="2026-01-01T00:00:00+00:00")
+        for grupo in ("A", "B"):
+            m1 = g_ids.nodo("PERSONA_MENCION", grupo + "1", reporte="T1")
+            m2 = g_ids.nodo("PERSONA_MENCION", grupo + "2", reporte="T2")
+            sid = "test:identidad:" + grupo
+            g_ids.registrar_fuente(sid, tipo="test")
+            aid = g_ids.arista(
+                m1, m2, "POSIBLE_MISMA_IDENTIDAD", sid, "campo:persona",
+                "Hipotesis sintetica para probar identidades independientes.",
+                "test", "1.0", confianza=0.85)
+            d_id = g_ids.G.edges[m1, m2, aid]
+            d_id["validation_status"] = "validada"
+            d_id["validated_by"] = "OperadorPrueba"
+            d_id["validated_at"] = "2026-01-01T00:00:00+00:00"
+        grupos_ids = identidades.consolidar(g_ids)
+        check("dos identidades distintas en los mismos reportes no colapsan",
+              len(grupos_ids) == 2 and len(g_ids.nodos_tipo("IDENTIDAD")) == 2,
+              str([x["identidad"] for x in grupos_ids]))
 
         print("\n== IP: solo vale con fecha, hora y puerto cuando hay NAT ==")
         e164, _ = nz.normalizar_telefono("011 15 6888 9999")
@@ -172,6 +203,19 @@ def main():
         check("un reporte no archivado nunca genera alerta como archivado",
               all(g.G.nodes[ont.nid("REPORTE", r)].get("estado_sipar")
                   in ("archivado", "archivado_latente", "pendiente") for r in por_arch))
+
+        g_mencion = nucleo.Grafo(ts_corrida="2026-01-01T00:00:00+00:00")
+        n_rep = g_mencion.nodo("REPORTE", "T-MENCION")
+        n_evento = g_mencion.nodo("EVENTO", "chat-T-MENCION")
+        n_tel = g_mencion.nodo("TELEFONO", "+541100000001")
+        g_mencion.registrar_fuente("ncmec:T-MENCION", tipo="test")
+        g_mencion.arista(
+            n_evento, n_tel, "MENCIONA_TELEFONO", "ncmec:T-MENCION",
+            "chat.notes[0]", "El texto menciona el telefono.",
+            "mineria_texto", "1.0", confianza=0.8)
+        check("una mencion textual no se presenta como identificador atribuible",
+              not mod_alertas._aportes_de(g_mencion, n_rep).get(
+                  "identificador_atribuible"))
 
         print("\n== Unificacion de identidades ==")
         unif = res["identidades_unificadas"]
@@ -239,6 +283,77 @@ def main():
               str(libro.verificar()))
         check("las validaciones registradas se re-aplican tras reconstruir",
               res["validaciones"]["aplicadas"] == len(libro.registros()))
+
+        # La decision debe anteceder alertas, agrupamientos, comunidades y
+        # candidatos. Se prueba con un corpus aislado para no tocar los libros
+        # de validacion incluidos en el repositorio.
+        tmp_dec = tempfile.mkdtemp(prefix="grafo_decision_")
+        base_anterior = construir.BASE
+        gen_modelo = construir.docs_modelo.generar
+        gen_tecnicos = construir.docs_tecnicos.generar
+        try:
+            datos_dec = os.path.join(tmp_dec, "datos")
+            estado_dec = os.path.join(tmp_dec, "estado")
+            os.makedirs(datos_dec)
+            os.makedirs(estado_dec)
+
+            def _reporte_telefono(rid):
+                return dict(
+                    reportId=rid,
+                    reportedInformation=dict(
+                        reportingEsp=dict(espName="PlataformaPrueba"),
+                        incidentSummary=dict(platform="PlataformaPrueba"),
+                        reportedPeople=dict(reportedPersons=[dict(
+                            id=rid + "-p",
+                            phones=dict(phones=[dict(value="+54 11 0000 0001")]))])))
+
+            for rid in ("TD1", "TD2"):
+                with open(os.path.join(datos_dec, rid + ".json"), "w",
+                          encoding="utf-8") as fh:
+                    json.dump(_reporte_telefono(rid), fh)
+            with open(os.path.join(datos_dec, "estado_institucional.json"), "w",
+                      encoding="utf-8") as fh:
+                json.dump({
+                    "TD1": {"estado": "archivado",
+                            "motivo_archivo": "sin_datos_de_usuario"},
+                    "TD2": {"estado": "en_analisis"},
+                }, fh)
+
+            construir.BASE = tmp_dec
+            construir.docs_modelo.generar = lambda *args, **kwargs: None
+            construir.docs_tecnicos.generar = lambda *args, **kwargs: None
+            _, antes = construir.construir(
+                datos_dec, os.path.join(tmp_dec, "salida_antes"),
+                ts_corrida="2026-01-01T00:00:00+00:00")
+            aid_dec = antes["vinculacion"]["vinculos"][0]["arista_id"]
+            validacion.LibroValidaciones(
+                os.path.join(estado_dec, "validaciones.jsonl")).registrar(
+                    aid_dec, "rechazada", "OperadorPrueba",
+                    "Los datos pertenecen a terceros distintos.",
+                    ts="2026-01-02T00:00:00+00:00")
+
+            g_dec, despues = construir.construir(
+                datos_dec, os.path.join(tmp_dec, "salida_despues"),
+                ts_corrida="2026-01-03T00:00:00+00:00")
+            arista_dec = next(
+                d for _, _, _, d in g_dec.aristas(vigentes=False)
+                if d["arista_id"] == aid_dec)
+            check("el rechazo deja la arista auditable pero no vigente",
+                  arista_dec["validation_status"] == "rechazada"
+                  and not arista_dec["vigente"])
+            check("el rechazo se propaga al listado operativo",
+                  not despues["vinculacion"]["vinculos"]
+                  and len(despues["vinculacion"]["rechazados_por_operador"]) == 1)
+            check("el rechazo se aplica antes de agrupar y alertar",
+                  not despues["legajos"] and not despues["comunidades"]
+                  and not despues["alertas"]["alertas"])
+            check("el par rechazado no reaparece como candidato estructural",
+                  not despues["candidatos_enlace"])
+        finally:
+            construir.BASE = base_anterior
+            construir.docs_modelo.generar = gen_modelo
+            construir.docs_tecnicos.generar = gen_tecnicos
+            shutil.rmtree(tmp_dec, ignore_errors=True)
 
         print("\n== Minimizacion: el texto sensible no entra al grafo ==")
         with open(os.path.join(tmp, "grafo.json"), "r", encoding="utf-8") as fh:
@@ -334,13 +449,237 @@ def main():
         if vinculos_txt:
             v_txt = vinculos_txt[0]
             check("la explicacion avisa que no esta declarado en ningun campo",
-                  u"declarado en un campo" in v_txt["explicacion"])
+                  u"ninguno de los dos reportes declara el dato en un campo"
+                  in v_txt["explicacion"])
             check("pesa menos que el mismo dato declarado por el prestador",
                   v_txt["confidence"] < ont.REGLAS["R03_TELEFONO"]["peso_base"],
                   str(v_txt["confidence"]))
         check("el descuento por venir de un texto es explicito y menor que uno",
               0 < resolucion.FACTOR_TEXTO_LIBRE < 1)
         shutil.rmtree(tmp_txt, ignore_errors=True)
+
+        # El origen se evalua por lado. La version anterior solo descontaba si
+        # AMBOS lados eran texto, de modo que campo↔texto quedaba disfrazado de
+        # campo↔campo.
+        g_origen = nucleo.Grafo(ts_corrida="2026-01-01T00:00:00+00:00")
+        n_tel = g_origen.nodo("TELEFONO", "+541155550123")
+        campo = [dict(relation_type="ASOCIADO_A_TELEFONO")]
+        texto = [dict(relation_type="MENCIONA_TELEFONO")]
+        mixto = resolucion.evaluar_coincidencia(
+            g_origen, n_tel, campo, texto, 1.0)[0]
+        ambos_texto = resolucion.evaluar_coincidencia(
+            g_origen, n_tel, texto, texto, 1.0)[0]
+        check("campo-texto queda identificado y se descuenta una vez",
+              mixto["lados_desde_texto"] == 1
+              and mixto["factor_texto_libre"]
+              == round(resolucion.FACTOR_TEXTO_LIBRE, 4))
+        check("texto-texto se descuenta por cada lado",
+              ambos_texto["lados_desde_texto"] == 2
+              and ambos_texto["factor_texto_libre"]
+              == round(resolucion.FACTOR_TEXTO_LIBRE ** 2, 4)
+              and ambos_texto["peso_efectivo"] < mixto["peso_efectivo"])
+
+        # ------------------------------------------------------------------
+        print(chr(10)+"== Metadatos multimedia explicables ==")
+        g_mm = nucleo.Grafo(ts_corrida="2026-01-01T00:00:00+00:00")
+        for rid in ("MM1", "MM2"):
+            g_mm.registrar_fuente("ncmec:" + rid, tipo="test",
+                                  extra=dict(report_id=rid))
+            g_mm.nodo("REPORTE", rid)
+        ruta_mm = os.path.join(tmp, "multimedia.json")
+        manifiesto = {"fileDetails": [
+            {
+                "reportId": "MM1", "fileId": "img-1",
+                "originalFileName": "uno.png",
+                "originalFileHash": [{"hashType": "SHA256",
+                                      "value": "1" * 64}],
+                "details": [{"nameValuePair": [
+                    {"name": "media_type", "value": "image/png"},
+                    {"name": "perceptual_hash",
+                     "value": "a3f1c80d76b24e19"},
+                ]}],
+            },
+            {
+                "reportId": "MM1", "fileId": "audio-1",
+                "originalFileName": "uno.ogg",
+                "originalFileHash": [{"hashType": "SHA256",
+                                      "value": "2" * 64}],
+                "details": [{"nameValuePair": [
+                    {"name": "synthetic_audio_fingerprint",
+                     "value": "audfp-prueba-1"},
+                ]}],
+            },
+            {
+                "reportId": "MM2", "fileId": "img-2",
+                "originalFileName": "dos.jpg",
+                "originalFileHash": [{"hashType": "SHA256",
+                                      "value": "3" * 64}],
+                "details": [{"nameValuePair": [
+                    {"name": "media_type", "value": "image/jpeg"},
+                    {"name": "perceptual_hash",
+                     "value": "a3f1c80d76b24e1d"},
+                ]}],
+            },
+            {
+                "reportId": "MM2", "fileId": "audio-2",
+                "originalFileName": "dos.ogg",
+                "originalFileHash": [{"hashType": "SHA256",
+                                      "value": "4" * 64}],
+                "details": [{"nameValuePair": [
+                    {"name": "synthetic_audio_fingerprint",
+                     "value": "audfp-prueba-1"},
+                ]}],
+            },
+        ]}
+        with open(ruta_mm, "w", encoding="utf-8") as fh:
+            json.dump(manifiesto, fh)
+        carga_mm = multimedia.ingerir(g_mm, [ruta_mm])
+        analisis_mm = multimedia.analizar(g_mm, carga_mm)
+        check("la distancia Hamming del lote es exactamente un bit",
+              multimedia.distancia_hamming(
+                  "a3f1c80d76b24e19", "a3f1c80d76b24e1d") == 1)
+        check("se conservan los cuatro adjuntos declarados",
+              len(carga_mm["archivos"]) == 4)
+        check("el pHash cercano produce una comparacion, no igualdad",
+              len(analisis_mm["comparaciones_phash"]) == 1
+              and analisis_mm["comparaciones_phash"][0]["distancia_hamming"] == 1
+              and carga_mm["archivos"][0]["sha256"]
+                  != carga_mm["archivos"][2]["sha256"])
+        check("la explicacion aclara que no se analizaron los binarios",
+              all(d.get("binarios_analizados") is False
+                  for _, _, _, d in g_mm.aristas(
+                      relacion="SIMILITUD_PERCEPTUAL")))
+        check("la huella de audio coincidente produce una relacion derivada",
+              len(analisis_mm["coincidencias_audio"]) == 1)
+        v_mm = resolucion.vincular_reportes(
+            g_mm, disparos_adicionales=analisis_mm["disparos"])
+        reglas_mm = set(v_mm["vinculos"][0]["reglas"])
+        check("pHash y audio llegan como reglas distintas al vinculo",
+              {"R11_PHASH_SIMILAR", "R12_HUELLA_AUDIO"} <= reglas_mm,
+              str(sorted(reglas_mm)))
+
+        # ------------------------------------------------------------------
+        print(chr(10)+"== Contexto de lugar: hipotesis, nunca identidad ==")
+        g_lugar = nucleo.Grafo(ts_corrida="2026-01-01T00:00:00+00:00")
+        textos_lugar = {}
+        for rid in ("L1", "L2", "L3"):
+            sid = "ncmec:" + rid
+            g_lugar.registrar_fuente(sid, tipo="test",
+                                     extra=dict(report_id=rid))
+            g_lugar.nodo("REPORTE", rid)
+        frases = {
+            "L1": ("[2026-01-01 10:00 UTC] Reported User (Profile A): "
+                   "Cerca de la estacion, por el galpon del mural azul."),
+            "L2": ("[2026-01-02 10:00 UTC] Reported User (Profile B): "
+                   "Deposito con mural celeste, entrada lateral."),
+            # La misma frase dicha solo por la contraparte no puede atribuirse
+            # a la cuenta reportada ni alimentar el perfil de ese reporte.
+            "L3": ("[2026-01-03 10:00 UTC] Other User (Profile C): "
+                   "Cerca de la estacion, por el galpon del mural azul."),
+        }
+        for rid, frase in frases.items():
+            h = nucleo.hash_texto(frase)
+            textos_lugar[h] = dict(
+                locator="chat.notes[0].value", source_evidence_id="ncmec:" + rid,
+                tipo="transcripcion_chat", texto=frase)
+        a_lugar = contexto_lugar.analizar(g_lugar, textos_lugar)
+        perfiles_lugar = {x["reporte"] for x in a_lugar["perfiles"]}
+        check("solo se analiza lo dicho por la cuenta reportada",
+              perfiles_lugar == {"L1", "L2"}, str(sorted(perfiles_lugar)))
+        check("las dos descripciones compatibles generan una hipotesis",
+              len(a_lugar["similitudes"]) == 1)
+        check("la hipotesis de lugar prohibe la fusion automatica",
+              a_lugar["similitudes"][0]["fusion_automatica"] is False)
+        serializado_lugar = json.dumps(g_lugar.a_dict(), ensure_ascii=False)
+        check("el texto del lugar no se copia al grafo",
+              "galpon del mural azul" not in serializado_lugar.lower())
+        v_lugar = resolucion.vincular_reportes(
+            g_lugar, disparos_adicionales=a_lugar["disparos"])
+        check("una semejanza de lugar sola no vincula reportes",
+              not v_lugar["vinculos"] and len(v_lugar["descartados"]) == 1)
+        soporte = a_lugar["disparos"][0]["arista_soporte"]
+        for u, v, k, d in g_lugar.aristas(vigentes=False):
+            if d["arista_id"] == soporte:
+                d["validation_status"] = "rechazada"
+                d["vigente"] = False
+        check("una similitud rechazada deja de alimentar el algoritmo",
+              not construir._disparos_vigentes(g_lugar,
+                                                a_lugar["disparos"]))
+
+        # ------------------------------------------------------------------
+        print(chr(10)+"== Candidatos estructurales con significado investigativo ==")
+        g_cand = nucleo.Grafo(ts_corrida="2026-01-01T00:00:00+00:00")
+        org = g_cand.nodo("ORGANIZACION", "PlataformaPrueba")
+        reps = []
+        for rid in ("TC1", "TC2"):
+            sid = "ncmec:" + rid
+            g_cand.registrar_fuente(sid, tipo="test")
+            rep = g_cand.nodo("REPORTE", rid)
+            reps.append(rep)
+            g_cand.arista(rep, org, "EMITIDO_POR", sid, "reportingEsp",
+                           "La plataforma emitio el reporte.", "test", "1.0")
+        check("compartir solamente plataforma no genera candidato",
+              not analisis.candidatos_de_enlace(g_cand))
+
+        alias = g_cand.nodo("ALIAS", "puenteazul47")
+        for i, rid in enumerate(("TC1", "TC2")):
+            cuenta = g_cand.nodo("CUENTA", "Servicio/C%d" % (i + 1))
+            g_cand.arista(cuenta, alias, "ALIAS_DE", "ncmec:" + rid,
+                           "displayNames[0]", "La cuenta usa el alias compartido.",
+                           "test", "1.0")
+        candidatos = analisis.candidatos_de_enlace(g_cand)
+        check("un identificador investigativo compartido si genera candidato",
+              len(candidatos) == 1
+              and candidatos[0]["vecinos_comunes"][0]["tipo"] == "ALIAS")
+        check("el candidato conserva el locator de ambos reportes",
+              bool(candidatos[0]["vecinos_comunes"][0]["soporte_a"])
+              and bool(candidatos[0]["vecinos_comunes"][0]["soporte_b"]))
+        metricas = analisis.centralidades(g)
+        filas_metricas = (metricas.get("grado", [])
+                           + metricas.get("intermediacion", [])
+                           + metricas.get("pagerank", []))
+        check("las centralidades se calculan sobre reportes, no plataformas",
+              metricas.get("proyeccion") == "reporte-reporte"
+              and filas_metricas
+              and all(x.get("tipo") == "REPORTE" for x in filas_metricas))
+        check("cada comunidad declara el algoritmo que realmente se ejecuto",
+              all(c.get("algoritmo") in (
+                  "louvain", "greedy_modularity_fallback")
+                  for c in res["comunidades"]))
+
+        # ------------------------------------------------------------------
+        print(chr(10)+"== Identificadores masivos sin corte arbitrario ==")
+        def _grafo_cuenta_compartida(cantidad):
+            gg = nucleo.Grafo(ts_corrida="2026-01-01T00:00:00+00:00")
+            cuenta = gg.nodo("CUENTA", "Servicio/cuenta-compartida")
+            for i in range(cantidad):
+                rid = "TH%03d" % i
+                sid = "ncmec:" + rid
+                gg.registrar_fuente(sid, tipo="test")
+                gg.nodo("REPORTE", rid)
+                mencion = gg.nodo("PERSONA_MENCION", rid + "/p", reporte=rid)
+                gg.arista(mencion, cuenta, "USA_CUENTA", sid,
+                           "reportedPersons[0].espUserId",
+                           "La fuente declara la cuenta.", "test", "1.0")
+            return gg
+
+        g_101 = _grafo_cuenta_compartida(101)
+        v_101 = resolucion.vincular_reportes(g_101)
+        check("una cuenta en 101 reportes ya no desaparece por el numero 100",
+              v_101["pares_evaluados"] == 5050
+              and len(v_101["vinculos"]) == 5050,
+              "%d pares / %d vinculos" %
+              (v_101["pares_evaluados"], len(v_101["vinculos"])))
+
+        g_150 = _grafo_cuenta_compartida(150)
+        v_150 = resolucion.vincular_reportes(g_150)
+        grupo = v_150["hubs"][0] if v_150["hubs"] else {}
+        check("una expansion excesiva se conserva como grupo compacto completo",
+              grupo.get("politica") == "grupo_compacto"
+              and grupo.get("oculto") is False
+              and len(grupo.get("ids_reportes") or []) == 150
+              and grupo.get("pares_posibles") == 11175,
+              str(grupo))
 
         print("\n== El informe es del caso, no del archivo ==")
         d_total = mod_dossier.construir(g, res)
@@ -557,8 +896,18 @@ def main():
                   if m != "_default"))
         check("advierte que los pesos no estan calibrados",
               "no están calibrados" in texto_doc)
+        check("aclara que el puntaje no es una probabilidad",
+              "No es una probabilidad" in texto_doc)
         check("advierte que las ventanas de IP son estimadas",
               "estimados y no están verificados" in texto_doc)
+
+        modelo = os.path.join(tmp, "MODELO.md")
+        __import__("docs_modelo").generar(modelo, g.resumen())
+        with open(modelo, "r", encoding="utf-8") as fh:
+            texto_modelo = fh.read()
+        check("el modelo generado enumera todos los origenes y relaciones",
+              all("`%s`" % x in texto_modelo
+                  for x in list(ont.ORIGENES) + list(ont.RELACIONES)))
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

@@ -13,7 +13,7 @@ Complementa a los otros tres, sin repetirlos:
 - `grafo/ESTADO.md` — qué está implementado, simplificado o ausente.
 - `grafo/MODELO_DATOS.md` — la ontología: tipos de nodo y vocabulario.
 
-Versión de ontología documentada: **0.3.0**.
+Versión de ontología documentada: **0.4.0**.
 
 ---
 
@@ -23,11 +23,11 @@ Todo corre local, sin servicios de red y sin llamadas a terceros. Es un requisit
 
 | Componente | Versión verificada | Para qué |
 |---|---|---|
-| Python | 3.11.1 | todo el procesamiento; mínimo requerido 3.8 |
-| networkx | 3.5 | estructura del grafo y algoritmos clásicos |
+| Python | 3.12.14 | todo el procesamiento; mínimo requerido 3.8 |
+| networkx | 3.6.1 | estructura del grafo y algoritmos clásicos |
 | Biblioteca estándar | — | servidor HTTP, hashes, JSON, fechas, expresiones regulares |
 
-Corrida de verificación: `3.11.1` sobre `Windows-10-10.0.26200-SP0`.
+Corrida de verificación: `3.12.14` sobre `Linux-6.18.44-x86_64-with-glibc2.39`.
 
 **Una sola dependencia externa, y es deliberado.** El servidor, el visor, los informes, la seudonimización y los libros de decisiones usan únicamente la biblioteca estándar. Agregar infraestructura pesada antes de justificarla con requisitos medidos está expresamente desaconsejado en el contexto del proyecto.
 
@@ -37,12 +37,14 @@ Cada módulo que produce relaciones declara un método y una versión, y ambos q
 
 | Módulo | Método que graba | Versión | Responsabilidad |
 |---|---|---|---|
-| `src/resolucion.py` | `resolucion_determinista` | 1.2 | vinculación entre reportes, identidades, contra-evidencia |
-| `src/analisis.py` | `analisis_clasico` | 1.1 | legajos, comunidades, centralidades, baseline de enlaces |
+| `src/resolucion.py` | `resolucion_determinista` | 1.3 | vinculación entre reportes, identidades, contra-evidencia |
+| `src/analisis.py` | `analisis_clasico` | 1.2 | legajos, comunidades, centralidades, baseline de enlaces |
+| `src/multimedia.py` | `analisis_multimedia` | 1.0 | manifiestos, pHash por Hamming y huellas de audio |
+| `src/contexto_lugar.py` | `contexto_lugar_controlado` | 1.0 | categorías controladas y similitud contextual de lugares |
 | `src/alertas.py` | `alertas_reapertura` | 2.0 | alertas de reapertura tipadas por motivo de archivo |
 | `src/normalizacion.py` | — | 1.0 | teléfonos, correos, IP, alias, marcas temporales |
 | `src/validacion.py` | `vinculacion_manual` | 1.0 | libros de decisiones humanas y vinculación manual |
-| `src/ontologia.py` | — | 0.3.0 | tipos, vocabulario, reglas, pesos y umbrales |
+| `src/ontologia.py` | — | 0.4.0 | tipos, vocabulario, reglas, pesos y umbrales |
 
 Los módulos sin versión propia no crean aristas: transforman valores (`normalizacion`) o declaran vocabulario (`ontologia`), y su versión viaja igual en cada arista como `ontologia_version`.
 
@@ -72,7 +74,7 @@ Una arista rechazada **no se borra**: se marca `vigente = false` y queda con su 
 
 ## 4. Reglas de vinculación y sus pesos
 
-Estas son las nueve reglas que pueden vincular dos reportes. Todas son deterministas: mismos datos, mismo resultado, siempre.
+Estas son las 13 reglas que pueden aportar a la vinculación de dos reportes. Su ejecución es reproducible: mismos datos y versiones, mismo resultado.
 
 Cada regla declara cuatro cosas.
 
@@ -85,14 +87,17 @@ Cada regla declara cuatro cosas.
 |---|---|---|---|---|---|
 | `R01_CUENTA` | `CUENTA` | 0,98 | sí | no | 1.0 |
 | `R02_DISPOSITIVO` | `DISPOSITIVO` | 0,92 | sí | sí | 1.0 |
-| `R03_TELEFONO` | `TELEFONO` | 0,90 | sí | sí | 1.0 |
-| `R04_EMAIL` | `EMAIL` | 0,90 | sí | sí | 1.0 |
+| `R03_TELEFONO` | `TELEFONO` | 0,90 | sí | sí | 1.1 |
+| `R04_EMAIL` | `EMAIL` | 0,90 | sí | sí | 1.1 |
 | `R05_EVIDENCIA` | `EVIDENCIA` | 0,88 | sí | sí | 1.0 |
 | `R06_IP_VENTANA` | `IP` | 0,72 | sí | sí | 1.0 |
 | `R07_IP_SUELTA` | `IP` | 0,28 | **no, solo refuerza** | sí | 1.0 |
-| `R08_ALIAS` | `ALIAS` | 0,22 | **no, solo refuerza** | sí | 1.0 |
+| `R08_ALIAS` | `ALIAS` | 0,22 | **no, solo refuerza** | sí | 1.1 |
 | `R09_UBICACION` | `UBICACION` | 0,08 | **no, solo refuerza** | sí | 1.0 |
-| `R10_ALIAS_PAGO` | `ALIAS_PAGO` | 0,62 | sí | sí | 1.0 |
+| `R10_ALIAS_PAGO` | `ALIAS_PAGO` | 0,62 | sí | sí | 1.1 |
+| `R11_PHASH_SIMILAR` | `HASH_PERCEPTUAL` | 0,82 | sí | no | 1.0 |
+| `R12_HUELLA_AUDIO` | `HUELLA_AUDIO` | 0,86 | sí | sí | 1.0 |
+| `R13_CONTEXTO_LUGAR` | `LUGAR_MENCION` | 0,12 | **no, solo refuerza** | no | 1.0 |
 
 ### Qué detecta cada una
 
@@ -106,6 +111,15 @@ Cada regla declara cuatro cosas.
 - **`R08_ALIAS`** — Mismo nombre visible: refuerza, nunca sostiene solo.
 - **`R09_UBICACION`** — Misma ciudad estimada: contexto, nunca sostiene solo.
 - **`R10_ALIAS_PAGO`** — Misma via de cobro: mismo alias de pago normalizado.
+- **`R11_PHASH_SIMILAR`** — Hashes perceptuales de imagen a distancia Hamming menor o igual al umbral; indica similitud visual, no archivo identico.
+- **`R12_HUELLA_AUDIO`** — Misma huella algoritmica de audio declarada.
+- **`R13_CONTEXTO_LUGAR`** — Descripciones de lugar comparten al menos dos dimensiones de un vocabulario controlado; solo corrobora.
+
+### Multimedia y contexto de lugar
+
+- **pHash:** la primera versión acepta huellas hexadecimales de 64 bits declaradas por el manifiesto. Genera candidatos con 9 bloques exactos y luego calcula la distancia de Hamming real. Solo conserva pares a distancia ≤ 8. El bloqueo evita comparar cada imagen contra todas las demás; la explicación deja claro que no se abrieron los binarios.
+- **Huella de audio:** exige igualdad exacta del valor algorítmico declarado. No lo presenta como SHA-256 ni como prueba de autoría.
+- **Lugar:** usa el vocabulario controlado versión `1.0`, publicado en `src/contexto_lugar.py`. Exige al menos dos dimensiones comunes, una de ellas de anclaje, y un solapamiento ponderado ≥ 0,45. Solo toma las líneas atribuibles a `Reported User`, no copia la frase al grafo, nunca fusiona lugares y la regla R13 solo corrobora.
 
 ### Por qué esos pesos y no otros
 
@@ -113,19 +127,19 @@ El orden no es arbitrario: sigue **cuánto individualiza cada dato**.
 
 La cuenta de plataforma encabeza con **0,98** porque el par `ESP + espUserId` identifica a un titular concreto dentro de una plataforma. El dispositivo la sigue con **0,92**: individualiza casi tan bien, pero un aparato puede prestarse o venderse. Teléfono y correo comparten **0,90**. El hash de archivo baja a **0,88** porque prueba que dos reportes traen el mismo contenido, no que provengan de la misma persona: un material que circula lo comparten muchos.
 
-Debajo del umbral quedan las **3 reglas que solo refuerzan** (`R07_IP_SUELTA`, `R08_ALIAS`, `R09_UBICACION`). Su peso —entre 0,08 y 0,28— está deliberadamente por debajo del umbral de propuesta: aunque dispararan todas juntas, no alcanzan para crear un vínculo. Es la traducción de la regla del relevamiento: *una relación debe apoyarse en datos objetivos coincidentes, no en semejanza contextual*.
+Debajo del umbral quedan las **4 reglas que solo refuerzan** (`R07_IP_SUELTA`, `R08_ALIAS`, `R09_UBICACION`, `R13_CONTEXTO_LUGAR`). Su peso —entre 0,08 y 0,28— está deliberadamente por debajo del umbral de propuesta: aunque dispararan todas juntas, no alcanzan para crear un vínculo. Es la traducción de la regla del relevamiento: *una relación debe apoyarse en datos objetivos coincidentes, no en semejanza contextual*.
 
 Ninguna regla que sostiene baja de **0,62** ni llega a **0,99**.
 
 ## 5. Cómo se combinan los pesos
 
-Cuando dos reportes comparten varios datos, cada regla que dispara aporta su peso y se combinan con **noisy-OR**:
+Cuando dos reportes comparten varios datos, cada regla que dispara aporta su peso y se combinan con **noisy-OR** para producir un puntaje interno de priorización:
 
 ```
-confianza = 1 - Π (1 - peso_efectivo_i)
+puntaje = 1 - Π (1 - peso_efectivo_i)
 ```
 
-La lectura es directa: cada coincidencia es una razón independiente para creer que los reportes están relacionados, y la confianza es la probabilidad de que **al menos una** sea válida. Nunca baja al sumar evidencia y nunca supera 1.
+El valor sirve para ordenar y aplicar umbrales: nunca baja al sumar evidencia y nunca supera 1. **No es una probabilidad.** Los pesos todavía no están calibrados con casos revisados por especialistas y las señales no pueden suponerse estadísticamente independientes. El JSON conserva el nombre histórico `confidence` por compatibilidad, pero debe leerse como puntaje.
 
 **La condición que lo gobierna todo:** el producto solo se acumula si *al menos una* regla que sostiene disparó. Si únicamente dispararon reglas corroborantes, el resultado es `0.0` y el par se descarta, por muchas que sean.
 
@@ -135,33 +149,33 @@ La lectura es directa: cada coincidencia es una razón independiente para creer 
 |---|---|---|
 | `UMBRAL_PROPONER` | 0,55 | por debajo, el vínculo no se propone y queda como descartado con su motivo |
 | `UMBRAL_CLUSTER` | 0,70 | peso mínimo para que un vínculo agrupe dos reportes en un mismo legajo |
-| `UMBRAL_PROBABLE` | 0,70 | desde acá la confianza se informa como «media» |
-| `UMBRAL_ALTA` | 0,90 | desde acá se informa como «alta» |
+| `UMBRAL_PROBABLE` | 0,70 | desde acá el puntaje se informa como «medio» |
+| `UMBRAL_ALTA` | 0,90 | desde acá el puntaje se informa como «alto» |
 | `CONFIANZA_MAXIMA` | 0,99 | techo absoluto: ninguna arista puede llegar a 1 |
 
-El techo de 0,99 no es cosmético. Un 1,00 en pantalla se lee como certeza, y el sistema no produce certezas: produce propuestas que una persona tiene que revisar.
+El techo de 0,99 no es cosmético. Un 1,00 en pantalla se leería como certeza, y el sistema no produce certezas: produce propuestas que una persona tiene que revisar.
 
 ### Ejemplo trabajado, calculado sobre esta corrida
 
 Reportes **255553607** y **900000101**. Dispararon 5 reglas:
 
-| Regla | Valor coincidente | Peso base | × rareza | = peso efectivo | Rol |
-|---|---|---|---|---|---|
-| `R01_CUENTA` | grindr/888658825 | 0,98 | 1,0000 | 0,9800 | **sostiene** |
-| `R02_DISPOSITIVO` | b534375433e0e502 | 0,92 | 1,0000 | 0,9200 | **sostiene** |
-| `R07_IP_SUELTA` | 181.46.66.242 | 0,28 | 1,0000 | 0,2800 | refuerza |
-| `R08_ALIAS` | lechero | 0,22 | 1,0000 | 0,2200 | refuerza |
-| `R09_UBICACION` | Monte Grande, B, AR | 0,08 | 1,0000 | 0,0800 | refuerza |
+| Regla | Valor coincidente | Peso base | × rareza | × texto | × similitud | = peso efectivo | Rol |
+|---|---|---|---|---|---|---|---|
+| `R01_CUENTA` | grindr/888658825 | 0,98 | 1,0000 | 1,0000 | 1,0000 | 0,9800 | **sostiene** |
+| `R02_DISPOSITIVO` | b534375433e0e502 | 0,92 | 1,0000 | 1,0000 | 1,0000 | 0,9200 | **sostiene** |
+| `R07_IP_SUELTA` | 181.46.66.242 | 0,28 | 1,0000 | 1,0000 | 1,0000 | 0,2800 | refuerza |
+| `R08_ALIAS` | lechero | 0,22 | 1,0000 | 1,0000 | 1,0000 | 0,2200 | refuerza |
+| `R09_UBICACION` | Monte Grande, B, AR | 0,08 | 1,0000 | 1,0000 | 1,0000 | 0,0800 | refuerza |
 
 Como al menos una regla sostiene, se acumula:
 
 ```
-confianza = 1 - (1 - 0,9800) × (1 - 0,9200) × (1 - 0,2800) × (1 - 0,2200) × (1 - 0,0800)
-          = 1 - 0,0008
-          = 0,9900
+puntaje = 1 - (1 - 0,9800) × (1 - 0,9200) × (1 - 0,2800) × (1 - 0,2200) × (1 - 0,0800)
+        = 1 - 0,0008
+        = 0,9900
 ```
 
-Confianza registrada en la arista: **0,9900** — franja «alta», por el techo de 0,99.
+Puntaje registrado en el campo técnico `confidence`: **0,9900** — franja «alta», por el techo de 0,99. No es una probabilidad.
 
 ## 6. Ponderación por rareza (discriminancia)
 
@@ -188,21 +202,37 @@ Curva efectiva, calculada al generar este documento:
 
 ### Cuándo un identificador deja de sostener
 
-Además del decaimiento, hay un corte duro: pasado cierto punto el identificador se degrada a *solo refuerza*, sin importar qué regla sea.
+Además del decaimiento, hay un corte probatorio: pasado cierto punto el identificador se degrada a *solo refuerza*. El límite computacional se expresa aparte como cantidad máxima de pares por tipo.
 
 | Constante | Valor | Efecto |
 |---|---|---|
 | `DF_PLENA_DISCRIMINANCIA` | 10 | hasta acá el identificador conserva todo su peso |
 | `DF_HUB_ABSOLUTO` | 50 | desde acá deja de sostener por sí solo, con cualquier corpus |
-| `DF_HUB_SIN_PARES` | 100 | desde acá no genera pares para comparar y se informa aparte como *hub* |
 | `CORPUS_MINIMO_PARA_FRACCION` | 200 | recién con este volumen se aplica también el criterio de fracción |
 | `FRACCION_BAJA_DISCRIMINANCIA` | 0,20 | con corpus grande, aparecer en más de esta fracción degrada |
 
-Hay un segundo descuento, independiente del anterior. Cuando el identificador que comparten los dos reportes no está declarado en ningún campo sino escrito en un texto libre —la conversación, la biografía del perfil—, el peso se multiplica por `FACTOR_TEXTO_LIBRE` = 0,85. No es que la extracción falle: es que cambia lo que el dato significa. Que el prestador informe un teléfono es un dato de la cuenta; que alguien lo escriba en un chat es una afirmación de esa persona, que puede estar equivocada, ser de un tercero o ser mentira.
+Límites de expansión antes de conservar el identificador como grupo compacto (la señal no se oculta):
+
+| Tipo | Máximo de pares |
+|---|---|
+| `ALIAS` | 1500 |
+| `ALIAS_PAGO` | 4000 |
+| `CUENTA` | 10000 |
+| `DISPOSITIVO` | 5000 |
+| `EMAIL` | 5000 |
+| `EVIDENCIA` | 7500 |
+| `HASH_PERCEPTUAL` | 5000 |
+| `HUELLA_AUDIO` | 5000 |
+| `IP` | 2500 |
+| `TELEFONO` | 5000 |
+| `UBICACION` | 1000 |
+| `_default` | 1000 |
+
+Hay un segundo descuento, independiente del anterior. Por cada lado de la coincidencia que dependa exclusivamente de texto libre —conversación o biografía—, el peso se multiplica por `FACTOR_TEXTO_LIBRE` = 0,85. Campo↔texto se descuenta una vez y texto↔texto dos veces. No es que la extracción falle: cambia lo que el dato significa. Que el prestador informe un teléfono es un dato de la cuenta; que alguien lo escriba en un chat es una mención que puede corresponder a un tercero o ser falsa.
 
 > **La rareza es una propiedad del identificador, no del tamaño de la base.** El primer diseño medía la fracción del corpus, y con diez reportes un dispositivo compartido por cuatro daba 40 % y quedaba degradado, perdiendo un vínculo legítimo. Ese mismo dispositivo en cien mil reportes es altamente discriminante. Por eso el umbral principal es **absoluto** sobre `df`, y la fracción solo entra a partir de 200 reportes. Hay invariantes que verifican que `discriminancia(4)` da lo mismo con 10 y con 100.000 reportes.
 
-La regla `R01_CUENTA` es la única exceptuada del corte por *hub*: si un `espUserId` se repite en decenas de reportes, el problema es de los datos y conviene verlo, no ocultarlo.
+La regla `R01_CUENTA` es la única exceptuada del corte probatorio por baja discriminancia. Si la cantidad de pares supera su límite computacional, la cuenta se conserva como grupo compacto con la lista completa de reportes: se evita la explosión sin ocultarla.
 
 ## 7. Política de dirección IP
 
@@ -312,7 +342,9 @@ Los vínculos que no califican se registran como **silenciados**, con su motivo.
 |---|---|
 | Se consideran archivados | `archivado`, `archivado_latente`, `pendiente` |
 | Se consideran activos (pueden disparar) | `derivado`, `en_analisis`, `en_investigacion`, `judicializado` |
-| Tipos de dato que individualizan | `CUENTA`, `DISPOSITIVO`, `EMAIL`, `TELEFONO` |
+| Relaciones de campo que permiten atribuir un identificador | `ASOCIADO_A_EMAIL`, `ASOCIADO_A_TELEFONO`, `USA_CUENTA`, `USA_DISPOSITIVO` |
+
+Las relaciones `MENCIONA_*` quedan expresamente fuera: una conversación puede nombrar un teléfono o correo de un tercero y esa mención no resuelve por sí sola la falta de atribución.
 
 > Toda esta lógica depende de que el motivo de archivo se registre de forma **estructurada**. Hoy se simula con `reportes_sinteticos/estado_institucional.json`. Si en SIPAR es texto libre, ese es el primer cambio a pedir.
 
@@ -325,14 +357,14 @@ Corren sobre la **proyección reporte–reporte**: un grafo no dirigido donde ca
 | Legajos | componentes conexas | — | qué reportes conviene mirar juntos |
 | Comunidades | Louvain | `weight="peso"`, `seed=7` | subgrupos dentro de un legajo grande; con pocos reportes coincide con las componentes |
 | Centralidad de grado | `degree_centrality` | top 10 | con cuántos se conecta cada reporte |
-| Intermediación | `betweenness_centrality` | top 10, solo si el grafo tiene ≤ 3.000 nodos | qué reporte actúa de puente entre grupos |
-| PageRank | `pagerank` | top 10, solo si ≤ 20.000 nodos | importancia estructural |
+| Intermediación | `betweenness_centrality` | top 10, `weight=1/peso`, solo si el grafo tiene ≤ 3.000 reportes | qué reporte actúa de puente entre grupos |
+| PageRank | `pagerank` | top 10, `weight=peso`, solo si ≤ 20.000 reportes | importancia estructural |
 | Puentes | `nx.bridges` | top 10 | aristas cuya caída parte el legajo en dos |
-| Enlaces probables | Adamic–Adar | top 15, **no materializa aristas** | baseline determinista contra el cual comparar una futura GNN |
+| Enlaces probables | Adamic–Adar | proyección reporte–identificador, top 15, **no materializa aristas** | baseline determinista contra el cual comparar una futura GNN |
 
-El `seed=7` de Louvain no es decorativo: sin él dos corridas sobre los mismos datos pueden dar comunidades distintas, y un informe que cambia solo porque se volvió a ejecutar no es reproducible.
+El `seed=7` de Louvain no es decorativo: sin él dos corridas sobre los mismos datos pueden dar comunidades distintas, y un informe que cambia solo porque se volvió a ejecutar no es reproducible. Si Louvain falla y se usa `greedy_modularity`, la salida declara el algoritmo efectivo y el error que activó el fallback.
 
-Adamic–Adar **calcula y ordena, pero no escribe nada en el grafo**. Es un ranking de pares que merecerían revisión, no un conjunto de relaciones. Materializarlo convertiría una sugerencia estadística en algo que se ve igual que un hecho.
+Adamic–Adar **calcula y ordena, pero no escribe nada en el grafo**. Es un ranking de pares que merecerían revisión, no un conjunto de relaciones. Materializarlo convertiría una sugerencia estadística en algo que se ve igual que un hecho. Los pares nacen de vecinos investigativos compartidos; no se combinan todos los reportes y se excluyen plataforma y otros nodos administrativos. Cada vecino conserva el locator de ambos lados.
 
 > **Una centralidad alta no significa culpabilidad, liderazgo ni peligrosidad.** Describe una posición estructural en el grafo que se pudo construir con los datos disponibles. Un reporte puede ser central solo porque su plataforma informa más campos que las demás. La advertencia viaja en la salida del propio módulo.
 
@@ -353,7 +385,7 @@ Esto funciona porque **el identificador de arista es determinista**: se calcula 
 
 ### Seudonimización
 
-Antes de enviar el dossier a cualquier modelo de lenguaje, los identificadores de tipo `IP`, `CUENTA`, `TELEFONO`, `EMAIL`, `DISPOSITIVO`, `ALIAS`, `EVIDENCIA` se reemplazan por etiquetas estables (`IP-1`, `CUENTA-2`). El modelo redacta sobre las etiquetas y los valores reales se restituyen después, localmente, sobre el texto devuelto. Hay invariantes que verifican que ningún identificador real sobrevive en el dossier seudonimizado.
+Antes de enviar el dossier a cualquier modelo de lenguaje, los identificadores de tipo `IP`, `CUENTA`, `TELEFONO`, `EMAIL`, `DISPOSITIVO`, `ALIAS`, `ALIAS_PAGO`, `EVIDENCIA`, `HASH_PERCEPTUAL`, `HUELLA_AUDIO` se reemplazan por etiquetas estables (`IP-1`, `CUENTA-2`). El modelo redacta sobre las etiquetas y los valores reales se restituyen después, localmente, sobre el texto devuelto. Hay invariantes que verifican que ningún identificador real sobrevive en el dossier seudonimizado.
 
 ## 14. Formatos de salida
 
@@ -376,7 +408,7 @@ Todo lo de `salida/` se regenera en cada corrida y no se versiona. Lo único que
 
 Lo que sigue no son defectos ocultos: son las condiciones bajo las cuales los números de arriba son válidos.
 
-1. **Los pesos no están calibrados contra un conjunto validado.** Salen del criterio del relevamiento —cuánto individualiza cada dato— y no de medir aciertos y errores sobre casos reales ya trabajados. Ese conjunto todavía no existe, y sin él no se puede informar precisión ni recall.
+1. **Los pesos no están calibrados contra un conjunto validado.** Salen del criterio del relevamiento —cuánto individualiza cada dato— y no de medir aciertos y errores sobre casos reales ya trabajados. Por eso `confidence` es un puntaje, no una probabilidad. Ese conjunto todavía no existe, y sin él no se puede informar precisión ni recall.
 2. **Las ventanas de IP por prestador son estimadas.** Hay que confirmarlas con cada uno.
 3. **El corpus de prueba tiene diez reportes.** Los umbrales que dependen del volumen —`CORPUS_MINIMO_PARA_FRACCION` = 200, `DF_HUB_ABSOLUTO` = 50— no se ejercitan con datos reales, solo con pruebas unitarias.
 4. **Todo corre en memoria con `networkx`.** No escala más allá de decenas de miles de nodos. Evaluar una base de grafos distribuida recién tiene sentido con volúmenes reales medidos.

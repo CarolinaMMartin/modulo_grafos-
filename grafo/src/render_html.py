@@ -28,9 +28,9 @@ legajo (agrupada por conjunto de reportes vinculados).
 
 import json
 
-import networkx as nx
 
 import ontologia as ont
+import resolucion
 
 ATRIBUTOS_LEGIBLES = {
     "valor": u"Valor", "clasificacion": u"Clasificación NCMEC",
@@ -67,6 +67,9 @@ MOTIVO_CORTO = {
     "ALIAS": u"mismo nombre visible",
     "ALIAS_PAGO": u"misma vía de cobro",
     "UBICACION": u"misma zona",
+    "HASH_PERCEPTUAL": u"imágenes similares",
+    "HUELLA_AUDIO": u"misma huella de audio",
+    "LUGAR_MENCION": u"descripciones de lugar similares",
 }
 
 # Lo que se muestra al abrir un reporte: los datos por los que se vincula.
@@ -116,26 +119,6 @@ NIVEL_JERARQUICO = {
 }
 
 
-def _layout(g):
-    """Posiciones iniciales. La simulacion del navegador las refina."""
-    H = nx.Graph()
-    H.add_nodes_from(g.G.nodes())
-    for u, v, k, d in g.aristas():
-        H.add_edge(u, v, weight=2.0 if d["origin"] == ont.OBSERVADA else 1.0)
-    if H.number_of_nodes() == 0:
-        return {}
-    pos = nx.spring_layout(H, seed=17, k=1.5 / max(1, H.number_of_nodes() ** 0.4),
-                           iterations=300, weight="weight")
-    xs = [p[0] for p in pos.values()] or [0]
-    ys = [p[1] for p in pos.values()] or [0]
-    minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
-    dx = (maxx - minx) or 1.0
-    dy = (maxy - miny) or 1.0
-    m = 90
-    return {n: ((p[0] - minx) / dx * (ANCHO - 2 * m) + m,
-                (p[1] - miny) / dy * (ALTO - 2 * m) + m)
-            for n, p in pos.items()}
-
 
 PREFERENCIA_CAMINO = {"PERSONA_MENCION": 0, "IDENTIDAD": 0, "CUENTA": 1,
                       "EVENTO": 3, "ORGANIZACION": 4}
@@ -151,7 +134,7 @@ def _camino(g, n_rep, n_destino):
     sid = "ncmec:%s" % g.G.nodes[n_rep]["valor"]
     vecinos = {}
     for u, v, k, d in g.aristas():
-        if d.get("source_evidence_id") != sid:
+        if g.reporte_de_fuente(d.get("source_evidence_id")) != sid:
             continue
         vecinos.setdefault(u, set()).add(v)
         vecinos.setdefault(v, set()).add(u)
@@ -191,8 +174,8 @@ def _reportes_por_nodo(g):
     from collections import defaultdict
     mapa = defaultdict(set)
     for u, v, k, d in g.aristas(vigentes=False):
-        sid = d.get("source_evidence_id") or ""
-        if not sid.startswith("ncmec:"):
+        sid = g.reporte_de_fuente(d.get("source_evidence_id")) or ""
+        if not sid:
             continue
         rid = sid.split(":", 1)[1]
         mapa[u].add(rid)
@@ -280,8 +263,16 @@ def _datos(g, res, dossier=None, texto_informe=None):
         puente = []
         for x in (d.get("detalle_reglas") or []):
             n_dato = x.get("nodo")
-            if not n_dato or n_dato not in g.G:
-                continue
+            fuentes = []
+            for nu, nv, nk, nd in g.aristas(vigentes=False):
+                if n_dato and n_dato in (nu, nv):
+                    sid = g.reporte_de_fuente(nd.get("source_evidence_id"))
+                    if sid in ("ncmec:%s" % g.G.nodes[u].get("valor"),
+                               "ncmec:%s" % g.G.nodes[v].get("valor")):
+                        dato_fuente = dict(reporte=sid.split(":", 1)[1],
+                                           ruta=nd.get("source_locator"), arista=nd["arista_id"])
+                        if dato_fuente not in fuentes:
+                            fuentes.append(dato_fuente)
             puente.append(dict(
                 nodo=n_dato,
                 tipo=ont.ETIQUETA_TIPO.get(x.get("tipo"), x.get("tipo")),
@@ -289,8 +280,10 @@ def _datos(g, res, dossier=None, texto_informe=None):
                 peso=x.get("peso_efectivo"),
                 sostiene=not x.get("corrobora_solamente"),
                 texto=x.get("nota"),
-                camino_a=_camino(g, u, n_dato),
-                camino_b=_camino(g, v, n_dato)))
+                fuentes=fuentes,
+                locators=x.get("source_locators") or [],
+                camino_a=_camino(g, u, n_dato) if n_dato in g.G else [],
+                camino_b=_camino(g, v, n_dato) if n_dato in g.G else []))
         puente.sort(key=lambda z: (not z["sostiene"], -(z["peso"] or 0)))
         if d["relation_type"] == "VINCULADO_POR_OPERADOR":
             # No hay dato compartido que mostrar: la vinculacion es la decision.
@@ -302,6 +295,15 @@ def _datos(g, res, dossier=None, texto_informe=None):
                 if not x.get("corrobora_solamente")) or u"dato compartido"
         aristas.append(dict(
             puente=puente,
+            calculo=(resolucion.calculo_legible(d["detalle_reglas"], d["confidence"])
+                     if d.get("detalle_reglas") else None),
+            resumen=(d.get("explicacion") or "").split("\n\n")[0],
+            duplicado=d.get("indicios_duplicado"),
+            historial=[{k: r.get(k) for k in ("decision", "usuario", "observacion", "ts")}
+                       for r in d.get("historial_validacion", [])],
+            reportes=([g.reporte_de_fuente(d.get("source_evidence_id")).split(":", 1)[1]]
+                      if g.reporte_de_fuente(d.get("source_evidence_id")) else
+                      sorted(set(por_nodo.get(u, [])) | set(por_nodo.get(v, [])))),
             motivo=motivo,
             id=d["arista_id"], a=u, b=v,
             relacion=d["relation_type"],
@@ -379,300 +381,240 @@ PLANTILLA = r"""<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Vinculaciones — Bóveda CIJ</title>
+<script>
+/* Aplicar antes de pintar evita el destello al recuperar el tema elegido. */
+try { document.documentElement.dataset.tema = localStorage.getItem("bcij_tema")==="oscuro" ? "oscuro" : "claro"; }
+catch(e) { document.documentElement.dataset.tema = "claro"; }
+</script>
 <style>
 :root{
-  --fondo:#060a12; --lienzo:#080d17; --panel:#0b1220; --panel2:#0e1728;
-  --borde:#1a2740; --texto:#dbe4f0; --tenue:#7d8ba3; --suave:#9fb0c9;
-  --cyan:#22d3ee; --cyan-tenue:rgba(34,211,238,.10); --cyan-borde:rgba(34,211,238,.32);
-  --verde:#34d399; --ambar:#fbbf24; --alarma:#f87171;
-  /* Dos familias, y cada una tiene su motivo.
-
-     La de lectura es la del sistema. El visor no carga nada de internet, asi
-     que no hay fuente propia que valga: se toma la mejor que haya instalada y
-     se cae con gracia hasta Arial.
-
-     La monoespaciada quedo reservada para lo que de verdad se lee caracter por
-     caracter -un comando, un hash, un locator-. Estaba en casi todo el visor:
-     los rotulos de las lineas, los titulos de las cajas, los subtitulos, los
-     chips. Eso hacia que una pantalla que lee un abogado pareciera una
-     terminal. Los numeros que ya no van en monoespaciada llevan tabular-nums,
-     que es lo unico que se necesitaba de ella: que las cifras alineen. */
-  --sans:"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,
-    -apple-system,Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
-  --mono:"Cascadia Mono","JetBrains Mono",Consolas,"DejaVu Sans Mono",monospace;
-  --cifras:"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,
-    -apple-system,Inter,Roboto,Arial,sans-serif;
+  color-scheme:light;
+  --fuente:"Segoe UI","Public Sans",Arial,system-ui,-apple-system,sans-serif;
+  --mono:var(--fuente);
+  --fondo:#f5f6f7;--lienzo:#f5f6f7;--panel:#fff;--panel2:#f8f9fa;
+  --borde:#dce0e4;--borde-fuerte:#b9c1c9;--texto:#15202b;--tenue:#65717c;--suave:#4f5d68;
+  --cyan:#2b5f8f;--cyan-tenue:#e6eef6;--cyan-borde:#9db6cd;
+  --verde:#1b7146;--verde-bg:#e3f2e9;--ambar:#8a5300;--ambar-bg:#fbf1dc;
+  --alarma:#b42318;--alarma-bg:#fbeae8;--hover:#edf0f2;
+  --inverso:#15202b;--inverso-texto:#fff;--sombra:0 16px 60px #15202b30;
+  --vinculo:#2b5f8f;--duplicado:#92516e;--inferida:#766099;--afirmada:#56616b;
+  --tipo-cuenta:#91633d;--tipo-alias:#967353;--tipo-alias-pago:#8c732b;
+  --tipo-email:#447b98;--tipo-telefono:#337b72;--tipo-ip:#4b8058;
+  --tipo-dispositivo:#83689b;--tipo-evidencia:#697580;--tipo-ubicacion:#967539;
+  --tipo-identidad:#696999;--tipo-organizacion:#647383;--tipo-reporte:#447797;
+}
+:root[data-tema="oscuro"]{
+  color-scheme:dark;
+  --fondo:#0d1217;--lienzo:#0d1217;--panel:#141b22;--panel2:#19222b;
+  --borde:#2a333c;--borde-fuerte:#4b5966;--texto:#e8ecef;--tenue:#96a2ad;--suave:#b1bbc4;
+  --cyan:#8fb8dc;--cyan-tenue:#1d2e3e;--cyan-borde:#4b6b87;
+  --verde:#7ccf9d;--verde-bg:#1c352a;--ambar:#e6b862;--ambar-bg:#372f22;
+  --alarma:#f19a92;--alarma-bg:#382624;--hover:#202a33;
+  --inverso:#e8ecef;--inverso-texto:#0d1217;--sombra:0 16px 60px #0007;
+  --vinculo:#8fb8dc;--duplicado:#d3a0b6;--inferida:#b5a0d0;--afirmada:#bac5cf;
+  --tipo-cuenta:#c59d7b;--tipo-alias:#c8ac92;--tipo-alias-pago:#c9b379;
+  --tipo-email:#8ab8d0;--tipo-telefono:#88beb4;--tipo-ip:#93bb9b;
+  --tipo-dispositivo:#bda6d2;--tipo-evidencia:#aebbc5;--tipo-ubicacion:#c6b082;
+  --tipo-identidad:#aaaad2;--tipo-organizacion:#a1b0bf;--tipo-reporte:#95b8d1;
 }
 *{box-sizing:border-box}
-html,body{height:100%}
+html,body{height:100%;width:100%}
 body{margin:0;background:var(--fondo);color:var(--texto);display:flex;
-  font:13.5px/1.62 var(--sans);overflow:hidden;
-  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-/* Las cifras alinean sin necesidad de una monoespaciada. */
-.sub,.chip,.cuenta,#ruta,#pie,td,.caja .titulo,.caja .marca,.rotulo{
-  font-variant-numeric:tabular-nums}
-::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-thumb{background:#1c2942;border-radius:5px}
+  font:13px/1.5 var(--fuente);overflow:hidden;padding-top:58px;padding-bottom:45px}
+button,input,select,textarea,svg,svg text,code,pre{font-family:var(--fuente)}
+svg text{font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--borde-fuerte);border-radius:3px}
 ::-webkit-scrollbar-track{background:transparent}
-
-#izq{flex:0 0 300px;background:var(--panel);border:1px solid var(--borde);
-  border-radius:14px;margin:10px 0 10px 10px;overflow-y:auto;position:relative;
-  transition:flex-basis .3s cubic-bezier(.4,0,.2,1)}
-#izq.plegado{flex-basis:44px}
+a{color:var(--cyan)}
+#cabecera{position:fixed;inset:0 0 auto 0;height:58px;z-index:10;display:flex;align-items:center;
+  gap:12px;padding:0 20px;border-bottom:1px solid var(--borde);background:var(--panel)}
+#cabecera .emblema{width:28px;height:28px;background:var(--inverso);color:var(--inverso-texto);
+  display:grid;place-items:center;border-radius:4px;font-size:16px;font-weight:600}
+#cabecera strong{font-size:14px;font-weight:600;letter-spacing:-.015em}
+#cabecera .contexto{color:var(--tenue);font-size:12px;border-left:1px solid var(--borde);padding-left:12px}
+#cabecera .acciones{margin-left:auto;display:flex;align-items:center;gap:8px}
+#cabecera label{color:var(--tenue);font-size:12px}
+#tema{max-width:100px;padding:6px 9px}
+#izq{flex:0 0 260px;min-width:0;background:var(--panel);border-right:1px solid var(--borde);
+  overflow-y:auto;position:relative;transition:flex-basis .2s}
+#izq.plegado{flex-basis:48px;overflow:hidden}
 #izq.plegado .contenido{display:none}
-#izq .contenido{padding:42px 18px 26px 18px}
+#izq .contenido{padding:57px 18px 24px}
 #izq .plegar{left:auto;right:10px}
 #izq.plegado .plegar{right:9px}
-#izq label{display:flex;align-items:center;gap:7px;font-size:12px;
-  color:var(--suave);margin:5px 0;cursor:pointer;line-height:1.35}
+#izq label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--suave);margin:8px 0;cursor:pointer;line-height:1.4}
 #izq label:hover{color:var(--texto)}
-#izq input[type=checkbox]{accent-color:#22d3ee;margin:0;flex:0 0 auto}
-#izq input[type=range]{accent-color:#22d3ee}
-.sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto;display:inline-block}
-.rotuloGrupo{font-size:10.5px;color:var(--tenue);margin:14px 0 4px;
-  text-transform:uppercase;letter-spacing:.1em}
-.trazo{display:inline-block;width:26px;height:0;vertical-align:middle;
-  margin-right:8px;border-top-width:2px;flex:0 0 auto}
-#centro{flex:1;min-width:280px;position:relative;margin:10px 0;
-  border:1px solid var(--borde);border-radius:14px;background:
-    radial-gradient(1200px 700px at 30% 15%,rgba(34,211,238,.04),transparent 60%),
-    var(--lienzo);overflow:hidden}
-.asa{flex:0 0 7px;cursor:col-resize;position:relative}
-.asa::after{content:"";position:absolute;top:50%;left:2px;width:3px;height:46px;
-  margin-top:-23px;border-radius:3px;background:#1e2c46;transition:background .2s}
+#izq input[type=checkbox]{accent-color:var(--cyan);margin:0;flex:0 0 auto}
+#izq input[type=range]{accent-color:var(--cyan)}
+.sw{width:9px;height:9px;border-radius:2px;flex:0 0 auto;display:inline-block}
+.rotuloGrupo{font-size:10px;color:var(--tenue);margin:16px 0 7px;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+.trazo{display:inline-block;width:26px;height:0;vertical-align:middle;margin-right:8px;border-top-width:2px;flex:0 0 auto}
+#centro{flex:1;min-width:0;position:relative;background:var(--lienzo);overflow:hidden;display:flex;flex-direction:column}
+.asa{flex:0 0 4px;cursor:col-resize;position:relative;background:var(--panel)}
+.asa::after{content:"";position:absolute;top:50%;left:0;width:3px;height:38px;margin-top:-19px;border-radius:2px;background:var(--borde)}
 .asa:hover::after{background:var(--cyan)}
-#der{flex:0 0 440px;background:var(--panel);border:1px solid var(--borde);
-  border-radius:14px;margin:10px 10px 10px 0;overflow-y:auto;position:relative;
-  transition:flex-basis .3s cubic-bezier(.4,0,.2,1)}
+#der{flex:0 0 360px;min-width:0;background:var(--panel);border-left:1px solid var(--borde);
+  overflow-y:auto;position:relative;transition:flex-basis .2s}
 #der.plegado{flex-basis:44px}
 #der.plegado .contenido{display:none}
-.contenido{padding:16px 18px 26px 44px}
-.plegar{position:absolute;top:10px;left:10px;width:26px;height:26px;padding:0;
-  z-index:3;display:flex;align-items:center;justify-content:center;font-size:13px}
-
-h1{font-size:15px;margin:0 0 2px;font-weight:600}
-h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--cyan);
-  margin:20px 0 8px;font-weight:600;opacity:.85}
-h3{font-size:14.5px;margin:8px 0 4px;font-weight:600;line-height:1.35}
-p{margin:0 0 10px}
-.sub{font-size:11.5px;color:var(--tenue);letter-spacing:.005em}
-
-.tarjeta{background:var(--panel2);border:1px solid var(--borde);border-radius:10px;
-  padding:11px 12px;margin:8px 0}
-.tarjeta.cyan{border-color:var(--cyan-borde);background:linear-gradient(180deg,
-  rgba(34,211,238,.05),rgba(34,211,238,.01))}
-.tarjeta.alarma{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.05)}
-.tarjeta.click{cursor:pointer;transition:border-color .18s,transform .18s}
-.tarjeta.click:hover{border-color:var(--cyan-borde);transform:translateX(2px)}
-
-.chip{display:inline-flex;align-items:center;gap:5px;padding:2.5px 9px;border-radius:999px;
-  font-size:11px;border:1px solid var(--borde);
-  background:#0d1626;color:var(--suave);margin:0 5px 5px 0;white-space:nowrap}
-.chip.cy{border-color:var(--cyan-borde);background:var(--cyan-tenue);color:#67e8f9}
-.chip.ok{border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.08);color:#6ee7b7}
-.chip.am{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:#fcd34d}
-.chip.al{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.08);color:#fca5a5}
+#der .contenido{padding:18px 22px 26px}
+#navDetalle{position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:8px;
+  padding:12px;background:var(--panel);border-bottom:1px solid var(--borde)}
+#navDetalle .plegar{position:static;margin-left:auto;flex:0 0 28px}
+#der.plegado #navDetalle{padding:8px}
+#der.plegado #navDetalle .historia{display:none}
+.plegar{position:absolute;top:12px;left:12px;width:28px;height:28px;padding:0;
+  z-index:3;display:flex;align-items:center;justify-content:center;font-size:16px}
+h1{font-size:16px;margin:0 0 3px;font-weight:600}
+h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--tenue);margin:23px 0 10px;font-weight:600}
+h3{font-size:16px;margin:8px 0 8px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+p{margin:0 0 10px}.sub{font-size:11.5px;color:var(--tenue)}
+.tarjeta{background:transparent;border:0;border-bottom:1px solid var(--borde);padding:12px 0;margin:5px 0}
+.tarjeta.cyan{border-left:2px solid var(--cyan-borde);padding-left:12px}
+.tarjeta.alarma{border-left:2px solid var(--alarma);padding-left:12px;background:var(--alarma-bg)}
+.tarjeta.click{cursor:pointer}.tarjeta.click:hover{background:var(--hover)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:3px;font-size:10.5px;
+  border:1px solid var(--borde);background:var(--panel2);color:var(--suave);margin:0 5px 5px 0;white-space:normal;overflow-wrap:anywhere}
+.chip.cy{border-color:var(--cyan-borde);background:var(--cyan-tenue);color:var(--cyan)}
+.chip.ok,.chip.coincide{border-color:var(--verde);background:var(--verde-bg);color:var(--verde)}
+.chip.am{border-color:var(--ambar);background:var(--ambar-bg);color:var(--ambar)}
+.chip.al{border-color:var(--alarma);background:var(--alarma-bg);color:var(--alarma)}
 .chip .pt{width:6px;height:6px;border-radius:50%;background:currentColor}
-.chip.boton{cursor:pointer;max-width:100%}
-.chip.boton:hover{border-color:var(--cyan-borde);color:#67e8f9}
-
-button{font:inherit;font-size:12px;padding:7px 12px;border:1px solid var(--borde);
-  background:#0d1626;color:var(--suave);border-radius:8px;cursor:pointer;
-  transition:border-color .18s,color .18s,background .18s;white-space:nowrap}
-button:hover:not(:disabled){border-color:var(--cyan-borde);color:#67e8f9;background:var(--cyan-tenue)}
-button.primario{border-color:var(--cyan-borde);background:rgba(34,211,238,.14);color:#a5f3fc;font-weight:600}
+.chip.boton{cursor:pointer;max-width:100%}.chip.boton:hover{border-color:var(--cyan);color:var(--cyan)}
+button{font:inherit;font-size:12px;padding:7px 11px;border:1px solid var(--borde);background:var(--panel);
+  color:var(--suave);border-radius:4px;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
+button:hover:not(:disabled){color:var(--texto);background:var(--hover);border-color:var(--borde-fuerte)}
+button.primario{border-color:var(--inverso);background:var(--inverso);color:var(--inverso-texto);font-weight:600}
+button.primario:hover:not(:disabled){opacity:.88;background:var(--inverso);color:var(--inverso-texto)}
 button:disabled{opacity:.35;cursor:default}
-select{border:1px solid var(--borde);border-radius:9px;color:#a5f3fc;
-  background:rgba(8,13,23,.94);padding:7px 11px;font:inherit;font-size:12px;
-  cursor:pointer;outline:none;max-width:260px}
-select:hover{border-color:var(--cyan-borde)}
-input[type=text]{width:100%;padding:8px 11px;border:1px solid var(--borde);
-  border-radius:8px;font:inherit;font-size:12.5px;background:#0a1120;
-  color:var(--texto);outline:none}
-input[type=text]:focus{border-color:var(--cyan-borde)}
-.fila{display:flex;gap:8px;align-items:center;margin:9px 0;flex-wrap:wrap}
-
-#barra{position:absolute;top:12px;left:14px;right:14px;display:flex;gap:8px;
-  align-items:center;flex-wrap:wrap;z-index:5;pointer-events:none}
-#barra>*{pointer-events:auto}
-.grupo{display:flex;background:rgba(8,13,23,.94);border:1px solid var(--borde);
-  border-radius:9px;overflow:hidden}
-.grupo button{border:0;border-radius:0;background:transparent;padding:7px 13px}
-.grupo button+button{border-left:1px solid var(--borde)}
-.solo{background:rgba(8,13,23,.94)}
-#ruta{margin-left:auto;font-size:11.5px;color:var(--tenue);
-  background:rgba(8,13,23,.94);border-radius:8px;padding:6px 11px;
-  max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-svg{width:100%;height:100%;display:block;cursor:grab}
+select{border:1px solid var(--borde);border-radius:4px;color:var(--texto);background:var(--panel);
+  padding:7px 10px;font:inherit;font-size:12px;cursor:pointer;max-width:240px;min-width:0}
+select:hover{border-color:var(--borde-fuerte)}
+input[type=text]{width:100%;padding:9px 10px;border:1px solid var(--borde);border-radius:4px;
+  font:inherit;font-size:12px;background:var(--panel);color:var(--texto)}
+input[type=text]:focus{border-color:var(--cyan)}
+.fila{display:flex;gap:7px;align-items:center;margin:9px 0;flex-wrap:wrap}
+#barra{position:relative;flex:0 0 auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
+  padding:10px 14px;z-index:5;border-bottom:1px solid var(--borde);background:var(--panel)}
+.grupo{display:flex;overflow:hidden}.grupo button{border:0;background:transparent;padding:7px 8px}
+.grupo button+button{border-left:1px solid var(--borde);border-radius:0}
+.solo{background:transparent;border-color:transparent}
+#ruta{font-size:11px;color:var(--tenue);margin-left:auto;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+svg#lienzo{width:100%;flex:1;min-height:0;display:block;cursor:grab;touch-action:none}
 svg.arrastrando{cursor:grabbing}
-
-/* --- cajas ------------------------------------------------------------- */
-.caja{cursor:grab}
-.caja.moviendo{cursor:grabbing}
-.caja.movida rect.cuerpo{filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))}
-.caja rect.cuerpo{fill:#0e1728;stroke:#3a4f70;stroke-width:1.5;rx:7;
-  transition:stroke .18s,fill .18s}
-.caja:hover rect.cuerpo{stroke:var(--cyan)}
-.caja.sel rect.cuerpo{stroke:#fff;stroke-width:2}
-.caja.raiz rect.cuerpo{fill:#10243a;stroke:var(--cyan);stroke-width:1.8}
-.caja .barra{rx:2}
-.caja .titulo{fill:#e6eefb;font-size:12.5px;font-family:var(--sans);
-  font-weight:600;letter-spacing:.005em;
-  dominant-baseline:middle;pointer-events:none}
-.caja .sub{fill:#7d8ba3;font-size:10px;font-family:var(--sans);
-  dominant-baseline:middle;pointer-events:none}
-.caja .marca{fill:var(--ambar);font-size:10px;font-family:var(--sans);
-  font-weight:600;
-  text-anchor:end;dominant-baseline:middle;pointer-events:none}
-/* El orden importa: realzada gana sobre raiz, y apagada gana sobre todo. Con
-   la misma especificidad manda la última, y una caja filtrada que se siga
-   viendo encendida es exactamente el error de §5.4 del traspaso. */
-.caja.realzada rect.cuerpo{stroke:#fff;stroke-width:2.2}
-.caja.apagada{opacity:.16}
-.caja.apagada rect.cuerpo{stroke:#22314c;stroke-width:1.4}
-
-.mas{cursor:pointer}
-.mas.apagada{opacity:.16}
-.mas circle{fill:#0d1626;stroke:var(--ambar);stroke-width:1.4;transition:fill .18s}
-.mas:hover circle{fill:rgba(251,191,36,.25)}
-.mas path{stroke:var(--ambar);stroke-width:1.6;stroke-linecap:round}
-
-/* --- conectores --------------------------------------------------------
-   Criterio unico, y no se mezcla:
-     el COLOR de una linea entre reportes dice como se obtuvo la vinculacion.
-     el COLOR de una linea a un dato dice de que tipo de dato se trata
-       (COLOR_VISOR).
-     el GROSOR dice el peso: mas gruesa, mas peso.
-   Antes el trazo discontinuo distinguia el origen, pero a simple vista un
-   rayado y un punteado se parecen, y el peso -que es lo que el operador mira
-   para decidir- no se veia en ningun lado. Ver la leyenda del panel izquierdo. */
-.con{fill:none;stroke:#3d5070;stroke-width:1.5;
-  transition:stroke .18s,stroke-width .18s,opacity .18s}
-.con.vinculo{stroke:#22d3ee}
-/* El duplicado NO va en ámbar ni en ningún color de tipo de dato: una línea
-   entre reportes con color de dato rompe el criterio -el ámbar se contaba como
-   una línea de Monte Grande-. Va en rosa, que no está en la paleta de datos, y
-   además lo dice el rótulo con todas las letras. */
-.con.duplicado{stroke:#f472b6}
-.con.inferida{stroke:#a78bfa}
-/* La afirmada por una persona va en un tono neutro, distinto de todos los
-   colores de dato: no la calculó el sistema. No lleva peso porque no hay nada
-   calculado, así que tampoco varía el grosor. */
-.con.afirmada{stroke:#e5edf7;stroke-width:2.4}
-.con.cruce{stroke-width:1.7;opacity:.72}
-.con.realzada{opacity:1;stroke-width:2.8;filter:drop-shadow(0 0 4px currentColor)}
-.con.origen{stroke-width:0}
-.con.origen.realzada{stroke-width:0}
-.con.apagada{opacity:.08}
-.con.sel{stroke:#fff;stroke-width:3;opacity:1}
+.caja{cursor:grab}.caja.moviendo{cursor:grabbing}
+.caja.movida rect.cuerpo{filter:drop-shadow(0 2px 3px #0002)}
+.caja rect.cuerpo{fill:var(--panel);stroke:var(--borde-fuerte);stroke-width:1;rx:5;transition:stroke .15s,fill .15s}
+.caja:hover rect.cuerpo{stroke:var(--cyan);fill:var(--panel2)}
+.caja.sel rect.cuerpo,.caja.realzada rect.cuerpo{stroke:var(--cyan);stroke-width:2}
+.caja.raiz rect.cuerpo{fill:var(--inverso);stroke:var(--inverso);stroke-width:1}
+.caja .barra{rx:2}.caja .titulo{fill:var(--texto);font-size:13px;font-weight:600;dominant-baseline:middle;pointer-events:none}
+.caja .sub{fill:var(--tenue);font-size:11px;dominant-baseline:middle;pointer-events:none}
+.caja.raiz .titulo{fill:var(--inverso-texto)}.caja.raiz .sub{fill:var(--inverso-texto);opacity:.78}
+.caja .marca{fill:var(--ambar);font-size:10px;text-anchor:end;dominant-baseline:middle;pointer-events:none}
+.caja.raiz .marca{fill:var(--inverso-texto)}
+.caja.apagada{opacity:.2}.caja.apagada rect.cuerpo{stroke:var(--borde);stroke-width:1}
+.caja .marca.accion{pointer-events:auto;cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+.caja .marca.accion:hover,.caja .marca.accion:focus{fill:var(--cyan)}
+.caja circle.accion{cursor:pointer}
+.caja .accion:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.caja.fuera{opacity:.3}
+.caja.alcance{opacity:1}
+.caja.alcance rect.cuerpo{stroke:var(--cyan);stroke-width:2}
+.mas{cursor:pointer}.mas.apagada{opacity:.2}.mas circle{fill:var(--panel);stroke:var(--borde-fuerte);stroke-width:1}
+.mas:hover circle{fill:var(--hover);stroke:var(--cyan)}.mas path{stroke:var(--suave);stroke-width:1.4;stroke-linecap:round}
+.con{fill:none;stroke:var(--borde-fuerte);stroke-width:1.5;transition:opacity .15s}
+.con.vinculo{stroke:var(--vinculo)}.con.duplicado{stroke:var(--duplicado)}
+.con.inferida{stroke:var(--inferida);stroke-dasharray:5 4}.con.afirmada{stroke:var(--afirmada);stroke-width:2.4}
+.con.cruce{stroke-width:1.5;opacity:.62}.con.realzada{opacity:1;stroke-width:2.8}
+.con.origen,.con.origen.realzada{stroke-width:0}.con.apagada{opacity:.08}.con.sel{stroke:var(--texto);stroke-width:3;opacity:1}
 .zona{stroke:transparent;stroke-width:16;fill:none;cursor:pointer}
-.rotulo{font-size:10.5px;font-family:var(--sans);fill:#8fa1bb;text-anchor:middle;
-  pointer-events:none;paint-order:stroke;stroke:#080d17;stroke-width:4;
-  stroke-linejoin:round}
-.rotulo.vinculo{fill:#a5d8e8}
-.rotulo.peso{fill:#6ee7b7}
-.rotulo.apagado{opacity:.2}
-
+.rotulo{font-size:10.5px;fill:var(--suave);text-anchor:middle;pointer-events:none;paint-order:stroke;
+  stroke:var(--lienzo);stroke-width:4;stroke-linejoin:round}
+.rotulo.vinculo{fill:var(--cyan)}.rotulo.peso{fill:var(--verde)}.rotulo.apagado{opacity:.2}
+#flecha path{fill:var(--borde-fuerte)}#flechaCyan path{fill:var(--vinculo)}
 table{width:100%;border-collapse:collapse;font-size:12px}
-td{padding:5px 2px;vertical-align:top;border-bottom:1px solid rgba(26,39,64,.7)}
-td:first-child{color:var(--tenue);width:44%;padding-right:10px}
-td.mono{font-family:var(--mono);font-size:11.5px;overflow-wrap:anywhere}
-.prosa{font-size:13px;line-height:1.7;color:#c8d4e4}
-.prosa p{margin:0 0 11px}
-.prosa h1{font-size:16px;margin:16px 0 8px}
-.prosa h2{color:var(--cyan);font-size:11px;margin:18px 0 8px}
-.prosa h3{font-size:13.5px;margin:14px 0 6px;color:#e2e8f0}
-.prosa li{margin:0 0 5px}
-/* El valor exacto -el que se copia al expediente y se compara caracter por
-   caracter- se sigue mostrando en monoespaciada. Es lo unico que la justifica:
-   distinguir un 0 de una O, un 1 de una l. */
-.valor{font-family:var(--mono);font-size:.94em;letter-spacing:.01em}
-.cadena{font-size:12px;color:var(--suave);line-height:2;
-  font-variant-numeric:tabular-nums}
-.cadena .fl{color:var(--tenue);padding:0 3px}
-.cita{font-family:var(--mono);font-size:11px;color:var(--tenue);
-  overflow-wrap:anywhere;
-  background:#0a1120;border:1px solid var(--borde);border-radius:8px;padding:9px 11px}
-.vacio{color:var(--tenue);font-size:12.5px;font-style:italic}
-/* Secciones plegables de la ficha. Todo arranca cerrado: el panel tiene que
-   dejar leer una cosa por vez, no volcar el expediente entero. */
-details.sec{border:1px solid var(--borde);border-radius:10px;margin:8px 0;
-  background:var(--panel2);overflow:hidden}
-details.sec>summary{cursor:pointer;list-style:none;padding:10px 12px;
-  font-size:12.5px;color:var(--suave);display:flex;align-items:center;gap:8px;
-  transition:background .15s}
+td{padding:8px 2px;vertical-align:top;border-bottom:1px solid var(--borde);overflow-wrap:anywhere}
+td:first-child{color:var(--tenue);width:44%;padding-right:10px}td.mono{font-size:11.5px;word-break:break-all}
+.prosa{font-size:13px;line-height:1.7;color:var(--suave)}.prosa p{margin:0 0 11px}
+.prosa h1{font-size:17px;margin:16px 0 8px;color:var(--texto)}.prosa h2{color:var(--tenue);font-size:11px;margin:18px 0 8px}
+.prosa h3{font-size:14px;margin:14px 0 6px;color:var(--texto)}.prosa li{margin:0 0 5px}
+.cadena{font-size:11.5px;color:var(--suave);line-height:2}.cadena .fl{color:var(--tenue);padding:0 3px}
+.cita{font-size:11px;color:var(--tenue);word-break:break-all;background:var(--panel2);
+  border:1px solid var(--borde);border-radius:3px;padding:9px 11px}
+.vacio{color:var(--tenue);font-size:12px}
+details.sec{border:0;border-bottom:1px solid var(--borde);margin:5px 0;background:transparent;overflow:hidden}
+details.sec>summary{cursor:pointer;list-style:none;padding:12px 0;font-size:12.5px;color:var(--suave);
+  display:flex;align-items:center;gap:8px}
 details.sec>summary::-webkit-details-marker{display:none}
-details.sec>summary::before{content:"\25B8";color:var(--cyan);font-size:11px;
-  display:inline-block;transition:transform .18s}
-details.sec[open]>summary::before{transform:rotate(90deg)}
-details.sec>summary:hover{background:rgba(34,211,238,.06)}
-details.sec>summary b{color:var(--texto);font-weight:600}
-details.sec>summary .cuenta{margin-left:auto;font-size:11.5px;color:var(--tenue)}
-details.sec .interior{padding:0 12px 12px}
-details.sub2{border-top:1px solid var(--borde);border-radius:0;margin:0;
-  background:transparent}
-details.sub2>summary{padding:9px 12px 9px 10px}
-details.sub2 .interior{padding:0 10px 12px}
-.rotulo-grupo{margin:10px 0 4px;font-size:10.5px;color:var(--tenue);
-  text-transform:uppercase;letter-spacing:.1em}
-/* Marca de coincidencia: el dato que este reporte comparte con el otro. Es lo
-   unico que hay que poder encontrar de un vistazo en la lista del vinculado. */
-.chip.coincide{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.12);
-  color:#6ee7b7}
+details.sec>summary::before{content:"\25B8";color:var(--tenue);font-size:11px;display:inline-block;transition:transform .15s}
+details.sec[open]>summary::before{transform:rotate(90deg)}details.sec>summary:hover{color:var(--texto)}
+details.sec>summary b{color:var(--texto);font-weight:600}details.sec>summary .cuenta{margin-left:auto;font-size:11px;color:var(--tenue)}
+details.sec .interior{padding:0 0 14px 16px}details.sub2{border-top:1px solid var(--borde);margin:0}
+details.sub2>summary{padding:9px 0}details.sub2 .interior{padding:0 0 12px 12px}
+.rotulo-grupo{margin:14px 0 5px;font-size:10.5px;color:var(--tenue);text-transform:uppercase;letter-spacing:.08em}
 .nota-chica{font-size:11.5px;color:var(--tenue);margin:8px 0 0}
-
-/* --- dialogo de decision --------------------------------------------------
-   El operador no entra a una consola. Todo lo que registra una decision se
-   pide en pantalla, con el fundamento a la vista de quien lo escribe. */
-#velo{position:fixed;inset:0;background:rgba(3,6,12,.74);display:none;
-  align-items:center;justify-content:center;z-index:50}
-#velo.visible{display:flex}
-.modal{width:min(580px,92vw);max-height:88vh;overflow-y:auto;background:var(--panel);
-  border:1px solid var(--cyan-borde);border-radius:14px;padding:22px 24px 20px;
-  box-shadow:0 24px 70px rgba(0,0,0,.65)}
-.modal h3{margin:0 0 8px;font-size:16px}
-.modal .intro{font-size:12.5px;color:var(--suave);line-height:1.65;margin-bottom:4px}
-.modal label{display:block;font-size:10.5px;color:var(--cyan);margin:16px 0 6px;
-  text-transform:uppercase;letter-spacing:.12em;font-weight:600}
-.modal textarea{width:100%;min-height:104px;padding:10px 12px;border:1px solid var(--borde);
-  border-radius:8px;font:inherit;font-size:13px;line-height:1.6;background:#0a1120;
-  color:var(--texto);outline:none;resize:vertical}
-.modal textarea:focus{border-color:var(--cyan-borde)}
+#velo{position:fixed;inset:0;background:#0d121770;display:none;align-items:center;justify-content:center;z-index:50}
+#velo.visible{display:flex}.modal{width:min(580px,92vw);max-height:88vh;overflow-y:auto;background:var(--panel);
+  border:1px solid var(--borde);border-radius:5px;padding:24px;box-shadow:var(--sombra)}
+.modal h3{margin:0 0 8px;font-size:18px}.modal .intro{font-size:12.5px;color:var(--suave);line-height:1.65;margin-bottom:4px}
+.modal label{display:block;font-size:11px;color:var(--tenue);margin:16px 0 6px;font-weight:600}
+.modal textarea{width:100%;min-height:104px;padding:10px 12px;border:1px solid var(--borde);border-radius:4px;
+  font:inherit;background:var(--panel);color:var(--texto);resize:vertical}
 .modal .ayuda{font-size:11.5px;color:var(--tenue);margin-top:6px;line-height:1.55}
 .modal .mal{font-size:12px;color:var(--alarma);min-height:17px;margin-top:10px}
 .modal .pie{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
-#aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;
-  background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.42);
-  color:#6ee7b7;padding:11px 18px;border-radius:10px;font-size:12.5px;
-  display:none;max-width:80vw}
+#aviso{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:60;background:var(--verde-bg);
+  border:1px solid var(--verde);color:var(--verde);padding:11px 18px;border-radius:4px;font-size:12.5px;display:none;max-width:80vw;box-shadow:var(--sombra)}
 #aviso.visible{display:block}
-#pie{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--tenue);
-  pointer-events:none;background:rgba(6,10,18,.85);
-  border-radius:8px;padding:6px 10px}
+#pie{position:absolute;left:16px;bottom:12px;font-size:11px;color:var(--tenue);pointer-events:none;
+  background:var(--lienzo);padding:6px 0;max-width:calc(100% - 32px)}
+#avisoGeneral{position:fixed;bottom:0;left:0;right:0;height:45px;padding:9px 18px;background:var(--panel);
+  border-top:1px solid var(--borde);font-size:11px;color:var(--tenue);z-index:5;display:flex;align-items:center}
+.revision{border-top:1px solid var(--borde);border-bottom:1px solid var(--borde);padding:15px 0;margin:18px 0}
+.revision .fila{flex-wrap:wrap}.hallazgo{font-size:14px;line-height:1.65;margin:15px 0;color:var(--texto)}
+.registro{border-bottom:1px solid var(--borde);padding:10px 0;font-size:12px;overflow-wrap:anywhere}
+.calculo-paso{padding:12px 0;border-bottom:1px solid var(--borde);font-size:12.5px}.calculo-paso p{margin:5px 0}
+.valor-evidencia{overflow-wrap:anywhere}:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+@media(max-width:1100px){#der{flex-basis:310px}#cabecera .contexto{display:none}#barra{gap:3px;padding:8px}#barra button{padding:6px 8px}#ruta{display:none}}
+@media(max-width:760px){#der{flex-basis:270px}#izq:not(.plegado){position:absolute;top:58px;bottom:58px;left:0;width:260px;z-index:12;box-shadow:var(--sombra)}
+  #cabecera{padding:0 12px;gap:8px}#cabecera strong{font-size:12px}#cabecera label{display:none}#cabecera .acciones{gap:4px}
+  #cabecera .acciones button{padding:6px}#avisoGeneral{height:58px;font-size:10px}body{padding-bottom:58px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body>
 
-<aside id="izq">
-  <button class="plegar" id="plegIzq" title="Plegar los filtros">‹</button>
+<header id="cabecera">
+  <span class="emblema" aria-hidden="true">⋈</span>
+  <strong>Módulo de grafos</strong><span class="contexto">Bóveda CIJ · Vinculaciones</span>
+  <div class="acciones">
+    <button id="abrirFiltros" title="Buscar, importar y filtrar reportes">Filtros y reportes</button>
+    <button id="abrirHistorial">Revisiones</button>
+    <label for="tema">Apariencia</label>
+    <select id="tema" aria-label="Apariencia"><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select>
+  </div>
+</header>
+<aside id="izq" class="plegado" aria-label="Filtros y reportes">
+  <button class="plegar" id="plegIzq" title="Abrir o plegar filtros" aria-label="Abrir o plegar filtros">☰</button>
   <div class="contenido">
     <h1>Vinculaciones</h1>
     <div class="sub" id="meta"></div>
 
-    <h2>Probar con otros reportes</h2>
+    <h2>Incorporar reportes</h2>
     <div style="font-size:11.5px;color:var(--tenue);line-height:1.55;margin-bottom:8px">
-      Se procesan con las mismas reglas, junto al dataset del proyecto. Quedan
-      en <span class="cita" style="padding:1px 5px">grafo/entrada/</span>, fuera
-      del repositorio.</div>
+      Incorporá reportes JSON para analizar sus conexiones con los reportes cargados. El procesamiento es local.</div>
     <input type="file" id="archivos" multiple accept=".json,application/json"
            style="display:none">
     <div class="fila"><button id="btnImportar">Elegir archivos...</button></div>
     <div id="importados"></div>
 
     <h2>Buscar en el caso</h2>
-    <input type="text" id="buscar" placeholder="cuenta, IP, dispositivo, alias...">
+    <input type="text" id="buscar" aria-label="Buscar en el caso" placeholder="cuenta, IP, dispositivo, alias...">
 
     <h2>Antecedentes a revisar</h2>
     <div id="alertas"></div>
+    <h2>Revisión del reporte</h2>
+    <button id="btnRevisiones">Ver pendientes e historial</button>
 
     <h2>Qué se muestra</h2>
     <div class="rotuloGrupo">Peso mínimo de la vinculación</div>
@@ -682,6 +624,8 @@ details.sub2 .interior{padding:0 10px 12px}
     </div>
     <label><input type="checkbox" id="verPesos">
       Escribir el peso sobre la línea</label>
+    <label><input type="checkbox" id="verCruces">
+      Dibujar las líneas de un dato hacia los otros reportes donde consta</label>
     <label><input type="checkbox" id="soloComp">
       Solo los datos que comparte con otro reporte</label>
 
@@ -691,12 +635,6 @@ details.sub2 .interior{padding:0 10px 12px}
     <h2>Cómo leer el lienzo</h2>
     <div id="leyenda"></div>
 
-    <div class="tarjeta cyan" style="margin-top:18px">
-      <div style="font-size:12px;color:var(--suave)">
-        Todo lo que se muestra son <b style="color:var(--texto)">propuestas del
-        sistema</b>. Ninguna relación acredita autoría ni responsabilidad.
-      </div>
-    </div>
   </div>
 </aside>
 
@@ -708,8 +646,9 @@ details.sub2 .interior{padding:0 10px 12px}
       <button id="atras" title="Volver (Alt + ←)">‹ Volver</button>
       <button id="adelante" title="Siguiente (Alt + →)">Siguiente ›</button>
     </div>
-    <select id="selCaso" title="Caso en curso"></select>
-    <button class="solo" id="contraer">Contraer</button>
+    <select id="selCaso" title="Caso en curso" aria-label="Caso en curso"></select>
+    <button class="solo" id="contraer">Contraer todo</button>
+    <button class="solo" id="desplegar">Desplegar todo</button>
     <button class="solo" id="ordenar" title="Devolver las cajas que moviste a su lugar">Ordenar</button>
     <button class="solo" id="ajustar" title="Encuadrar">Encuadrar</button>
     <button class="solo primario" id="btnInforme">Informe</button>
@@ -738,19 +677,26 @@ details.sub2 .interior{padding:0 10px 12px}
 <div class="asa" id="asa"></div>
 
 <aside id="der">
-  <button class="plegar" id="plegDer" title="Plegar la ficha">›</button>
+  <nav id="navDetalle" aria-label="Navegación del detalle">
+    <button class="historia" id="atrasDetalle" title="Volver a la ficha y vista anteriores (Alt + ←)" disabled>‹ Volver</button>
+    <button class="historia" id="adelanteDetalle" title="Recuperar la ficha siguiente (Alt + →)" disabled>Siguiente ›</button>
+    <button class="plegar" id="plegDer" title="Abrir o plegar detalle" aria-label="Abrir o plegar detalle">›</button>
+  </nav>
   <div class="contenido" id="cuerpo"></div>
 </aside>
 
-<div id="velo"><div class="modal" id="modal"></div></div>
-<div id="aviso"></div>
+<div id="velo"><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Registrar decisión"></div></div>
+<div id="aviso" role="status" aria-live="polite"></div>
+<footer id="avisoGeneral">El módulo detecta conexiones entre reportes; no determina autoría ni responsabilidad.
+  La incorporación a una actuación requiere revisión humana. Los puntajes ordenan las vinculaciones: no son porcentajes de acierto.</footer>
 
 <script>
 const D = __DATOS__;
 const NODOS = new Map(D.nodos.map(n=>[n.id,n]));
 const ARISTAS = new Map(D.aristas.map(a=>[a.id,a]));
 const CASOS = D.casos || [];
-const VINCULOS = D.aristas.filter(a=>a.entreReportes);
+// El lienzo representa relaciones vigentes; el índice completo conserva la revisión.
+const VINCULOS = D.aristas.filter(a=>a.entreReportes && a.vigente!==false && a.estado!=="rechazada");
 const UNIF = new Map(Object.entries(D.identidades||{}));
 const RE = id => UNIF.get(id) || id;
 
@@ -779,14 +725,75 @@ const BREVE = {
 const breve = v => v ? (BREVE[v] || legible(v)) : v;
 const attr = n => Object.fromEntries((n.atributos||[]));
 
+/* Ubicación dentro del JSON recibido, expresada para lectura humana.
+   Los índices técnicos empiezan en cero; al operador se muestran desde uno.
+   Un índice vacío no identifica una posición y no se inventa una. */
+const CAMPOS_FUENTE = {
+  reportedInformation:["Información reportada"],
+  reportingEsp:["Proveedor que envió el reporte"], espName:["Nombre del proveedor"],
+  reportedPeople:["Personas reportadas"], reportedPersons:["Personas reportadas","Persona"],
+  childVictims:["Víctimas menores de edad","Persona"],
+  intendedRecipients:["Destinatarios previstos","Persona"],
+  sourceInformation:["Registros capturados por la plataforma"], sourceCaptures:["Registros técnicos","Registro"],
+  captureType:["Tipo de registro"], valueType:["Tipo de identificador"],
+  value:["Valor informado"], eventName:["Evento informado"], dateTime:["Fecha y hora"], port:["Puerto de origen"],
+  espUserId:["Identificador de cuenta"], profileBio:["Biografía del perfil"],
+  displayNames:["Nombres visibles","Nombre visible"], screenNames:["Nombres de usuario","Nombre de usuario"],
+  screenName:["Nombre de usuario"], phones:["Teléfonos","Teléfono"], emails:["Correos electrónicos","Correo electrónico"],
+  espEstimatedLocations:["Ubicaciones estimadas por la plataforma","Ubicación estimada"],
+  incidentDetails:["Detalles del incidente"], chatIncident:["Chats","Chat"], notes:["Notas","Nota"],
+  automatedInformation:["Información automática"], autoGeneratedNotes:["Resultados generados automáticamente"],
+  geoLookups:["Consultas de geolocalización"],
+  reportedPersonGeoLookups:["Resultados sobre personas reportadas","Resultado sobre personas reportadas"],
+  childVictimGeoLookups:["Resultados sobre víctimas menores de edad","Resultado sobre víctimas menores de edad"],
+  intendedRecipientGeoLookups:["Resultados sobre destinatarios","Resultado sobre destinatarios"],
+  esp:["Prestador informado"], ip:["Dirección IP"], ipAddress:["Dirección IP"],
+  country:["País"], city:["Ciudad"], region:["Región"],
+  lawEnforcementContactInformation:["Autoridades destinatarias"],
+  lawEnforcementContacts:["Organismos destinatarios","Organismo destinatario"], agency:["Nombre del organismo"],
+  uploadedFiles:["Archivos adjuntos","Archivo adjunto"], fileDetails:["Detalles de archivos","Archivo"],
+  fileName:["Nombre del archivo"], hash:["Huella del archivo"], md5:["Huella MD5"], sha1:["Huella SHA-1"], sha256:["Huella SHA-256"]
+};
+function ubicacionFuente(ruta){
+  const original = String(ruta||"").trim();
+  if(!original) return "La fuente no informa una ubicación específica.";
+  if(original.includes(" | ")) return [...new Set(original.split(" | ").map(ubicacionFuente))].join("; ");
+  const libro = original.match(/^libro:vinculos_manuales#(\d+)$/);
+  if(libro) return "Registro de decisiones → Vinculación manual "+libro[1];
+  if(/^e_[a-f0-9]+$/i.test(original)) return "Relación utilizada como antecedente (identificador en auditoría)";
+  if(original.startsWith("USA_CUENTA -> ")) return "Antecedente de asociación con una cuenta";
+  const partes = original.split("#"), etiquetas = [];
+  let desconocido = false;
+  for(const segmento of partes[0].split(".")){
+    const m = segmento.match(/^([A-Za-z][A-Za-z0-9_]*)(?:\[(\d*)\])?$/);
+    const meta = m && CAMPOS_FUENTE[m[1]];
+    if(!meta){ desconocido = true; break; }
+    const indice = m[2];
+    const texto = indice!==undefined && indice!==""
+      ? (meta[1]||meta[0])+" "+(Number(indice)+1) : meta[0];
+    if(etiquetas[etiquetas.length-1]!==texto) etiquetas.push(texto);
+  }
+  if(desconocido) return "Referencia de origen sin traducción disponible; consulte el detalle técnico de auditoría.";
+  if(partes.length>1){
+    const perfil = partes.slice(1).join("#").match(/^Profile=(.+)$/);
+    etiquetas.push(perfil ? "Identificador de perfil extraído: "+perfil[1] : "Fragmento identificado en auditoría");
+  }
+  return etiquetas.join(" → ");
+}
+
 /* Tipos de dato que pueden aparecer en la fila de datos, en el orden en que se
    ofrecen en el panel. Sale de la ontologia, no de una lista escrita a mano. */
 const TIPOS_DATO = Object.keys(D.tipos||{}).filter(t=>D.tipos[t].enTarjeta);
-const COLOR_TIPO = t => (D.tipos[t]||{}).colorVisor || "#8fa1bb";
+const VARIABLES_TIPO = {
+  CUENTA:"cuenta",ALIAS:"alias",ALIAS_PAGO:"alias-pago",EMAIL:"email",TELEFONO:"telefono",IP:"ip",
+  DISPOSITIVO:"dispositivo",EVIDENCIA:"evidencia",UBICACION:"ubicacion",IDENTIDAD:"identidad",
+  PERSONA_MENCION:"identidad",ORGANIZACION:"organizacion",REPORTE:"reporte",EVENTO:"reporte"
+};
+const COLOR_TIPO = t => VARIABLES_TIPO[t] ? "var(--tipo-"+VARIABLES_TIPO[t]+")" : "var(--suave)";
 const NOMBRE_TIPO = t => (D.tipos[t]||{}).legible || t;
 
 const estado = {caso:null, raiz:null, abiertos:new Set(), sel:null,
-                texto:"", pesoMin:0, verPesos:false, soloCompartidos:false,
+                texto:"", pesoMin:0, verPesos:false, verCruces:false, soloCompartidos:false,
                 tipos:new Set(TIPOS_DATO), mov:new Map(), centro:null};
 
 /* =============================================================== caso ===== */
@@ -821,6 +828,17 @@ function fueraDelCaso(nodo){
   const rs = reportesCaso();
   return (nodo.reportes||[]).filter(r=>!rs.has(r));
 }
+/* Relaciones cuyo destino aporta un detalle del dato, sin sumar otra caja.
+   El prestador de una IP no es su titular ni identifica a quien la utilizó. */
+const RELACIONES_EN_TARJETA = {ASIGNADA_A: true};
+function detallesDe(id){
+  return [...new Set(D.aristas
+    .filter(a=>a.a===id && RELACIONES_EN_TARJETA[a.relacion]
+               && a.vigente!==false && a.estado!=="rechazada")
+    .map(a=>NODOS.get(a.b))
+    .filter(n=>n && n.etiqueta)
+    .map(n=>n.etiqueta))];
+}
 const DESCARTADOS = D.descartados || [];
 function descartadosDelDato(id){
   return DESCARTADOS.filter(x=>(x.compartido||[]).some(c=>c.nodo && RE(c.nodo)===id));
@@ -840,6 +858,7 @@ function casoDe(valorReporte){
    Quien usa esto no entra a una consola. Todo lo que haya que declarar —quién
    dispone la decisión y con qué fundamento— se pide en pantalla. */
 const EN_APP = location.protocol === "http:" || location.protocol === "https:";
+let focoAnterior = null;
 
 function operadorGuardado(){
   try { return localStorage.getItem("bcij_operador") || ""; } catch(e){ return ""; }
@@ -856,17 +875,20 @@ function avisar(texto){
 function cerrarDialogo(){
   document.getElementById("velo").classList.remove("visible");
   document.getElementById("modal").innerHTML = "";
+  if(focoAnterior && focoAnterior.isConnected) focoAnterior.focus();
 }
 function dialogo(cfg){
+  focoAnterior = document.activeElement;
   const velo = document.getElementById("velo"), m = document.getElementById("modal");
   m.innerHTML =
-    '<h3>'+esc(cfg.titulo)+'</h3>'+
+    '<h3 id="dlgTitulo">'+esc(cfg.titulo)+'</h3>'+
     '<div class="intro">'+cfg.intro+'</div>'+
-    '<label for="dlgOperador">Quién lo dispone</label>'+
+    '<label for="dlgOperador">Operador que registra la decisión</label>'+
     '<input type="text" id="dlgOperador" placeholder="su identificación de operador" value="'+
       esc(operadorGuardado())+'">'+
     '<label for="dlgMotivo">'+esc(cfg.etiquetaMotivo)+'</label>'+
-    '<textarea id="dlgMotivo" placeholder="Escriba acá el fundamento de la decisión."></textarea>'+
+    '<textarea id="dlgMotivo" placeholder="'+esc(cfg.motivoObligatorio ?
+      'Explique el motivo de la decisión.' : 'Observación opcional.')+'"></textarea>'+
     '<div class="ayuda">'+cfg.ayuda+'</div>'+
     '<div class="mal" id="dlgMal"></div>'+
     '<div class="pie"><button id="dlgCancelar">Cancelar</button>'+
@@ -881,9 +903,8 @@ function dialogo(cfg){
   btn.onclick = ()=>{
     const usuario = inpU.value.trim(), motivo = inpM.value.trim();
     if(!usuario){ mal.textContent = "Falta indicar quién dispone la decisión."; return; }
-    if(cfg.motivoObligatorio && motivo.length < 10){
-      mal.textContent = "El fundamento es obligatorio y queda asentado en el "+
-        "informe del caso: conviene que se entienda por sí solo.";
+    if(cfg.motivoObligatorio && !motivo){
+      mal.textContent = "Escriba el motivo para registrar esta decisión.";
       return;
     }
     recordarOperador(usuario);
@@ -926,9 +947,8 @@ function sinApp(que){
     '<div class="intro">Está viendo el archivo del grafo, que sirve para mirar: '+
     'no puede guardar nada. Para '+esc(que)+' hay que abrir la aplicación, que es '+
     'la que registra las decisiones.</div>'+
-    '<div class="cita" style="margin-top:14px">python grafo/servidor.py</div>'+
-    '<div class="ayuda">Eso abre el visor en el navegador con los botones '+
-    'habilitados. Se corre una sola vez y queda andando.</div>'+
+    '<div class="ayuda">Vuelva a la pestaña de la aplicación local que abrió '+
+    'al iniciar el módulo. En este archivo descargado las revisiones no se guardan.</div>'+
     '<div class="pie"><button class="primario" id="dlgCerrar">Entendido</button></div>';
   velo.classList.add("visible");
   document.getElementById("dlgCerrar").onclick = cerrarDialogo;
@@ -1031,14 +1051,15 @@ function accionQuitarImportado(reporte){
 }
 
 function accionVincular(a, b){
+  const actual = vinculoVigenteEntre(a, b);
+  if(actual){ ir({tipo:"vinculo", id:actual.id}); return; }
   if(!EN_APP) return sinApp("vincular estos reportes");
   dialogo({
     titulo: "Vincular los reportes "+a+" y "+b,
-    intro: 'El sistema no los vinculó: los comparó y las coincidencias no '+
-      'alcanzaron para sostenerlo por sí solas. Usted puede establecer la '+
-      'vinculación por su propio criterio. Va a quedar registrada como suya, '+
-      'con su fundamento, y los dos reportes van a pasar a tratarse como un '+
-      'mismo caso.',
+    intro: 'Estos reportes no tienen una vinculación directa vigente. '+
+      'Las coincidencias evaluadas no alcanzaron para proponerla automáticamente. '+
+      'Puede registrar una vinculación directa por su propio criterio, con su nombre '+
+      'y fundamento. Se agruparán en el mismo caso si todavía no lo estaban.',
     etiquetaMotivo: "Fundamento de la vinculación",
     ayuda: 'Queda asentado en el informe del caso y en el libro de '+
       'vinculaciones. La vinculación se conserva hasta que alguien la revierta, '+
@@ -1069,10 +1090,112 @@ function accionDesvincular(a, b){
     }
   });
 }
-/* Botón para una coincidencia que el sistema evaluó y descartó. */
+
+const ESTADOS_REVISION = {pendiente:"Pendiente de revisión", validada:"Validada",
+  rechazada:"Rechazada", en_revision:"En revisión"};
+function revisable(a){
+  return a.origen!=="afirmada" && a.relacion!=="IDENTIFICADO_COMO";
+}
+function accionDecidir(id, decision){
+  const a = ARISTAS.get(id);
+  if(!a || !revisable(a)) return;
+  if(!EN_APP) return sinApp("registrar la revisión");
+  const identidad = a.relacion==="POSIBLE_MISMA_IDENTIDAD";
+  const titulos = {validada:identidad?"Confirmar que es la misma persona":"Validar la vinculación",
+    rechazada:"Rechazar la vinculación", en_revision:"Dejar en revisión"};
+  const intro = decision==="rechazada"
+    ? "Esta relación dejará de usarse en el análisis. Podrá recuperarla desde el historial de revisiones."
+    : decision==="en_revision"
+    ? "Queda en revisión y se incluye en el análisis. Si estaba rechazada, vuelve a estar activa."
+    : identidad
+    ? "Confirma que ambas menciones corresponden a la misma persona. El módulo agrupará esas menciones bajo una identidad."
+    : "Confirma que revisó los datos que sostienen esta relación. La decisión quedará registrada.";
+  dialogo({titulo:titulos[decision], intro:esc(intro),
+    etiquetaMotivo:decision==="rechazada"?"Motivo del rechazo":"Observación (opcional)",
+    ayuda:"La decisión se guarda con operador y fecha. Las revisiones anteriores se conservan.",
+    motivoObligatorio:decision==="rechazada", aceptar:"Guardar decisión",
+    alAceptar:function(usuario, observacion){
+      return pedir("/api/decidir", {arista:id, decision, usuario, observacion}).then(()=>{
+        try { sessionStorage.setItem("bcij_relacion", id); } catch(e){}
+        return "Decisión guardada: "+ESTADOS_REVISION[decision]+".";
+      });
+    }});
+}
+function bloqueRevision(a){
+  if(!revisable(a)) return "";
+  const etiqueta = ESTADOS_REVISION[a.estado] || a.estadoLegible;
+  let h = '<section class="revision" aria-label="Revisión"><b>'+esc(etiqueta)+'</b>';
+  if(a.validado_por) h += '<div class="nota-chica">Registrado por '+esc(a.validado_por)+
+    (a.validado_en?' · '+esc(a.validado_en.replace("T", " ")):'')+'</div>';
+  if(a.estado==="rechazada") h += '<p class="nota-chica">Excluida del análisis. Puede cambiar esta decisión.</p>';
+  h += '<div class="fila">';
+  for(const [decision, etiquetaBoton] of [["validada",a.relacion==="POSIBLE_MISMA_IDENTIDAD"?
+      "Confirmar identidad":"Validar"],["rechazada","Rechazar"],["en_revision","Dejar en revisión"]]){
+    h += '<button '+(decision==="validada"?'class="primario" ':'')+
+      'data-accion="decidir" data-arista="'+esc(a.id)+'" data-decision="'+decision+'"'+
+      (a.estado===decision?' disabled':'')+'>'+etiquetaBoton+'</button>';
+  }
+  h += '</div></section>';
+  if((a.historial||[]).length) h += seccion("Historial de revisiones", a.historial.length,
+    a.historial.slice().reverse().map(r=>'<div class="registro"><b>'+esc(ESTADOS_REVISION[r.decision]||r.decision)+
+      '</b> · '+esc(r.usuario)+'<div>'+esc((r.ts||"").replace("T"," "))+'</div>'+
+      (r.observacion?'<div>'+esc(r.observacion)+'</div>':'')+'</div>').join(""));
+  return h;
+}
+
+function fichaRevisiones(){
+  const c = caso(), reporte = estado.raiz || (c && c.reportes[0]);
+  const lista = D.aristas.filter(a=>revisable(a) && (a.reportes||[]).includes(reporte));
+  let h = '<h3>Revisiones del reporte '+esc(reporte||"")+'</h3>';
+  for(const [titulo, filtro] of [
+    ["Vinculaciones", a=>a.entreReportes && a.estado!=="rechazada"],
+    ["Hipótesis de identidad", a=>a.relacion==="POSIBLE_MISMA_IDENTIDAD" && a.estado!=="rechazada"],
+    ["Rechazadas", a=>a.estado==="rechazada"],
+    ["Otras relaciones", a=>!a.entreReportes && a.relacion!=="POSIBLE_MISMA_IDENTIDAD" && a.estado!=="rechazada"]]){
+    const grupo = lista.filter(filtro);
+    if(!grupo.length) continue;
+    h += seccion(titulo, grupo.length, grupo.map(a=>'<button class="tarjeta" style="display:block;width:100%;text-align:left" '+
+      'data-ir="'+(a.entreReportes?'vinculo':'relacion')+'|'+esc(a.id)+'">'+
+      esc(etq(a.a))+' — '+esc(etq(a.b))+'<div class="nota-chica">'+esc(a.relacionLegible)+
+      ' · '+esc(ESTADOS_REVISION[a.estado]||a.estadoLegible)+'</div></button>').join(""));
+  }
+  if(!lista.length) h += '<p>No hay relaciones para revisar.</p>';
+  ficha(h);
+}
+/* La evaluación automática y la decisión humana son hechos diferentes.
+   Consultar el estado vigente sin aplicar filtros visuales evita proponer
+   otra vez una decisión que ya está registrada. */
+function vinculoVigenteEntre(a, b){
+  const par = VINCULOS.filter(v=>{
+    const ra = (NODOS.get(v.a)||{}).valor, rb = (NODOS.get(v.b)||{}).valor;
+    return (ra===a && rb===b) || (ra===b && rb===a);
+  });
+  return par.find(v=>v.origen==="afirmada") || par[0] || null;
+}
 function botonVincular(a, b){
-  return '<div class="fila"><button class="primario" data-accion="vincular" '+
-    'data-a="'+esc(a)+'" data-b="'+esc(b)+'">Vincular estos reportes</button></div>';
+  const vigente = vinculoVigenteEntre(a, b);
+  if(vigente){
+    const manual = vigente.origen==="afirmada";
+    let h = '<div class="registro"><b>'+(manual
+      ? 'Vinculación vigente por decisión de una persona'
+      : 'Vinculación automática vigente')+'</b>';
+    if(manual){
+      h += '<p class="nota-chica">La registró '+esc(vigente.dispuestaPor||"un operador")+
+        (vigente.validado_en?' · '+esc(vigente.validado_en.replace("T"," ")):'')+'.</p>';
+      if(vigente.motivoOperador) h += '<p>Fundamento: '+esc(vigente.motivoOperador)+'</p>';
+      h += '<p class="nota-chica">La línea del lienzo representa esta decisión. '+
+        'No cambia el resultado de la evaluación automática anterior.</p>';
+    }
+    return h+'<div class="fila"><button data-ir="vinculo|'+esc(vigente.id)+
+      '">Ver vinculación y decisión</button></div></div>';
+  }
+  const ca = casoDe(a), cb = casoDe(b), indirecta = ca && cb && ca.id===cb.id;
+  const nota = indirecta
+    ? '<p class="nota-chica">Pertenecen al mismo caso a través de otras vinculaciones. '+
+      'Esta coincidencia no establece una relación directa entre ellos.</p>' : '';
+  return nota+'<div class="fila"><button class="primario" data-accion="vincular" '+
+    'data-a="'+esc(a)+'" data-b="'+esc(b)+'">'+
+    (indirecta?'Registrar vínculo manual directo':'Vincular estos reportes')+'</button></div>';
 }
 
 /* Tarjeta de una coincidencia que se evaluó y no prosperó.
@@ -1127,10 +1250,35 @@ function alternarFoco(v){
    otro. Hay una prueba que compara ambas listas y falla si se desincronizan. */
 function instantanea(){
   return {caso: estado.caso, raiz: estado.raiz, centro: estado.centro,
-          abiertos: [...estado.abiertos], mov: [...estado.mov]};
+          abiertos: [...estado.abiertos], mov: [...estado.mov], verCruces: estado.verCruces,
+          camara: {...VP}};
 }
 function anotarVista(){
   if(HIST.pos>=0) HIST.pila[HIST.pos].lienzo = instantanea();
+}
+/* Guardar la lectura antes de reemplazar la ficha. No guarda HTML ni decisiones:
+   al volver se renderizan los datos vigentes y se repone la posición de lectura. */
+function anotarDetalle(){
+  const v = HIST.pila[HIST.pos];
+  if(!v) return;
+  // Si una acción ya pidió otro encuadre, su cámara aún pertenece a la vista
+  // anterior. Las acciones de centrado guardan esa vista antes de cambiarla.
+  if(VP.encuadrado && v.lienzo) v.lienzo.camara = {...VP};
+  v.detalle = {
+    scroll: document.getElementById("der").scrollTop,
+    secciones: [...document.getElementById("cuerpo").querySelectorAll("details")]
+      .map(d=>({titulo:d.querySelector("summary")?.textContent, abierta:d.open}))
+  };
+}
+function restaurarDetalle(v){
+  if(!v.detalle) return;
+  const secciones = document.getElementById("cuerpo").querySelectorAll("details");
+  secciones.forEach((d,i)=>{
+    const anterior = v.detalle.secciones[i];
+    if(anterior && anterior.titulo===d.querySelector("summary")?.textContent)
+      d.open = anterior.abierta;
+  });
+  document.getElementById("der").scrollTop = v.detalle.scroll;
 }
 function restaurarVista(v){
   if(!v.lienzo) return;
@@ -1140,11 +1288,15 @@ function restaurarVista(v){
   estado.centro = f.centro;
   estado.abiertos = new Set(f.abiertos);
   estado.mov = new Map(f.mov);
-  VP.encuadrado = false;
+  estado.verCruces = !!f.verCruces;
+  document.getElementById("verCruces").checked = estado.verCruces;
+  if(f.camara?.encuadrado){ Object.assign(VP, f.camara); pintarVP(); }
+  else VP.encuadrado = false;
 }
-function ir(v){
+function ir(v, nuevaVista=false){
   const act = HIST.pila[HIST.pos];
-  if(!(act && act.tipo===v.tipo && act.id===v.id)){
+  anotarDetalle();
+  if(nuevaVista || !(act && act.tipo===v.tipo && act.id===v.id)){
     HIST.pila = HIST.pila.slice(0,HIST.pos+1); HIST.pila.push(v); HIST.pos++;
   }
   /* Solo se anota la entrada NUEVA. Anotar tambien la anterior la pisaria con
@@ -1153,16 +1305,16 @@ function ir(v){
      el operador tenia. Las acciones que cambian el lienzo sin navegar anotan
      por su cuenta. */
   anotarVista();
-  mostrar(v);
+  mostrar(HIST.pila[HIST.pos]);
 }
 function atras(){
   if(HIST.pos<=0) return;
-  anotarVista(); HIST.pos--;
+  anotarDetalle(); anotarVista(); HIST.pos--;
   restaurarVista(HIST.pila[HIST.pos]); mostrar(HIST.pila[HIST.pos]);
 }
 function adelante(){
   if(HIST.pos>=HIST.pila.length-1) return;
-  anotarVista(); HIST.pos++;
+  anotarDetalle(); anotarVista(); HIST.pos++;
   restaurarVista(HIST.pila[HIST.pos]); mostrar(HIST.pila[HIST.pos]);
 }
 function mostrar(v){
@@ -1171,16 +1323,21 @@ function mostrar(v){
   else if(v.tipo==="entidad"){ fichaEntidad(v.id); }
   else if(v.tipo==="vinculo"){ fichaVinculo(v.id); }
   else if(v.tipo==="relacion"){ fichaRelacion(v.id); }
+  else if(v.tipo==="revisiones"){ fichaRevisiones(); }
   else if(v.tipo==="informe"){ fichaInforme(); }
   else fichaCaso();
   document.getElementById("atras").disabled = HIST.pos<=0;
   document.getElementById("adelante").disabled = HIST.pos>=HIST.pila.length-1;
+  document.getElementById("atrasDetalle").disabled = HIST.pos<=0;
+  document.getElementById("adelanteDetalle").disabled = HIST.pos>=HIST.pila.length-1;
   const nombre = v.tipo==="inicio" ? "Caso"
+    : v.tipo==="revisiones" ? "Revisiones"
     : v.tipo==="informe" ? "Informe"
     : v.tipo==="vinculo" ? "Vinculación"
     : v.tipo==="relacion" ? "Relación" : etq(v.id);
   document.getElementById("ruta").textContent = (HIST.pos>0?"◂ ":"")+nombre;
   dibujar();
+  restaurarDetalle(v);
 }
 window.addEventListener("keydown",e=>{
   if(e.altKey && e.key==="ArrowLeft"){ e.preventDefault(); atras(); }
@@ -1188,16 +1345,18 @@ window.addEventListener("keydown",e=>{
 });
 document.getElementById("atras").onclick = atras;
 document.getElementById("adelante").onclick = adelante;
+document.getElementById("atrasDetalle").onclick = atras;
+document.getElementById("adelanteDetalle").onclick = adelante;
 
 /* ============================================================== lienzo ==== */
 const SVGNS = "http://www.w3.org/2000/svg";
 const gCon = document.getElementById("gcon"), gRot = document.getElementById("grot"),
       gCaj = document.getElementById("gcajas"), svg = document.getElementById("lienzo");
 const ANCHO_CAJA = 250, ALTO_CAJA = 64, SEP_X = 34;
-const Y_RAIZ = 90, Y_REL = 290, Y_ENT = 500;
-/* Altura a la que corre el tramo horizontal del que cuelgan los reportes
-   vinculados. Deja libre la franja donde se escribe el motivo de cada rama. */
-const CARRIL_VINC = Y_RAIZ + ALTO_CAJA + 36;
+const X_RAIZ = 40, X_REL = 470, X_ENT = 880;
+const PASO_Y = ALTO_CAJA + 34;
+/* Franja entre la raíz y los reportes para los conectores y sus motivos. */
+const CARRIL_VINC = X_RAIZ + ANCHO_CAJA + 76;
 
 let VP = {x:0,y:0,k:1};
 function pintarVP(){ document.getElementById("vista")
@@ -1239,14 +1398,15 @@ function ajustar(el, texto, ancho){
              y el texto queda en el globo de ayuda: preferible perder la marca
              antes que recortar el número de reporte.
      sub     abajo, a lo ancho de la caja. */
-function caja(g, x, y, {titulo, sub, marca, marcaColor, color, clases, alClic}){
+function caja(g, x, y, {titulo, sub, marca, marcaColor, color, clases, alClic,
+                         alClicMarca, ayudaMarca}){
   const el = document.createElementNS(SVGNS,"g");
   el.setAttribute("class","caja "+(clases||""));
   el.setAttribute("transform","translate("+x+","+y+")");
   g.appendChild(el);                 // medir exige estar en el documento
   const r = document.createElementNS(SVGNS,"rect");
   r.setAttribute("class","cuerpo"); r.setAttribute("width",ANCHO_CAJA);
-  r.setAttribute("height",ALTO_CAJA); r.setAttribute("rx",7);
+  r.setAttribute("height",ALTO_CAJA); r.setAttribute("rx",5);
   el.appendChild(r);
   if(color){
     const b = document.createElementNS(SVGNS,"rect");
@@ -1266,15 +1426,36 @@ function caja(g, x, y, {titulo, sub, marca, marcaColor, color, clases, alClic}){
     if(marcaColor) m.setAttribute("fill",marcaColor);
     el.appendChild(m);
     const anchoMarca = medir(m, marca);
+    let marcaEl = m;
     if(anchoMarca > libre){
       el.removeChild(m);
       const pt = document.createElementNS(SVGNS,"circle");
       pt.setAttribute("cx",ANCHO_CAJA-14); pt.setAttribute("cy",21);
       pt.setAttribute("r",4);
-      pt.setAttribute("fill",marcaColor||"#fbbf24"); el.appendChild(pt);
+      pt.setAttribute("fill",marcaColor||"var(--ambar)"); el.appendChild(pt);
+      marcaEl = pt;
       ajustar(t, titulo, ANCHO_CAJA - 26 - 16);
     } else {
       ajustar(t, titulo, ANCHO_CAJA - 26 - anchoMarca - 12);
+    }
+    if(alClicMarca){
+      marcaEl.classList.add("accion");
+      marcaEl.setAttribute("role","button");
+      marcaEl.setAttribute("tabindex","0");
+      marcaEl.setAttribute("aria-label",ayudaMarca || marca);
+      marcaEl.style.pointerEvents = "auto";
+      const ayuda = document.createElementNS(SVGNS,"title");
+      ayuda.textContent = ayudaMarca || marca; marcaEl.appendChild(ayuda);
+      // El gesto pertenece a la marca, no a la selección ni al arrastre de la caja.
+      marcaEl.addEventListener("pointerdown",e=>{ e.stopPropagation(); SEARRASTRO = false; });
+      marcaEl.addEventListener("click",e=>{
+        e.preventDefault(); e.stopPropagation(); alClicMarca();
+      });
+      marcaEl.addEventListener("keydown",e=>{
+        if(e.key==="Enter" || e.key===" "){
+          e.preventDefault(); e.stopPropagation(); alClicMarca();
+        }
+      });
     }
   } else {
     ajustar(t, titulo, ANCHO_CAJA - 26);
@@ -1342,8 +1523,7 @@ function botonMas(g, x, y, abierto, alClic, ayuda, apagado){
   el.addEventListener("click", e=>{ e.stopPropagation(); alClic(); });
   g.appendChild(el);
 }
-/* Conector en ángulo recto: baja del origen, corre horizontal y entra al
-   destino por arriba. Es la forma en que se lee un árbol. */
+/* Los conectores avanzan desde la raíz hacia los reportes y sus datos. */
 /* Corta el motivo en renglones por sus comas. "misma cuenta, misma IP, mismo
    dispositivo" en una sola línea mide más que la caja y se monta sobre el
    motivo de la rama de al lado. */
@@ -1375,19 +1555,18 @@ function marcador(color){
   MARCADORES.set(color,"url(#"+id+")");
   return MARCADORES.get(color);
 }
-/* Esquinas redondeadas: con el ángulo vivo, dos líneas que doblan en el mismo
-   lugar se ven como una sola en cruz. Redondeadas, cada una sigue siendo un
-   trazo continuo que se puede seguir con la vista. */
-function ruta(x1, y1, x2, y2, ym){
-  if(Math.abs(x2-x1) < 1) return "M"+x1+","+y1+" V"+y2;
-  const r = Math.min(9, Math.abs(x2-x1)/2, Math.abs(ym-y1), Math.abs(y2-ym));
-  if(r < 2) return "M"+x1+","+y1+" V"+ym+" H"+x2+" V"+y2;
-  const sx = x2>x1 ? 1 : -1, s1 = ym>y1 ? 1 : -1, s2 = y2>ym ? 1 : -1;
-  return "M"+x1+","+y1+
-    " V"+(ym-r*s1)+" Q"+x1+","+ym+" "+(x1+r*sx)+","+ym+
-    " H"+(x2-r*sx)+" Q"+x2+","+ym+" "+x2+","+(ym+r*s2)+
-    " V"+y2;
+/* Curvas continuas para seguir cada rama del mapa horizontal. */
+function ruta(x1, y1, x2, y2, xm){
+  // Una curva horizontal conserva la lectura raíz → reporte → dato.
+  if(x2>=x1){
+    const medio = (x1+x2)/2;
+    return "M"+x1+","+y1+" C"+medio+","+y1+" "+medio+","+y2+" "+x2+","+y2;
+  }
+  // Los cruces de un dato hacia otros reportes usan carriles exteriores.
+  const carr = Math.max(x1,x2)+32+(xm||0)%78;
+  return "M"+x1+","+y1+" C"+carr+","+y1+" "+carr+","+y2+" "+x2+","+y2;
 }
+
 /* Grosor de una linea segun el peso de la vinculacion.
 
    La escala es absoluta -de 0,5 a 1- y no relativa al caso que se este
@@ -1404,7 +1583,7 @@ function grosorPorPeso(peso){
 function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
                                  dato, punto, apagado, realzado}){
   const x1 = desde.x, y1 = desde.y, x2 = hasta.x, y2 = hasta.y;
-  const ym = carril!=null ? carril : (y1 + (y2-y1)/2);
+  const ym = carril!=null ? carril : (x1 + (x2-x1)/2);
   const d = ruta(x1,y1,x2,y2,ym);
   const cl = "con "+(clase||"")+(apagado?" apagada":"")+(realzado?" realzada":"");
   const p = document.createElementNS(SVGNS,"path");
@@ -1418,8 +1597,11 @@ function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
   const grueso = grosorPorPeso(peso);
   if(grueso) p.style.strokeWidth = grueso;
   if(dato) p.setAttribute("data-dato",dato);
-  p.setAttribute("marker-end", color ? marcador(color)
-    : ((clase||"").indexOf("vinculo")===0 ? "url(#flechaCyan)" : "url(#flecha)"));
+  const colorPunta = color || ((clase||"").includes("afirmada") ? "var(--afirmada)"
+    : (clase||"").includes("inferida") ? "var(--inferida)"
+    : (clase||"").includes("duplicado") ? "var(--duplicado)"
+    : (clase||"").includes("vinculo") ? "var(--vinculo)" : "var(--borde-fuerte)");
+  p.setAttribute("marker-end",marcador(colorPunta));
   gCon.appendChild(p);
   /* Un punto en el arranque: dice de dónde sale la línea sin tener que
      seguirla hasta el final para descubrirlo. Solo en los cruces, que corren
@@ -1444,17 +1626,17 @@ function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
      es el mismo punto para todas- y colgando del tramo horizontal, no pegado a
      la caja: contra la punta de flecha no se llegaba a leer. */
   if(rotulo){
-    const lineas = envolver(rotulo, 28);
+    const lineas = envolver(rotulo, 23).slice(0,3);
     if(peso!=null && estado.verPesos) lineas.push("peso "+num(peso));
     // 14 y no 12: con 12 el alto real de un renglón de 10px -acentos y colas
     // incluidos- llega a tocar el de abajo. La auditoría lo detecta.
-    const base = ym + 24, alto = 14;
+    const alto = 14, base = y2 - 12 - (lineas.length-1)*alto;
     lineas.forEach((ln,i)=>{
       const esPeso = (peso!=null && estado.verPesos && i===lineas.length-1);
       const t = document.createElementNS(SVGNS,"text");
       t.setAttribute("class","rotulo "+(esPeso ? "peso" : "vinculo")+
                               (apagado?" apagado":""));
-      t.setAttribute("x",x2); t.setAttribute("y",base+i*alto);
+      t.setAttribute("x",x2-95); t.setAttribute("y",base+i*alto);
       t.textContent = ln; gRot.appendChild(t);
     });
   }
@@ -1466,6 +1648,16 @@ function conector(desde, hasta, {clase, rotulo, peso, alClic, color, carril,
 function marcarCruces(id, on){
   gCon.querySelectorAll('[data-dato="'+id+'"]')
       .forEach(p=>p.classList.toggle("realzada",on));
+}
+/* El alcance se realza sobre las cajas existentes: no cambia la disposición,
+   la selección ni el historial, y no vuelve a dibujar el grafo. */
+function marcarAlcance(nodo, on){
+  const reportes = new Set(otrosReportesDe(nodo));
+  gCaj.querySelectorAll("[data-reporte]").forEach(el=>{
+    const contiene = reportes.has(el.getAttribute("data-reporte"));
+    el.classList.toggle("alcance", on && contiene);
+    el.classList.toggle("fuera", on && !contiene);
+  });
 }
 
 function dibujar(){
@@ -1508,25 +1700,28 @@ function dibujar(){
     });
   });
 
-  // --- posiciones
-  const anchoFila = arr => arr.length*ANCHO_CAJA + Math.max(0,arr.length-1)*SEP_X;
-  const anchoTotal = Math.max(anchoFila(relacionados), anchoFila(entidades), ANCHO_CAJA);
-  const x0 = 60;
+  // Cada reporte ocupa el alto de sus datos abiertos: no se pisan ramas.
   const pos = new Map();
-  pos.set(nRaiz.id, {x: x0 + anchoTotal/2 - ANCHO_CAJA/2, y: Y_RAIZ});
-  const xRel = x0 + (anchoTotal - anchoFila(relacionados))/2;
-  relacionados.forEach((r,i)=>pos.set(r.nodo.id,
-    {x: xRel + i*(ANCHO_CAJA+SEP_X), y: Y_REL}));
-  const xEnt = x0 + (anchoTotal - anchoFila(entidades))/2;
-  entidades.forEach((e,i)=>pos.set(e.nodo.id,
-    {x: xEnt + i*(ANCHO_CAJA+SEP_X), y: Y_ENT}));
+  let cursor = 65;
+  const propios = entidades.filter(e=>e.padre.id===nRaiz.id);
+  propios.forEach((e,i)=>pos.set(e.nodo.id,{x:X_ENT,y:cursor+i*PASO_Y}));
+  if(propios.length) cursor += propios.length*PASO_Y+35;
+  relacionados.forEach(r=>{
+    const hijos = entidades.filter(e=>e.padre.id===r.nodo.id);
+    const alto = Math.max(PASO_Y,hijos.length*PASO_Y);
+    pos.set(r.nodo.id,{x:X_REL,y:cursor+(alto-PASO_Y)/2});
+    hijos.forEach((e,i)=>pos.set(e.nodo.id,{x:X_ENT,y:cursor+i*PASO_Y}));
+    cursor += alto+28;
+  });
+  const ys = relacionados.map(r=>pos.get(r.nodo.id).y);
+  pos.set(nRaiz.id,{x:X_RAIZ,y:ys.length ? (ys[0]+ys[ys.length-1])/2 : 95});
 
   // Posición efectiva: la que calcula la disposición, más lo que el operador
   // haya corrido esa caja a mano.
   const P = id => { const p = pos.get(id), m = estado.mov.get(id);
                     return m ? {x:p.x+m.dx, y:p.y+m.dy} : p; };
-  const abajo = p => ({x:p.x+ANCHO_CAJA/2, y:p.y+ALTO_CAJA});
-  const arriba = p => ({x:p.x+ANCHO_CAJA/2, y:p.y});
+  const abajo = p => ({x:p.x+ANCHO_CAJA, y:p.y+ALTO_CAJA/2});
+  const arriba = p => ({x:p.x, y:p.y+ALTO_CAJA/2});
 
   /* Realce. Al elegir un dato, el lienzo responde la pregunta que se hizo el
      operador al tocarlo: a qué reportes llega ese dato. Todo lo demás se
@@ -1592,20 +1787,22 @@ function dibujar(){
   // El color es el del tipo de dato, no un color de turno: así la línea que
   // sube, la barra de la caja de la que sale y su punta de flecha son el mismo
   // color, y dos IP distintas se leen como dos IP y no como dos cosas sueltas.
-  let carril = Y_ENT + ALTO_CAJA + 40;
-  entidades.forEach(e=>{
-    const color = COLOR_TIPO(e.nodo.tipo);
-    otrosReportesDe(e.nodo).forEach(rv=>{
-      const nr = nodoReporte(rv);
-      if(!nr || nr.id===e.padre.id || !pos.has(nr.id)) return;
-      const apagado = !coincide(e.nodo) || datoApagado(e.nodo.id);
-      conector(abajo(P(e.nodo.id)), abajo(P(nr.id)),
-        {clase:"cruce", color, carril, dato:e.nodo.id, punto:true, apagado: apagado,
-         realzado: focoDato===e.nodo.id,
-         alClic: ()=>alternarFoco({tipo:"entidad", id:e.nodo.id})});
-      carril += 13;
+  if(estado.verCruces){
+    let carril = X_ENT + ANCHO_CAJA + 40;
+    entidades.forEach(e=>{
+      const color = COLOR_TIPO(e.nodo.tipo);
+      otrosReportesDe(e.nodo).forEach(rv=>{
+        const nr = nodoReporte(rv);
+        if(!nr || nr.id===e.padre.id || !pos.has(nr.id)) return;
+        const apagado = !coincide(e.nodo) || datoApagado(e.nodo.id);
+        conector(abajo(P(e.nodo.id)), abajo(P(nr.id)),
+          {clase:"cruce", color, carril, dato:e.nodo.id, punto:true, apagado: apagado,
+           realzado: focoDato===e.nodo.id,
+           alClic: ()=>alternarFoco({tipo:"entidad", id:e.nodo.id})});
+        carril += 13;
+      });
     });
-  });
+  }
 
   // --- cajas
   // Un reporte que quedó bajo una identidad ya confirmada por un operador lo
@@ -1632,8 +1829,9 @@ function dibujar(){
       clases: clases+extra(nodo.id)+(apagada?" apagada":"")
               +(hayFoco && !apagada ? " realzada":""),
       alClic:()=>ir({tipo:"reporte", id:nodo.id})});
+    el.setAttribute("data-reporte",nodo.valor);
     arrastrable(el, nodo.id);
-    if(n) botonMas(gCaj, p.x+ANCHO_CAJA-19, p.y+45,
+    if(n) botonMas(gCaj, p.x+ANCHO_CAJA+15, p.y+ALTO_CAJA/2,
       estado.abiertos.has(nodo.id), ()=>alternar(nodo.id),
       (estado.abiertos.has(nodo.id)?"Cerrar":"Abrir")+" los "+n+
       " dato(s) de este reporte", apagada);
@@ -1669,16 +1867,24 @@ function dibujar(){
     // Si el dato no se repite dentro del caso pero sí en otros, se dice: la
     // caja sin marca ni líneas parecía un dato que a nadie más le figura.
     const el = caja(gCaj, p.x, p.y, {
-      titulo:e.nodo.etiqueta, sub:e.nodo.tipoLegible,
-      marca: enN>1 ? "en "+enN+" reportes" : (afuera ? "en otros casos" : null),
-      marcaColor: enN>1 ? null : "#8fa1bb",
+      titulo:e.nodo.etiqueta, sub:[e.nodo.tipoLegible,...detallesDe(e.nodo.id)].join(" · "),
+      marca: enN>1 ? "en "+enN+" reportes ›" : (afuera ? "en otros casos" : null),
+      alClicMarca: enN>1 ? ()=>centrarEn(e.nodo.id) : null,
+      ayudaMarca: enN>1 ? "Poner este dato en el centro y ver los "+enN+" reportes en los que consta" : null,
+      marcaColor: enN>1 ? null : "var(--tenue)",
       color: COLOR_TIPO(e.nodo.tipo),
       clases: extra(e.nodo.id)+(apagada?" apagada":"")
               +(focoDato===e.nodo.id ? " realzada":""),
       alClic:()=>alternarFoco({tipo:"entidad", id:e.nodo.id})});
     arrastrable(el, e.nodo.id);
-    el.addEventListener("mouseenter",()=>marcarCruces(e.nodo.id,true));
-    el.addEventListener("mouseleave",()=>marcarCruces(e.nodo.id,false));
+    el.addEventListener("mouseenter",()=>{
+      marcarCruces(e.nodo.id,true); marcarAlcance(e.nodo,true);
+    });
+    el.addEventListener("mouseleave",()=>{
+      marcarCruces(e.nodo.id,false); marcarAlcance(e.nodo,false);
+    });
+    el.addEventListener("focusin",()=>marcarAlcance(e.nodo,true));
+    el.addEventListener("focusout",()=>marcarAlcance(e.nodo,false));
   });
 
   document.getElementById("pie").textContent = modoDato
@@ -1695,31 +1901,45 @@ function dibujar(){
 function alternar(id){
   if(estado.abiertos.has(id)) estado.abiertos.delete(id); else estado.abiertos.add(id);
   anotarVista();
+  VP.encuadrado = false;
   dibujar();
 }
 function encuadrar(){
   const b = document.getElementById("vista").getBBox();
   const r = svg.getBoundingClientRect();
   if(!b.width || !r.width) return;
-  const k = Math.min((r.width-60)/b.width, (r.height-120)/b.height, 1.3);
+  const k = Math.max(.08,Math.min((r.width-64)/b.width, (r.height-70)/b.height, 1.15));
   VP.k = k;
-  VP.x = (r.width - b.width*k)/2 - b.x*k;
-  VP.y = 70 - b.y*k;
+  VP.x = (r.width-b.width*k)/2-b.x*k;
+  VP.y = (r.height-b.height*k)/2-b.y*k-8;
   pintarVP();
 }
 document.getElementById("ajustar").onclick = ()=>{ encuadrar(); };
-document.getElementById("contraer").onclick = ()=>{ estado.abiertos.clear(); dibujar(); };
+document.getElementById("contraer").onclick = ()=>{
+  estado.abiertos.clear(); anotarVista(); VP.encuadrado = false; dibujar();
+};
+document.getElementById("desplegar").onclick = ()=>{
+  const c=caso(); if(!c) return;
+  c.reportes.forEach(r=>{const n=nodoReporte(r);if(n) estado.abiertos.add(n.id);});
+  anotarVista(); VP.encuadrado = false; dibujar();
+};
 document.getElementById("ordenar").onclick = ()=>{
-  estado.mov.clear(); VP.encuadrado = false; dibujar(); };
+  estado.mov.clear(); anotarVista(); VP.encuadrado = false; dibujar(); };
 
 /* Poner un dato en el centro: el árbol se cuelga de él y la fila de abajo pasa
    a ser la de los reportes en los que consta. Es la vista para investigar un
    identificador -una cuenta, un dispositivo- en lugar de un reporte. */
 function centrarEn(id){
-  estado.centro = id || null;
-  estado.abiertos.clear(); estado.mov.clear();
-  VP.encuadrado = false;
-  ir(id ? {tipo:"entidad", id:id} : {tipo:"inicio"});
+  const centro = id || null, cambio = estado.centro!==centro;
+  // La caja puede estar seleccionada antes de tocar su marca. Cambiar el
+  // centro es otra vista aunque la ficha sea la misma: Volver debe conservarla.
+  anotarVista();
+  estado.centro = centro;
+  if(cambio){
+    estado.abiertos.clear(); estado.mov.clear();
+    VP.encuadrado = false;
+  }
+  ir(id ? {tipo:"entidad", id:id} : {tipo:"inicio"}, cambio);
 }
 document.getElementById("centrado").onclick = ()=>centrarEn(null);
 
@@ -1745,15 +1965,18 @@ document.getElementById("cuerpo").addEventListener("click", e=>{
   if(!acc) return;
   if(acc.dataset.accion==="descargar") descargarInforme();
   if(acc.dataset.accion==="raiz"){
+    anotarVista();
     estado.raiz = acc.dataset.valor; estado.abiertos.clear(); estado.mov.clear();
     VP.encuadrado = false; ir({tipo:"inicio"});
   }
-  if(acc.dataset.accion==="abrir"){ estado.abiertos.add(acc.dataset.valor); dibujar(); }
+  if(acc.dataset.accion==="abrir"){ estado.abiertos.add(acc.dataset.valor); anotarVista(); dibujar(); }
   if(acc.dataset.accion==="quitarImportado"){ accionQuitarImportado(acc.dataset.valor); }
   if(acc.dataset.accion==="centrar"){ centrarEn(acc.dataset.valor); }
   if(acc.dataset.accion==="descentrar"){ centrarEn(null); }
   if(acc.dataset.accion==="vincular"){ accionVincular(acc.dataset.a, acc.dataset.b); }
   if(acc.dataset.accion==="desvincular"){ accionDesvincular(acc.dataset.a, acc.dataset.b); }
+  if(acc.dataset.accion==="decidir"){ accionDecidir(acc.dataset.arista, acc.dataset.decision); }
+  if(acc.dataset.accion==="revisiones"){ ir({tipo:"revisiones"}); }
   if(acc.dataset.accion==="otroCaso"){
     const rv = acc.dataset.valor, c = casoDe(rv);
     if(c){
@@ -1785,7 +2008,7 @@ function chipPeso(c){
 function cadena(ids, destacado){
   return '<div class="cadena">'+ids.map(id=>{
     const t = esc(etq(id));
-    return id===destacado ? "<b class='valor' style='color:#67e8f9'>"+t+"</b>"
+    return id===destacado ? "<b style='color:var(--cyan)'>"+t+"</b>"
       : '<span class="chip boton" data-ir="entidad|'+id+'">'+t+'</span>';
   }).join('<span class="fl">→</span>')+'</div>';
 }
@@ -1821,7 +2044,7 @@ function fichaCaso(){
      quedó vinculado" no se distingue de "nunca se lo comparó con nada". */
   const desc = descartadosDelReporte(raizVal);
   if(desc.length){
-    h += '<h2>Se evaluó y no alcanzó ('+desc.length+')</h2>';
+    h += '<h2>Evaluación automática de coincidencias ('+desc.length+')</h2>';
     desc.forEach(x=>{
       const otro = x.a===raizVal ? x.b : x.a, oc = casoDe(otro);
       h += '<div class="tarjeta click" data-accion="otroCaso" data-valor="'+esc(otro)+'">'+
@@ -1834,10 +2057,8 @@ function fichaCaso(){
         botonVincular(raizVal, otro);
     });
     h += '<div class="prosa"><p style="font-size:11.5px;color:var(--tenue)">'+
-      'Si a su criterio estos reportes sí tienen que ver, la vinculación se '+
-      'establece a mano con el comando de arriba y queda registrada con su '+
-      'nombre y su fundamento. El sistema la conserva y agrupa los dos reportes '+
-      'en el mismo caso.</p></div>';
+      'La evaluación automática se conserva aunque una persona decida vincular los reportes. '+
+      'La decisión vigente, su operador y su fundamento se consultan en la ficha de vinculación.</p></div>';
   }
 
   h += '<h2>Otros reportes del caso</h2>';
@@ -1860,7 +2081,7 @@ function porQueEnUnaLinea(a){
   }
   const m = (a.motivo||"").trim();
   const frase = m ? m.charAt(0).toUpperCase()+m.slice(1)+"." : "Comparten un dato objetivo.";
-  return frase + (a.confianza!=null ? " Peso "+num(a.confianza)+"." : "");
+  return frase;
 }
 
 /* Lista las entidades de un reporte marcando las que tambien estan en otro.
@@ -1926,7 +2147,7 @@ function fichaReporte(id){
       porQueEnUnaLinea(a)+'</div>'+
       listaEntidades(otro.valor, n.valor)+
       '<div class="fila"><button data-ir="vinculo|'+a.id+
-      '">Ver el fundamento completo</button></div>'+
+      '">Ver coincidencia y revisar</button></div>'+
       '</div></details>';
   });
   h += seccion("Vinculaciones", vinc.length, cuerpo);
@@ -1943,8 +2164,8 @@ function fichaReporte(id){
   if(desc.length){
     let cuerpoDesc =
       '<div class="nota-chica" style="margin:0 0 8px">Comparten algún dato con '+
-      'éste y fueron evaluadas, pero no alcanzaron para proponer una '+
-      'vinculación. Quedan registradas para poder revisar el criterio.</div>';
+      'éste, pero esos datos no bastaron para proponer una vinculación automática. '+
+      'Debajo de cada evaluación se indica si una persona registró una vinculación.</div>';
     desc.forEach(x=>{
       const otro = x.a===n.valor ? x.b : x.a;
       const c = casoDe(otro);
@@ -1957,7 +2178,7 @@ function fichaReporte(id){
         esc(x.motivo||"")+'</div></div>'+
         botonVincular(n.valor, otro);
     });
-    h += seccion("Coincidencias que no alcanzaron", desc.length, cuerpoDesc);
+    h += seccion("Evaluación automática de coincidencias", desc.length, cuerpoDesc);
   }
 
   // --- identidad unificada, solo si un operador la confirmo ----------------
@@ -1967,8 +2188,8 @@ function fichaReporte(id){
       'Un operador confirmó que las menciones de persona de '+
       otrosReportesDe(idn).map(r=>'<b>'+esc(r)+'</b>').join(", ")+
       ' corresponden a la misma persona. No es un dato del reporte: es una '+
-      'decisión humana registrada, y se revierte desde el libro de validaciones.'+
-      '</div>');
+      'decisión humana registrada.'+
+      '</div><div class="fila"><button data-accion="revisiones">Revisar las decisiones de identidad</button></div>');
   }
 
   // --- la ficha tecnica, al final y cerrada -------------------------------
@@ -2049,7 +2270,7 @@ function fichaEntidad(id){
     cuerpo = '<div class="nota-chica" style="margin:0 0 8px">Este mismo dato '+
       'aparece en reportes que no forman parte de este caso. Que no haya una '+
       'línea hacia ellos no significa que el sistema no lo haya visto: '+
-      'significa que la coincidencia no alcanzó para sostener una vinculación.'+
+      'no existe una vinculación vigente que los agrupe en este caso.'+
       '</div>';
     fuera.forEach(r=>{
       const c = casoDe(r);
@@ -2065,7 +2286,7 @@ function fichaEntidad(id){
   if(desc.length){
     cuerpo = "";
     desc.forEach(x=>{ cuerpo += tarjetaDescartada(x, id); });
-    h += seccion("Coincidencias que no alcanzaron", desc.length, cuerpo);
+    h += seccion("Evaluación automática de coincidencias", desc.length, cuerpo);
   }
 
   const rel = D.aristas.filter(a=>!a.entreReportes && (RE(a.a)===id||RE(a.b)===id));
@@ -2094,84 +2315,93 @@ function fichaEntidad(id){
   ficha(h);
 }
 
+function detalleCalculo(a){
+  const c = a.calculo;
+  if(!c) return "";
+  let h = "";
+  c.pasos.forEach((p,i)=>{
+    h += '<div class="calculo-paso"><b>'+(i+1)+'. '+esc(p.nombre)+'</b>'+
+      '<p>Peso configurado: <b>'+num(p.peso_base)+'</b>. '+esc(p.motivo)+'</p>'+
+      p.ajustes.map(t=>'<p>'+esc(t)+'</p>').join("")+
+      (p.cuenta.includes("×")?'<p class="valor-evidencia">Cálculo del aporte: '+esc(p.cuenta)+'</p>':'')+'</div>';
+  });
+  h += '<p style="margin-top:12px">'+esc(c.combinacion)+'</p>';
+  if(c.pasos.length>1) h += '<p class="cita">'+esc(c.formula)+'</p>'+
+    '<p>Se aplica el límite configurado de '+num(c.limite)+'. Resultado: <b>'+num(c.puntaje)+'</b>.</p>';
+  return seccion("Cómo se calculó el puntaje", num(c.puntaje), h);
+}
+
+function detalleTecnico(a){
+  const rutas = [...new Set([a.locator].concat((a.puente||[]).flatMap(p=>
+    (p.fuentes||[]).map(f=>f.ruta).concat(p.locators||[]))).filter(Boolean))];
+  return seccion("Detalle técnico de auditoría", null,
+    '<p class="nota-chica">Método = procedimiento que produjo la relación. Versión = edición de ese procedimiento.</p>'+
+    '<p class="nota-chica">Las rutas siguientes son referencias exactas del JSON o del registro de decisiones. '+
+    'Los índices del JSON empiezan en 0; las ubicaciones legibles se numeran desde 1. No son páginas de un documento.</p>'+
+    tabla([["Procedimiento y versión",a.metodo],["Referencia interna de evidencia",a.fuente],
+      ["Identificador de la relación",a.id]])+
+    rutas.map(r=>'<p class="cita">'+esc(r)+'</p>').join(""));
+}
+
+function fuentesVinculo(a){
+  return seccion("Ver datos de origen", null, (a.puente||[]).map(p=>{
+    let h = '<div class="registro"><b>'+esc(p.tipo)+'</b><div class="valor-evidencia">'+esc(p.valor)+'</div>';
+    if(p.nodo) h += '<button data-ir="entidad|'+esc(p.nodo)+'">Explorar este dato</button>';
+    if(p.fuentes.length) h += '<table>'+p.fuentes.map(f=>
+      '<tr><td>Reporte '+esc(f.reporte)+'</td><td class="valor-evidencia">'+esc(ubicacionFuente(f.ruta))+
+      '<br><button data-ir="relacion|'+esc(f.arista)+'">Revisar dato de origen</button></td></tr>').join("")+'</table>';
+    if(p.locators.length) h += p.locators.map(l=>'<p class="nota-chica">'+esc(ubicacionFuente(l))+'</p>').join("");
+    return h+'</div>';
+  }).join(""));
+}
+
 function fichaVinculo(id){
   const a = ARISTAS.get(id); if(!a){ fichaCaso(); return; }
   const sost = (a.puente||[]).filter(x=>x.sostiene);
   const corr = (a.puente||[]).filter(x=>!x.sostiene);
   const manual = a.origen==="afirmada";
-  let h = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;'+
-    'color:var(--cyan)">'+(manual?"Vinculación establecida":"Por qué se vinculan")+'</div>'+
-    '<h3>Reporte '+esc(NODOS.get(a.a).valor)+' y Reporte '+esc(NODOS.get(a.b).valor)+'</h3>'+
-    chipPeso(a.confianza)+'<span class="chip">'+esc(a.origenLegible)+'</span>'+
-    '<span class="chip'+(a.estado==="validada"?" ok":a.estado==="rechazada"?" al":"")+'">'+
-    esc(a.estadoLegible)+'</span>';
-
-  /* Una vinculación manual no tiene "lo que la sostiene": lo que la sostiene es
-     el criterio de quien la dispuso, y eso es lo que hay que mostrar. */
+  let h = '<div class="sub">Vinculación entre reportes</div>'+
+    '<h3>'+esc(NODOS.get(a.a).valor)+' y '+esc(NODOS.get(a.b).valor)+'</h3>';
   if(manual){
-    h += '<h2>Quién la dispuso</h2>'+prosa(
-      'La estableció '+(a.dispuestaPor||"un operador")+
-      (a.validado_en ? ' el '+String(a.validado_en).slice(0,10) : '')+
-      '. No la propuso el sistema: no consta en la fuente ni surge de una regla, '+
-      'y por eso no lleva peso — no hay nada calculado que ponderar.');
-    if(a.motivoOperador){
-      h += '<h2>Fundamento registrado</h2><div class="tarjeta cyan">'+
-        '<div style="font-size:12.5px;color:var(--texto);line-height:1.6">'+
-        esc(a.motivoOperador)+'</div></div>';
-    }
-    h += '<h2>Cómo se revierte</h2>'+prosa(
-      'Desde el mismo libro, con otro registro. El anterior no se borra: la '+
-      'historia de la decisión se conserva.')+
+    h += '<p class="nota-chica">Registrada por '+esc(a.dispuestaPor||"un operador")+
+      (a.validado_en?' · '+esc(a.validado_en.replace("T"," ")):'')+'</p>'+
+      '<div class="hallazgo">'+esc(a.motivoOperador||"Vinculación manual.")+'</div>'+
       '<div class="fila"><button data-accion="desvincular" data-a="'+
       esc(NODOS.get(a.a).valor)+'" data-b="'+esc(NODOS.get(a.b).valor)+
       '">Revertir esta vinculación</button></div>';
+  } else {
+    // Cada coincidencia se lee una vez. Sus fuentes y su peso se abren a pedido.
+    h += '<h2>Por qué se vinculan</h2>';
+    h += sost.length ? sost.map(p=>'<div class="hallazgo valor-evidencia">'+
+      esc(p.texto.charAt(0).toUpperCase()+p.texto.slice(1))+'.</div>').join("")
+      : '<div class="hallazgo">'+esc(a.resumen)+'</div>';
+    if(a.duplicado) h += '<p class="nota-chica">Posible reporte duplicado: coinciden cuenta y plataforma, con '+
+      num(a.duplicado.horas_entre_hechos)+' horas entre hechos.</p>';
+    h += bloqueRevision(a);
+    h += detalleCalculo(a);
+    if(corr.length) h += seccion("Otros datos que refuerzan", corr.length,
+      '<p class="nota-chica">Se agregan al cálculo, pero no vinculan por sí solos.</p>'+
+      corr.map(p=>'<p class="valor-evidencia">'+esc(p.texto)+'.</p>').join(""));
+    h += fuentesVinculo(a);
   }
-  if(sost.length){
-    h += '<h2>Lo que sostiene la vinculación</h2>';
-    sost.forEach(p=>{
-      h += '<div class="tarjeta cyan">'+chipPeso(p.peso)+
-        '<div style="font-size:12.5px;margin:2px 0 8px"><b>'+esc(p.tipo)+'</b> '+
-        '<span class="chip boton valor" data-ir="entidad|'+p.nodo+'">'+
-        esc(p.valor)+'</span></div>'+
-        '<div style="font-size:11px;color:var(--tenue)">Desde el reporte '+
-        esc(NODOS.get(a.a).valor)+'</div>'+cadena(p.camino_a,p.nodo)+
-        '<div style="font-size:11px;color:var(--tenue);margin-top:6px">Desde el reporte '+
-        esc(NODOS.get(a.b).valor)+'</div>'+cadena(p.camino_b,p.nodo)+'</div>';
-    });
-  }
-  if(corr.length){
-    h += '<h2>Lo que solo refuerza</h2><div class="prosa"><p style="font-size:12px;'+
-      'color:var(--tenue)">Coinciden, pero no alcanzan por sí solos para vincular.</p></div>';
-    corr.forEach(p=>{
-      h += '<div class="tarjeta">'+chipPeso(p.peso)+'<div style="font-size:12.5px">'+
-        '<b>'+esc(p.tipo)+'</b> <span class="chip boton valor" '+
-        'data-ir="entidad|'+p.nodo+'">'+esc(p.valor)+'</span></div></div>';
-    });
-  }
-  if(a.explicacion) h += '<h2>Fundamento</h2>'+prosa(a.explicacion);
-  h += '<h2>De dónde surge</h2>'+tabla([["Método",a.metodo],
-    ["Evidencia de origen",a.fuente],["Revisada por",a.validado_por||"sin revisar"],
-    ["Identificador",a.id]]);
-  h += '<h2>Registrar una decisión</h2><div class="cita">python validar.py '+
-    esc(a.id)+' validada --usuario SU_USUARIO</div>';
+  h += detalleTecnico(a);
   ficha(h);
 }
 
 function fichaRelacion(id){
   const a = ARISTAS.get(id); if(!a){ fichaCaso(); return; }
-  let h = '<span class="chip">'+esc(a.origenLegible)+'</span>'+chipPeso(a.confianza)+
-    '<h3>'+esc(etq(a.a))+' <span style="color:var(--cyan);font-weight:400">'+
-    esc(a.relacionLegible)+'</span> '+esc(etq(a.b))+'</h3>'+
-    '<div style="font-size:11.5px;color:var(--tenue)">'+esc(a.origenDesc)+'</div>';
-  if(a.explicacion) h += '<h2>Fundamento</h2>'+prosa(a.explicacion);
-  h += '<h2>De dónde surge</h2>'+tabla([
-    ["Evidencia de origen",a.fuente],["Ubicación exacta en la fuente",a.locator],
-    ["Método",a.metodo],["Fecha del hecho observado",a.observado||"no informada"],
-    ["Revisada por",a.validado_por||"sin revisar"],["Puerto de origen",a.puerto||""],
-    ["Identificador",a.id]]);
+  let h = '<h3>'+esc(etq(a.a))+' <span style="font-weight:400">'+
+    esc(a.relacionLegible)+'</span> '+esc(etq(a.b))+'</h3>';
+  if(a.explicacion) h += prosa(a.explicacion);
+  h += bloqueRevision(a);
+  if(a.relacion==="IDENTIFICADO_COMO") h += '<button data-accion="revisiones">Revisar la decisión de identidad que la originó</button>';
+  h += seccion("Ver datos de origen", null, tabla([
+    ["Reporte(s) de origen",(a.reportes||[]).join(", ")],
+    ["Dónde se encuentra en el reporte",ubicacionFuente(a.locator)],
+    ["Fecha del dato",a.observado||"no informada"],["Puerto de origen",a.puerto||""]]));
+  h += detalleTecnico(a);
   ficha(h);
 }
-
 function markdown(t){
   const L = t.split("\n"); let out=[], enT=false, enL=false;
   const il = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
@@ -2287,19 +2517,19 @@ function pintarTipos(){
    dibujo y adivinar qué significa una línea, la línea no sirve. */
 function pintarLeyenda(){
   const origenes = [
-    ["#6b7f9e", "Consta en la fuente del reporte"],
-    ["#22d3ee", "Derivada por una regla del sistema"],
-    ["#f472b6", "Posible duplicado del mismo hecho"],
-    ["#a78bfa", "Hipótesis todavía sin validar"],
-    ["#e5edf7", "Establecida por un operador"],
+    ["var(--borde-fuerte)", "Consta en la fuente del reporte"],
+    ["var(--vinculo)", "Derivada por una regla del sistema"],
+    ["var(--duplicado)", "Posible duplicado del mismo hecho"],
+    ["var(--inferida)", "Hipótesis todavía sin validar"],
+    ["var(--afirmada)", "Establecida por un operador"],
   ];
   /* Muestra la escala con las lineas de verdad, no con una descripcion: el
      grosor se entiende viendolo. */
   const escala = [0.55, 0.75, 0.99].map(p=>
     '<div style="display:flex;align-items:center;gap:8px;margin:5px 0">'+
     '<span style="display:inline-block;width:34px;height:0;'+
-    'border-top:'+grosorPorPeso(p)+'px solid #22d3ee"></span>'+
-    '<span style="font-size:11.5px;color:var(--tenue)">'+
+    'border-top:'+grosorPorPeso(p)+'px solid var(--vinculo)"></span>'+
+    '<span style="font-family:var(--mono);font-size:11px;color:var(--tenue)">'+
     'peso '+num(p)+'</span></div>').join("");
   document.getElementById("leyenda").innerHTML =
     '<div class="rotuloGrupo" style="margin-top:0">El grosor es el peso</div>'+
@@ -2313,11 +2543,14 @@ function pintarLeyenda(){
       '<div style="display:flex;align-items:center;font-size:11.5px;'+
       'color:var(--suave);margin:6px 0"><span class="trazo" style="border-top-style:'+
       'solid;border-top-color:'+c+'"></span>'+esc(t)+'</div>').join("")+
-    '<div class="rotuloGrupo">Y en las líneas a un dato, de qué dato se trata</div>'+
+    '<div class="rotuloGrupo">En cuántos reportes consta cada dato</div>'+
     '<div style="font-size:11.5px;color:var(--suave);line-height:1.6">'+
-    'Cada tipo de dato tiene su color, el mismo en la barra de la caja y en la '+
-    'línea que la lleva a los otros reportes donde ese dato aparece. '+
-    'El número en ámbar dice en cuántos reportes del caso aparece.</div>';
+    'Cada tipo de dato tiene su color. La marca «en N reportes ›» cuenta los reportes '+
+    'distintos del caso donde consta ese dato. Al pasar el puntero por la caja se '+
+    'resaltan esos reportes y se atenúan los demás. Al tocar la marca, el dato pasa '+
+    'al centro con esos reportes debajo; «Volver» recupera la vista anterior. '+
+    'Si la marca no entra, aparece como un punto con la misma acción. Las líneas '+
+    'de cruce solo aparecen al activarlas en «Qué se muestra».</div>';
 }
 function pintarAlertas(){
   const rs = reportesCaso();
@@ -2357,6 +2590,8 @@ document.getElementById("peso").addEventListener("input", e=>{
   refrescar(true); });
 document.getElementById("verPesos").onchange = e=>{
   estado.verPesos = e.target.checked; refrescar(false); };
+document.getElementById("verCruces").onchange = e=>{
+  estado.verCruces = e.target.checked; anotarVista(); refrescar(false); };
 document.getElementById("soloComp").onchange = e=>{
   estado.soloCompartidos = e.target.checked; estado.abiertos.clear(); refrescar(true); };
 document.getElementById("meta").textContent =
@@ -2366,6 +2601,7 @@ document.getElementById("meta").textContent =
    dice una cosa y el lienzo muestra otra. */
 function sincronizarControles(){
   estado.verPesos = document.getElementById("verPesos").checked;
+  estado.verCruces = document.getElementById("verCruces").checked;
   estado.soloCompartidos = document.getElementById("soloComp").checked;
   estado.pesoMin = Number(document.getElementById("peso").value)/100;
   estado.texto = document.getElementById("buscar").value;
@@ -2379,11 +2615,24 @@ document.getElementById("btnImportar").onclick = ()=>{
   if(!EN_APP) return sinApp("importar reportes");
   document.getElementById("archivos").click();
 };
+document.getElementById("btnRevisiones").onclick = ()=>ir({tipo:"revisiones"});
 document.getElementById("archivos").addEventListener("change", function(e){
   importarArchivos(e.target.files);
   e.target.value = "";        // permite volver a elegir el mismo archivo
 });
 
+/* El tema se conserva entre aperturas y no toca decisiones ni historial. */
+const selectorTema = document.getElementById("tema");
+selectorTema.value = document.documentElement.dataset.tema || "claro";
+selectorTema.onchange = ()=>{
+  document.documentElement.dataset.tema = selectorTema.value;
+  try { localStorage.setItem("bcij_tema",selectorTema.value); } catch(e){}
+};
+document.getElementById("abrirFiltros").onclick = ()=>document.getElementById("plegIzq").click();
+document.getElementById("abrirHistorial").onclick = ()=>{
+  if(document.getElementById("der").classList.contains("plegado")) document.getElementById("plegDer").click();
+  ir({tipo:"revisiones"});
+};
 /* ============================================================ arranque ==== */
 const sel = document.getElementById("selCaso");
 CASOS.forEach(c=>{
@@ -2398,6 +2647,7 @@ function aplicarCaso(id){
   pintarAlertas();
 }
 function cambiarCaso(id){
+  anotarVista();
   aplicarCaso(id);
   estado.raiz = null; estado.centro = null;
   estado.abiertos.clear(); estado.mov.clear();
@@ -2413,20 +2663,29 @@ document.getElementById("velo").addEventListener("click", e=>{
   if(e.target.id==="velo") cerrarDialogo(); });
 window.addEventListener("keydown", e=>{
   if(e.key==="Escape" &&
-     document.getElementById("velo").classList.contains("visible")) cerrarDialogo(); });
+     document.getElementById("velo").classList.contains("visible")) cerrarDialogo();
+  if(e.key==="Tab" && document.getElementById("velo").classList.contains("visible")){
+    const campos = [...document.getElementById("modal").querySelectorAll("input,textarea,button:not(:disabled)")];
+    const primero = campos[0], ultimo = campos[campos.length-1];
+    if(e.shiftKey && document.activeElement===primero){ e.preventDefault(); ultimo.focus(); }
+    else if(!e.shiftKey && document.activeElement===ultimo){ e.preventDefault(); primero.focus(); }
+  }
+});
 
 /* Después de registrar una decisión el servidor reconstruye y la página se
    recarga. Se vuelve al caso donde estaba el operador y se le dice qué pasó:
    sin eso, la pantalla parpadea y no queda claro si quedó registrado. */
 let casoInicial = CASOS.length ? CASOS[0].id : null;
-let reporteInicial = null, avisoPendiente = "";
+let reporteInicial = null, avisoPendiente = "", relacionInicial = null;
 try {
   const r = sessionStorage.getItem("bcij_reporte");
   const c = r && CASOS.find(x=>x.reportes.includes(r));
   if(c){ casoInicial = c.id; reporteInicial = r; }
   avisoPendiente = sessionStorage.getItem("bcij_aviso") || "";
+  relacionInicial = sessionStorage.getItem("bcij_relacion");
   sessionStorage.removeItem("bcij_reporte");
   sessionStorage.removeItem("bcij_aviso");
+  sessionStorage.removeItem("bcij_relacion");
 } catch(e){}
 
 if(casoInicial){
@@ -2434,6 +2693,10 @@ if(casoInicial){
   if(reporteInicial){ estado.raiz = reporteInicial; VP.encuadrado = false; ir({tipo:"inicio"}); }
 } else {
   ficha('<div class="vacio">Sin casos.</div>');
+}
+if(relacionInicial && ARISTAS.has(relacionInicial)){
+  const a = ARISTAS.get(relacionInicial);
+  ir({tipo:a.entreReportes?"vinculo":"relacion", id:a.id});
 }
 avisar(avisoPendiente);
 </script></body></html>
@@ -2445,8 +2708,11 @@ def render(g, res, ruta, dossier=None, texto_informe=None,
     datos = _datos(g, res, dossier, texto_informe)
     if datos.get("informe") is not None:
         datos["informe"]["porCaso"] = informes_por_caso or {}
-    html = PLANTILLA.replace("__DATOS__",
-                             json.dumps(datos, ensure_ascii=False, default=str))
+    # Un comentario humano puede contener </script>. Debe conservarse como
+    # dato, nunca cerrar el bloque de JavaScript ni ejecutar HTML al recargar.
+    serializado = json.dumps(datos, ensure_ascii=False, default=str)
+    serializado = serializado.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    html = PLANTILLA.replace("__DATOS__", serializado)
     with open(ruta, "w", encoding="utf-8") as fh:
         fh.write(html)
     return ruta
